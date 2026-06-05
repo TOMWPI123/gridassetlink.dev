@@ -327,6 +327,7 @@ export type StreetMapLayerKey =
   | "circuitEndpoints"
   | "workOrderLocations"
   | "proposedChanges"
+  | "missingLocationAssets"
   | "planningRegions"
   | "isoNeReferenceOverlays";
 

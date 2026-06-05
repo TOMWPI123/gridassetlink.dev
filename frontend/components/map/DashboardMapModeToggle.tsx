@@ -11,7 +11,7 @@ type DashboardMapModeToggleProps = {
 const modes: Array<{ value: DashboardMapMode; label: string; Icon: typeof Map }> = [
   { value: "iso-ne-diagram", label: "ISO-NE Diagram", Icon: Map },
   { value: "street-level", label: "Street-Level Map", Icon: MapPinned },
-  { value: "hybrid", label: "Hybrid Dashboard", Icon: Layers3 },
+  { value: "hybrid", label: "Hybrid Planning", Icon: Layers3 },
 ];
 
 export function DashboardMapModeToggle({ value, onChange }: DashboardMapModeToggleProps) {

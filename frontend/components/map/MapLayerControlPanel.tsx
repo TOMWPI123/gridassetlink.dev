@@ -22,6 +22,7 @@ const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string }> 
   { key: "circuitEndpoints", label: "Circuit endpoints", note: "Protection/SCADA endpoints" },
   { key: "workOrderLocations", label: "Work orders", note: "Field task locations" },
   { key: "proposedChanges", label: "Proposed changes", note: "Staged changes" },
+  { key: "missingLocationAssets", label: "Missing-location assets", note: "Records awaiting lat/lon" },
   { key: "planningRegions", label: "Planning regions", note: "Polygon overlays" },
   { key: "isoNeReferenceOverlays", label: "ISO-NE overlays", note: "Public reference annotations" },
 ];

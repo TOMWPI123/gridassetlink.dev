@@ -23,8 +23,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setName(session?.user.full_name || "Not signed in");
     setRole(session?.user.role || "");
   }, [pathname]);
+  const isDashboard = pathname === "/dashboard";
   return (
-    <div className="shell">
+    <div className={`shell ${isDashboard ? "dashboard-shell" : ""}`}>
       <aside className="sidebar">
         <div className="brand"><div className="brand-mark">NE</div><div><div style={{ fontWeight: 800 }}>TelecomNE</div><div className="subtle" style={{ color: "#a9bac9" }}>Grid Asset Links</div></div></div>
         {groups.map((group) => (
@@ -35,11 +36,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
       </aside>
       <main className="main">
-        <div className="topbar">
-          <div className="toolbar" style={{ width: "100%" }}><Search size={16} /><input className="input" placeholder="Search assets, circuits, work orders, providers" /></div>
-          <div className="toolbar"><span className="subtle">{name}</span>{role ? <span className="badge gray">{role.replaceAll("_", " ")}</span> : null}<button className="icon-button" onClick={() => { clearSession(); router.push("/"); }} title="Sign out"><LogOut size={16} /></button></div>
-        </div>
-        <div className="content">{children}</div>
+        {!isDashboard ? (
+          <div className="topbar">
+            <div className="toolbar" style={{ width: "100%" }}><Search size={16} /><input className="input" placeholder="Search assets, circuits, work orders, providers" /></div>
+            <div className="toolbar"><span className="subtle">{name}</span>{role ? <span className="badge gray">{role.replaceAll("_", " ")}</span> : null}<button className="icon-button" onClick={() => { clearSession(); router.push("/"); }} title="Sign out"><LogOut size={16} /></button></div>
+          </div>
+        ) : null}
+        <div className={`content ${isDashboard ? "dashboard-content" : ""}`}>{children}</div>
       </main>
     </div>
   );
