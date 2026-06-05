@@ -1,0 +1,25 @@
+{
+  "sourceName": "GridAssetLink synthetic ISO-NE substations",
+  "sourceType": "synthetic-planning",
+  "generatedAt": "2026-06-05T23:47:24.864Z",
+  "seed": "gridassetlink-iso-ne-synthetic-substations-v1",
+  "featureCount": 100,
+  "stateCounts": {
+    "MA": 28,
+    "CT": 18,
+    "ME": 18,
+    "NH": 14,
+    "VT": 12,
+    "RI": 10
+  },
+  "statesIncluded": [
+    "CT",
+    "MA",
+    "RI",
+    "NH",
+    "VT",
+    "ME"
+  ],
+  "notes": "Synthetic demo/planning substations only. Not real utility assets.",
+  "publicLineAssociations": "Nearest public corridor IDs are synthetic planning associations only."
+}

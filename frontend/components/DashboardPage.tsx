@@ -18,9 +18,11 @@ import { StreetLevelAssetMap, type FocusRequest, type MapCommand, type StreetMap
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
 import { TransmissionMapSelector } from "@/components/map/TransmissionMapSelector";
-import type { Coordinate, DashboardMapMode, MapDrawingTool, MapNode, NodeParameters, StreetMapLayerKey, Substation, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, MapDrawingTool, MapNode, NodeParameters, PublicTransmissionLineCollection, PublicTransmissionLineFeature, StreetMapLayerKey, Substation, SyntheticSubstationCollection, SyntheticSubstationFeature, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
+  publicTransmissionLines: true,
+  syntheticSubstations: true,
   transmissionLines: true,
   substations: true,
   telecomNodes: true,
@@ -87,9 +89,39 @@ export function DashboardPage() {
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [publicTransmissionLines, setPublicTransmissionLines] = useState<PublicTransmissionLineFeature[]>([]);
+  const [syntheticSubstations, setSyntheticSubstations] = useState<SyntheticSubstationFeature[]>([]);
+  const [mapDataWarnings, setMapDataWarnings] = useState<{ publicLines?: string; syntheticSubstations?: string }>({});
 
   useEffect(() => {
     setIsAuthenticated(Boolean(getSession()));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStaticMapData() {
+      const warnings: { publicLines?: string; syntheticSubstations?: string } = {};
+      const publicLines = await fetchGeoJson<PublicTransmissionLineCollection>("/data/iso-ne-public-transmission-lines.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.publicLines = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as PublicTransmissionLineFeature[];
+        });
+      const synthetic = await fetchGeoJson<SyntheticSubstationCollection>("/data/iso-ne-synthetic-substations.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.syntheticSubstations = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as SyntheticSubstationFeature[];
+        });
+      if (cancelled) return;
+      setPublicTransmissionLines(publicLines);
+      setSyntheticSubstations(synthetic);
+      setMapDataWarnings(warnings);
+    }
+    void loadStaticMapData();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const publicOnly = !isAuthenticated;
@@ -111,6 +143,14 @@ export function DashboardPage() {
     () => publicOnly ? [] : transmissionLines.filter(isLineInIsoNeScope),
     [publicOnly, transmissionLines],
   );
+  const visiblePublicTransmissionLines = useMemo(
+    () => publicTransmissionLines.filter((feature) => feature.properties.isoNe),
+    [publicTransmissionLines],
+  );
+  const visibleSyntheticSubstations = useMemo(
+    () => publicOnly ? [] : syntheticSubstations.filter((feature) => feature.properties.synthetic && feature.properties.public === false),
+    [publicOnly, syntheticSubstations],
+  );
   const visiblePlanningRegions = useMemo(
     () => publicOnly ? [] : planningRegions,
     [planningRegions, publicOnly],
@@ -121,14 +161,14 @@ export function DashboardPage() {
   );
 
   const summaryCards = useMemo(
-    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, mapStatus),
-    [mapStatus, visibleNodes, visibleSubstations, visibleTransmissionLines, visibleTransmissionMaps],
+    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visibleSyntheticSubstations, mapStatus),
+    [mapStatus, visibleNodes, visiblePublicTransmissionLines, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps],
   );
   const searchResults = useMemo(
-    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, search)
+    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visibleSyntheticSubstations, search)
       .filter((selection) => matchesDashboardFilters(selection, assetTypeFilter, statusFilter, regionFilter, visibilityFilter))
       .slice(0, 12),
-    [assetTypeFilter, regionFilter, search, statusFilter, visibilityFilter, visibleNodes, visibleSubstations, visibleTransmissionLines],
+    [assetTypeFilter, regionFilter, search, statusFilter, visibilityFilter, visibleNodes, visiblePublicTransmissionLines, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
   );
 
   const handleMapStatusChange = useCallback((status: MapStatus, message?: string) => {
@@ -279,6 +319,8 @@ export function DashboardPage() {
         substations={visibleSubstations}
         nodes={visibleNodes}
         transmissionLines={visibleTransmissionLines}
+        publicTransmissionLines={visiblePublicTransmissionLines}
+        syntheticSubstations={visibleSyntheticSubstations}
         planningRegions={visiblePlanningRegions}
         layers={effectiveStreetLayers}
         activeTool={activeTool}
@@ -330,7 +372,7 @@ export function DashboardPage() {
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search map records" />
             </label>
             <div className="dashboard-filter-grid">
-              <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={setAssetTypeFilter} options={["all", "substation", "node", "transmission_line", "work_order"]} />
+              <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={setAssetTypeFilter} options={["all", "public_transmission_line", "synthetic_substation", "substation", "node", "transmission_line", "work_order"]} />
               <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={["all", "existing", "planned", "proposed", "open"]} />
               <FilterSelect label="Region" value={regionFilter} onChange={setRegionFilter} options={["all", "MA", "RI", "CT", "NH", "VT", "ME"]} />
               <FilterSelect label="Criticality" value="all" onChange={() => undefined} options={["all", "critical", "high", "normal"]} />
@@ -375,6 +417,9 @@ export function DashboardPage() {
                   <MapLayerControlPanel
                     layers={effectiveStreetLayers}
                     activeTool={activeTool}
+                    publicLineCount={visiblePublicTransmissionLines.length}
+                    syntheticSubstationCount={visibleSyntheticSubstations.length}
+                    dataWarnings={mapDataWarnings}
                     onToggleLayer={(layer) => setStreetLayers((current) => ({ ...current, [layer]: !current[layer] }))}
                     onToolChange={(tool) => {
                       if (publicOnly) {
@@ -528,9 +573,25 @@ function AddAssetChooser({ publicOnly, selectedKind, onSelect, onCreateMap }: { 
   );
 }
 
-function buildSummaryCards(maps: TransmissionMap[], substations: Substation[], nodes: MapNode[], lines: TransmissionLine[], mapStatus: MapStatus) {
+async function fetchGeoJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return await response.json() as T;
+}
+
+function buildSummaryCards(
+  maps: TransmissionMap[],
+  substations: Substation[],
+  nodes: MapNode[],
+  lines: TransmissionLine[],
+  publicLines: PublicTransmissionLineFeature[],
+  syntheticSubstations: SyntheticSubstationFeature[],
+  mapStatus: MapStatus,
+) {
   return [
     { label: "Transmission Maps", value: maps.length, note: "public + private", Icon: Network },
+    { label: "Public Lines", value: publicLines.length, note: "read-only HIFLD reference", Icon: Route },
+    { label: "Synthetic Substations", value: syntheticSubstations.length, note: "demo/private planning", Icon: MapPin },
     { label: "Substations", value: substations.length, note: `${substations.filter((item) => item.latitude === undefined).length} missing location`, Icon: MapPin },
     { label: "Transmission Lines", value: lines.length, note: "ISO-NE scoped", Icon: Route },
     { label: "SEL ICON Nodes", value: nodes.filter((node) => node.nodeType === "sel_icon_node").length, note: "parameterized", Icon: Cpu },
@@ -541,8 +602,17 @@ function buildSummaryCards(maps: TransmissionMap[], substations: Substation[], n
   ];
 }
 
-function buildSearchResults(substations: Substation[], nodes: MapNode[], lines: TransmissionLine[], query: string): StreetMapSelection[] {
+function buildSearchResults(
+  substations: Substation[],
+  nodes: MapNode[],
+  lines: TransmissionLine[],
+  publicLines: PublicTransmissionLineFeature[],
+  syntheticSubstations: SyntheticSubstationFeature[],
+  query: string,
+): StreetMapSelection[] {
   const all: StreetMapSelection[] = [
+    ...publicLines.map((record) => ({ kind: "public_transmission_line" as const, id: record.properties.id, label: publicLineLabel(record), record })),
+    ...syntheticSubstations.map((record) => ({ kind: "synthetic_substation" as const, id: record.properties.id, label: record.properties.name, record })),
     ...substations.map((record) => ({ kind: "substation" as const, id: record.id, label: record.name, record })),
     ...nodes.map((record) => ({ kind: "node" as const, id: record.id, label: record.name, record })),
     ...lines.map((record) => ({ kind: "transmission_line" as const, id: record.id, label: record.name, record })),
@@ -550,6 +620,10 @@ function buildSearchResults(substations: Substation[], nodes: MapNode[], lines: 
   const lowered = query.trim().toLowerCase();
   if (!lowered) return all;
   return all.filter((asset) => JSON.stringify(asset.record).toLowerCase().includes(lowered));
+}
+
+function publicLineLabel(record: PublicTransmissionLineFeature) {
+  return record.properties.name ? `${record.properties.name} (${record.properties.id})` : record.properties.id;
 }
 
 function matchesDashboardFilters(selection: StreetMapSelection, assetType: string, status: string, region: string, visibility: string) {
@@ -561,16 +635,22 @@ function matchesDashboardFilters(selection: StreetMapSelection, assetType: strin
 }
 
 function selectionStatus(selection: StreetMapSelection) {
+  if (selection.kind === "public_transmission_line") return selection.record.properties.status || "unknown";
+  if (selection.kind === "synthetic_substation") return selection.record.properties.status;
   const record = selection.record as { status?: string };
   return record.status || "open";
 }
 
 function selectionRegion(selection: StreetMapSelection) {
+  if (selection.kind === "public_transmission_line") return selection.record.properties.states[0] || "MA";
+  if (selection.kind === "synthetic_substation") return selection.record.properties.state;
   const record = selection.record as { state?: string };
   return record.state || "MA";
 }
 
 function selectionVisibility(selection: StreetMapSelection) {
+  if (selection.kind === "public_transmission_line") return "public";
+  if (selection.kind === "synthetic_substation") return selection.record.properties.visibility;
   const record = selection.record as { visibility?: string };
   return record.visibility || "private";
 }
@@ -612,6 +692,8 @@ function isCoordinateInIsoNeScope(longitude?: number, latitude?: number) {
 function publicLayerSet(layers: Record<StreetMapLayerKey, boolean>) {
   return {
     ...layers,
+    publicTransmissionLines: true,
+    syntheticSubstations: false,
     transmissionLines: false,
     substations: false,
     telecomNodes: false,

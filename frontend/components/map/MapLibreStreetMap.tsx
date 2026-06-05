@@ -2,7 +2,7 @@
 
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, MapDrawingTool, MapNode, PlanningRegion, StreetMapLayerKey, Substation, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
+import type { Coordinate, MapDrawingTool, MapNode, PlanningRegion, PublicTransmissionLineFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
 import type { FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
 
 type MapLibreStreetMapProps = {
@@ -10,6 +10,8 @@ type MapLibreStreetMapProps = {
   substations: Substation[];
   nodes: MapNode[];
   transmissionLines: TransmissionLine[];
+  publicTransmissionLines: PublicTransmissionLineFeature[];
+  syntheticSubstations: SyntheticSubstationFeature[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
   activeTool: MapDrawingTool;
@@ -26,6 +28,7 @@ type MapFeature = {
   geometry:
     | { type: "Point"; coordinates: Coordinate }
     | { type: "LineString"; coordinates: Coordinate[] }
+    | { type: "MultiLineString"; coordinates: Coordinate[][] }
     | { type: "Polygon"; coordinates: Coordinate[][] };
 };
 
@@ -38,7 +41,9 @@ const sourceIds = {
   regions: "regional-planning-regions",
   reference: "regional-iso-ne-reference",
   lines: "regional-transmission-lines",
+  publicLines: "public-transmission-lines",
   substations: "regional-substations",
+  syntheticSubstations: "synthetic-substations",
   nodes: "regional-map-nodes",
   workOrders: "regional-work-orders",
 };
@@ -46,9 +51,11 @@ const sourceIds = {
 const clickableLayerIds = [
   "regional-planning-regions-fill",
   "regional-reference-line",
+  "public-transmission-lines",
   "regional-transmission-lines",
   "regional-transmission-lines-dashed",
   "regional-substations",
+  "synthetic-substations-points",
   "regional-map-nodes",
   "regional-work-orders",
 ];
@@ -77,6 +84,8 @@ export function MapLibreStreetMap({
   substations,
   nodes,
   transmissionLines,
+  publicTransmissionLines,
+  syntheticSubstations,
   planningRegions,
   layers,
   activeTool,
@@ -99,10 +108,13 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, planningRegions, layers),
-    [substations, nodes, transmissionLines, planningRegions, layers],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, planningRegions, layers),
+    [substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, planningRegions, layers],
   );
-  const lookup = useMemo(() => buildSelectionLookup(substations, nodes, transmissionLines, planningRegions), [substations, nodes, transmissionLines, planningRegions]);
+  const lookup = useMemo(
+    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, planningRegions),
+    [substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, planningRegions],
+  );
 
   useEffect(() => {
     onMapClickRef.current = onMapClick;
@@ -186,7 +198,9 @@ export function MapLibreStreetMap({
     updateSource(mapRef.current, sourceIds.regions, datasets.regions);
     updateSource(mapRef.current, sourceIds.reference, datasets.reference);
     updateSource(mapRef.current, sourceIds.lines, datasets.lines);
+    updateSource(mapRef.current, sourceIds.publicLines, datasets.publicLines);
     updateSource(mapRef.current, sourceIds.substations, datasets.substations);
+    updateSource(mapRef.current, sourceIds.syntheticSubstations, datasets.syntheticSubstations);
     updateSource(mapRef.current, sourceIds.nodes, datasets.nodes);
     updateSource(mapRef.current, sourceIds.workOrders, datasets.workOrders);
   }, [datasets, styleReady]);
@@ -239,7 +253,8 @@ export function MapLibreStreetMap({
     <div className="maplibre-street-map" data-testid="street-level-map">
       <div className="maplibre-map-root" ref={containerRef} aria-label={`${activeMap.name} MapLibre street-level planning map`} />
       <div className="maplibre-legend" aria-hidden="true">
-        <span><i className="legend-line" />Transmission / fiber</span>
+        <span><i className="legend-line" />Public transmission lines</span>
+        <span><i className="legend-substation" />Synthetic substations</span>
         <span><i className="legend-substation" />Substations</span>
         <span><i className="legend-node" />SEL ICON / telecom</span>
         <span><i className="legend-work-order" />Work orders</span>
@@ -258,7 +273,8 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
   map.addSource(sourceIds.regions, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.reference, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.lines, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
-  [sourceIds.substations, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
+  map.addSource(sourceIds.publicLines, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  [sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
     map.addSource(sourceId, {
       type: "geojson",
       data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0],
@@ -293,6 +309,31 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     paint: { "line-color": "#020708", "line-width": 9, "line-opacity": 0.78 },
   });
   map.addLayer({
+    id: "public-transmission-lines-casing",
+    type: "line",
+    source: sourceIds.publicLines,
+    paint: { "line-color": "#020708", "line-width": ["match", ["get", "voltageClass"], "735+", 9, "500-734", 8, "345-499", 7, "230-344", 6, "115-229", 5, 4], "line-opacity": 0.72 },
+  });
+  map.addLayer({
+    id: "public-transmission-lines",
+    type: "line",
+    source: sourceIds.publicLines,
+    paint: {
+      "line-color": voltageClassColorExpression() as never,
+      "line-width": voltageClassWidthExpression() as never,
+      "line-opacity": ["match", ["get", "voltageClass"], "unknown", 0.56, 0.84],
+      "line-dasharray": ["match", ["get", "voltageClass"], "unknown", ["literal", [2, 2]], ["literal", [1, 0]]],
+    },
+  });
+  map.addLayer({
+    id: "public-transmission-lines-labels",
+    type: "symbol",
+    source: sourceIds.publicLines,
+    minzoom: 9.2,
+    layout: { "text-field": ["coalesce", ["get", "name"], ["get", "id"]], "text-size": 10, "symbol-placement": "line", "text-rotation-alignment": "map" },
+    paint: { "text-color": "#d7f4ff", "text-halo-color": "#061012", "text-halo-width": 1.4 },
+  });
+  map.addLayer({
     id: "regional-transmission-lines",
     type: "line",
     source: sourceIds.lines,
@@ -311,6 +352,7 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
   });
 
   addClusterLayers(map, sourceIds.substations, "regional-substations", "#69d7e4", "substation");
+  addClusterLayers(map, sourceIds.syntheticSubstations, "synthetic-substations", "#ffb84d", "synthetic");
   addClusterLayers(map, sourceIds.nodes, "regional-map-nodes", "#28c7a9", "node");
   addClusterLayers(map, sourceIds.workOrders, "regional-work-orders", "#efc95f", "work_order");
 
@@ -335,6 +377,39 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     minzoom: 8.4,
     layout: { "text-field": ["get", "label"], "text-size": 11, "text-offset": [0, 1.2], "text-anchor": "top" },
     paint: { "text-color": "#f4fbfa", "text-halo-color": "#071012", "text-halo-width": 1.6 },
+  });
+  map.addLayer({
+    id: "synthetic-substations-halo",
+    type: "circle",
+    source: sourceIds.syntheticSubstations,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": ["match", ["get", "criticality"], "critical", 18, "high", 15, "medium", 12, 10],
+      "circle-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#41d6c6"],
+      "circle-opacity": 0.16,
+      "circle-blur": 0.55,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-substations-points",
+    type: "circle",
+    source: sourceIds.syntheticSubstations,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": ["match", ["get", "criticality"], "critical", 8.5, "high", 7.5, "medium", 6.5, 5.5],
+      "circle-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#41d6c6"],
+      "circle-stroke-color": "#fff7d8",
+      "circle-stroke-width": 1.5,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-substations-labels",
+    type: "symbol",
+    source: sourceIds.syntheticSubstations,
+    filter: ["!", ["has", "point_count"]],
+    minzoom: 8.8,
+    layout: { "text-field": ["concat", "Synthetic ", ["get", "state"], " / ", ["get", "planningRole"]], "text-size": 10, "text-offset": [0, 1.15], "text-anchor": "top" },
+    paint: { "text-color": "#fff7d8", "text-halo-color": "#071012", "text-halo-width": 1.5 },
   });
   map.addLayer({
     id: "regional-map-nodes",
@@ -402,10 +477,42 @@ function voltageColorExpression() {
   ];
 }
 
+function voltageClassColorExpression() {
+  return [
+    "match",
+    ["get", "voltageClass"],
+    "735+", "#f4ffff",
+    "500-734", "#34f5ff",
+    "345-499", "#19d2ff",
+    "230-344", "#4f93ff",
+    "115-229", "#b390ff",
+    "69-114", "#78aaa5",
+    "below-69", "#6f7d83",
+    "#8c959b",
+  ];
+}
+
+function voltageClassWidthExpression() {
+  return [
+    "match",
+    ["get", "voltageClass"],
+    "735+", 6.8,
+    "500-734", 6,
+    "345-499", 5.2,
+    "230-344", 4.5,
+    "115-229", 3.7,
+    "69-114", 3.1,
+    "below-69", 2.4,
+    2.2,
+  ];
+}
+
 function buildDatasets(
   substations: Substation[],
   nodes: MapNode[],
   transmissionLines: TransmissionLine[],
+  publicTransmissionLines: PublicTransmissionLineFeature[],
+  syntheticSubstations: SyntheticSubstationFeature[],
   planningRegions: PlanningRegion[],
   layers: Record<StreetMapLayerKey, boolean>,
 ) {
@@ -433,11 +540,43 @@ function buildDatasets(
       },
       geometry: line.geometry,
     }))),
+    publicLines: layers.publicTransmissionLines ? collection(publicTransmissionLines.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "public_transmission_line",
+        id: feature.properties.id,
+        label: feature.properties.name ? `${feature.properties.name} (${feature.properties.id})` : feature.properties.id,
+        status: feature.properties.status || "unknown",
+        voltageKv: feature.properties.voltageKv ?? 0,
+        voltageClass: feature.properties.voltageClass || "unknown",
+        sourceType: feature.properties.sourceType,
+        readOnly: true,
+        synthetic: false,
+        states: feature.properties.states.join(", "),
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
     substations: collection(substations.filter((substation) => layers.substations && hasCoordinates(substation)).map((substation) => ({
       type: "Feature",
       properties: { kind: "substation", id: substation.id, label: substation.abbreviation || substation.name, status: substation.status, visibility: substation.visibility, voltageKv: substation.voltageKv?.[0] || 0 },
       geometry: { type: "Point", coordinates: [substation.longitude as number, substation.latitude as number] },
     }))),
+    syntheticSubstations: layers.syntheticSubstations ? collection(syntheticSubstations.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "synthetic_substation",
+        id: feature.properties.id,
+        label: feature.properties.name,
+        status: feature.properties.status,
+        state: feature.properties.state,
+        planningRole: feature.properties.planningRole,
+        criticality: feature.properties.criticality,
+        visibility: feature.properties.visibility,
+        sourceType: feature.properties.sourceType,
+        synthetic: true,
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
     nodes: collection(nodes.filter((node) => hasCoordinates(node) && nodeVisibleForLayers(node, layers)).map((node) => ({
       type: "Feature",
       properties: { kind: "node", id: node.id, label: node.name, status: node.status, nodeType: node.nodeType, visibility: node.visibility },
@@ -477,7 +616,14 @@ function fitActiveMap(map: MapLibreMap, activeMap: TransmissionMap, substations:
   map.fitBounds(boundsFromCoordinates(coordinates), { padding: 68, duration: 520 });
 }
 
-function buildSelectionLookup(substations: Substation[], nodes: MapNode[], transmissionLines: TransmissionLine[], planningRegions: PlanningRegion[]) {
+function buildSelectionLookup(
+  substations: Substation[],
+  nodes: MapNode[],
+  transmissionLines: TransmissionLine[],
+  publicTransmissionLines: PublicTransmissionLineFeature[],
+  syntheticSubstations: SyntheticSubstationFeature[],
+  planningRegions: PlanningRegion[],
+) {
   const lookup: Record<string, StreetMapSelection> = {};
   substations.forEach((record) => {
     lookup[`substation:${record.id}`] = { kind: "substation", id: record.id, label: record.name, record };
@@ -490,6 +636,22 @@ function buildSelectionLookup(substations: Substation[], nodes: MapNode[], trans
   });
   transmissionLines.forEach((record) => {
     lookup[`transmission_line:${record.id}`] = { kind: "transmission_line", id: record.id, label: record.name, record };
+  });
+  publicTransmissionLines.forEach((record) => {
+    lookup[`public_transmission_line:${record.properties.id}`] = {
+      kind: "public_transmission_line",
+      id: record.properties.id,
+      label: record.properties.name ? `${record.properties.name} (${record.properties.id})` : record.properties.id,
+      record,
+    };
+  });
+  syntheticSubstations.forEach((record) => {
+    lookup[`synthetic_substation:${record.properties.id}`] = {
+      kind: "synthetic_substation",
+      id: record.properties.id,
+      label: record.properties.name,
+      record,
+    };
   });
   planningRegions.forEach((record) => {
     lookup[`planning_region:${record.id}`] = { kind: "planning_region", id: record.id, label: record.name, record };
@@ -522,6 +684,10 @@ function lineVisibleForLayers(line: TransmissionLine, layers: Record<StreetMapLa
 
 function selectionCoordinates(selection: StreetMapSelection): Coordinate[] {
   if (selection.kind === "transmission_line") return selection.record.geometry.coordinates;
+  if (selection.kind === "public_transmission_line") {
+    return selection.record.geometry.type === "LineString" ? selection.record.geometry.coordinates : selection.record.geometry.coordinates.flat();
+  }
+  if (selection.kind === "synthetic_substation") return [selection.record.geometry.coordinates];
   if (selection.kind === "planning_region") return selection.record.geometry.coordinates[0];
   if ("latitude" in selection.record && selection.record.latitude !== undefined && selection.record.longitude !== undefined) {
     return [[selection.record.longitude, selection.record.latitude]];

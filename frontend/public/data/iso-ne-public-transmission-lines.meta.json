@@ -1,0 +1,16 @@
+{
+  "sourceName": "HIFLD Electric Power Transmission Lines",
+  "sourceType": "public-reference",
+  "sourceUrl": "https://services2.arcgis.com/LYMgRMwHfrWWEg3s/ArcGIS/rest/services/HIFLD_US_Electric_Power_Transmission_Lines/FeatureServer/0",
+  "generatedAt": "2026-06-05T23:45:14.164Z",
+  "featureCount": 2182,
+  "statesIncluded": [
+    "CT",
+    "MA",
+    "RI",
+    "NH",
+    "VT",
+    "ME"
+  ],
+  "notes": "Public reference data only. Not for operations."
+}

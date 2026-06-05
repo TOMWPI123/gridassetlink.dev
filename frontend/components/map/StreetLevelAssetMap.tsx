@@ -2,12 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, MapDrawingTool, MapNode, PlanningRegion, StreetMapLayerKey, Substation, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
+import type { Coordinate, MapDrawingTool, MapNode, PlanningRegion, PublicTransmissionLineFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
   | { kind: "node"; id: string; label: string; record: MapNode }
   | { kind: "transmission_line"; id: string; label: string; record: TransmissionLine }
+  | { kind: "public_transmission_line"; id: string; label: string; record: PublicTransmissionLineFeature }
+  | { kind: "synthetic_substation"; id: string; label: string; record: SyntheticSubstationFeature }
   | { kind: "planning_region"; id: string; label: string; record: PlanningRegion }
   | { kind: "work_order"; id: string; label: string; record: MapNode };
 
@@ -22,6 +24,8 @@ type StreetLevelAssetMapProps = {
   substations: Substation[];
   nodes: MapNode[];
   transmissionLines: TransmissionLine[];
+  publicTransmissionLines: PublicTransmissionLineFeature[];
+  syntheticSubstations: SyntheticSubstationFeature[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
   activeTool: MapDrawingTool;
@@ -43,6 +47,8 @@ export function StreetLevelAssetMap({
   substations,
   nodes,
   transmissionLines,
+  publicTransmissionLines,
+  syntheticSubstations,
   planningRegions,
   layers,
   activeTool,
@@ -61,6 +67,8 @@ export function StreetLevelAssetMap({
           substations={substations}
           nodes={nodes}
           transmissionLines={transmissionLines}
+          publicTransmissionLines={publicTransmissionLines}
+          syntheticSubstations={syntheticSubstations}
           planningRegions={planningRegions}
           layers={layers}
           activeTool={activeTool}

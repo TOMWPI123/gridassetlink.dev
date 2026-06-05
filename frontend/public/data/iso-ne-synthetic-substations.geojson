@@ -1,0 +1,4303 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-001",
+        "name": "Synthetic Hartford 01 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Hartford",
+        "latitude": 41.634116,
+        "longitude": -72.447272,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-123608"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-CT-001-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.447272,
+          41.634116
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-002",
+        "name": "Synthetic Western CT 02 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Western CT",
+        "latitude": 41.51361,
+        "longitude": -72.79957,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-104455"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-002-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-002-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.79957,
+          41.51361
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-003",
+        "name": "Synthetic New Haven 03 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "New Haven",
+        "latitude": 41.130535,
+        "longitude": -72.720319,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "planned",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-157627"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-003-1",
+          "DEV-SYN-CT-003-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.720319,
+          41.130535
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-004",
+        "name": "Synthetic Eastern CT 04 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Eastern CT",
+        "latitude": 41.74645,
+        "longitude": -71.72846,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "load_center",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-105785"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-004-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.72846,
+          41.74645
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-005",
+        "name": "Synthetic Hartford 05 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Hartford",
+        "latitude": 41.662707,
+        "longitude": -72.638043,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "load_center",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-134653"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-005-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-CT-005-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.638043,
+          41.662707
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-006",
+        "name": "Synthetic Western CT 06 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Western CT",
+        "latitude": 41.452123,
+        "longitude": -73.153958,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-107649"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-006-1",
+          "DEV-SYN-CT-006-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-006-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.153958,
+          41.452123
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-007",
+        "name": "Synthetic New Haven 07 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "New Haven",
+        "latitude": 41.279523,
+        "longitude": -72.491918,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "load_center",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-131838"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.491918,
+          41.279523
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-008",
+        "name": "Synthetic Eastern CT 08 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Eastern CT",
+        "latitude": 41.424549,
+        "longitude": -72.167231,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "existing",
+        "planningRole": "distribution_interface",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-120724"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-008-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-008-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.167231,
+          41.424549
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-009",
+        "name": "Synthetic Hartford 09 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Hartford",
+        "latitude": 41.650262,
+        "longitude": -72.724572,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "proposed",
+        "planningRole": "distribution_interface",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-101204"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-009-1",
+          "DEV-SYN-CT-009-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-CT-009-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.724572,
+          41.650262
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-010",
+        "name": "Synthetic Western CT 10 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Western CT",
+        "latitude": 41.296293,
+        "longitude": -73.479575,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-106779"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-010-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.479575,
+          41.296293
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-011",
+        "name": "Synthetic New Haven 11 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "CT",
+        "cityHint": "New Haven",
+        "latitude": 41.372768,
+        "longitude": -72.476721,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "load_center",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-116205"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-011-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.476721,
+          41.372768
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-012",
+        "name": "Synthetic Eastern CT 12 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Eastern CT",
+        "latitude": 41.513388,
+        "longitude": -72.173485,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "existing",
+        "planningRole": "distribution_interface",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-131008"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-012-1",
+          "DEV-SYN-CT-012-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-012-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.173485,
+          41.513388
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-013",
+        "name": "Synthetic Hartford 13 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Hartford",
+        "latitude": 41.930787,
+        "longitude": -72.426212,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "regional_switching_station",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-124266"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-CT-013-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.426212,
+          41.930787
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-014",
+        "name": "Synthetic Western CT 14 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Western CT",
+        "latitude": 41.567939,
+        "longitude": -73.536656,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "planned",
+        "planningRole": "distribution_interface",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-132767"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-014-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-014-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.536656,
+          41.567939
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-015",
+        "name": "Synthetic New Haven 15 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "New Haven",
+        "latitude": 41.479998,
+        "longitude": -72.525325,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "existing",
+        "planningRole": "distribution_interface",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-134459"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-015-1",
+          "DEV-SYN-CT-015-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.525325,
+          41.479998
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-016",
+        "name": "Synthetic Eastern CT 16 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Eastern CT",
+        "latitude": 41.500697,
+        "longitude": -72.47149,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "load_center",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-110510"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-016-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.47149,
+          41.500697
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-017",
+        "name": "Synthetic Hartford 17 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Hartford",
+        "latitude": 41.862348,
+        "longitude": -73.080718,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "load_center",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-103639"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-017-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-CT-017-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.080718,
+          41.862348
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-CT-018",
+        "name": "Synthetic Western CT 18 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "CT",
+        "cityHint": "Western CT",
+        "latitude": 41.462745,
+        "longitude": -73.512118,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "planned",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-109145"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-CT-018-1",
+          "DEV-SYN-CT-018-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-CT-018-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.512118,
+          41.462745
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-001",
+        "name": "Synthetic Central MA 01 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Central MA",
+        "latitude": 42.226081,
+        "longitude": -71.20018,
+        "voltageClasses": [
+          115
+        ],
+        "status": "planned",
+        "planningRole": "telecom_hub",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-157656"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-MA-001-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.20018,
+          42.226081
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-002",
+        "name": "Synthetic Worcester 02 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Worcester",
+        "latitude": 42.562723,
+        "longitude": -71.123714,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-143747"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-002-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-002-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.123714,
+          42.562723
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-003",
+        "name": "Synthetic Lowell 03 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Lowell",
+        "latitude": 42.747552,
+        "longitude": -70.865595,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-127823"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-003-1",
+          "DEV-SYN-MA-003-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.865595,
+          42.747552
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-004",
+        "name": "Synthetic Springfield 04 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Springfield",
+        "latitude": 41.915379,
+        "longitude": -72.224991,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "proposed",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-113725"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-004-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.224991,
+          41.915379
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-005",
+        "name": "Synthetic Cape 05 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Cape",
+        "latitude": 41.621985,
+        "longitude": -70.790084,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-150949"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-005-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-MA-005-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.790084,
+          41.621985
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-006",
+        "name": "Synthetic Auburn 06 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Auburn",
+        "latitude": 42.463709,
+        "longitude": -72.581408,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-125289"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-006-1",
+          "DEV-SYN-MA-006-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-006-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.581408,
+          42.463709
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-007",
+        "name": "Synthetic Central MA 07 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Central MA",
+        "latitude": 42.010056,
+        "longitude": -71.875137,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "existing",
+        "planningRole": "distribution_interface",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-101991"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.875137,
+          42.010056
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-008",
+        "name": "Synthetic Worcester 08 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Worcester",
+        "latitude": 42.362226,
+        "longitude": -71.497912,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "load_center",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-139765"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-008-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-008-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.497912,
+          42.362226
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-009",
+        "name": "Synthetic Lowell 09 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Lowell",
+        "latitude": 42.550349,
+        "longitude": -70.860094,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-112114"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-009-1",
+          "DEV-SYN-MA-009-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-MA-009-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.860094,
+          42.550349
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-010",
+        "name": "Synthetic Springfield 10 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Springfield",
+        "latitude": 41.931104,
+        "longitude": -72.559328,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "existing",
+        "planningRole": "distribution_interface",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-129117"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-010-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.559328,
+          41.931104
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-011",
+        "name": "Synthetic Cape 11 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Cape",
+        "latitude": 41.847462,
+        "longitude": -70.053219,
+        "voltageClasses": [
+          115
+        ],
+        "status": "existing",
+        "planningRole": "telecom_hub",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-129951"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-011-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.053219,
+          41.847462
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-012",
+        "name": "Synthetic Auburn 12 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Auburn",
+        "latitude": 41.931047,
+        "longitude": -71.654113,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "load_center",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-116428"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-012-1",
+          "DEV-SYN-MA-012-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-012-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.654113,
+          41.931047
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-013",
+        "name": "Synthetic Central MA 13 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Central MA",
+        "latitude": 41.985204,
+        "longitude": -71.642248,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "planned",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-116428"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-MA-013-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.642248,
+          41.985204
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-014",
+        "name": "Synthetic Worcester 14 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Worcester",
+        "latitude": 42.132803,
+        "longitude": -71.517954,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-126906"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-014-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-014-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.517954,
+          42.132803
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-015",
+        "name": "Synthetic Lowell 15 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Lowell",
+        "latitude": 42.753175,
+        "longitude": -70.800754,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "load_center",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-150983"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-015-1",
+          "DEV-SYN-MA-015-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.800754,
+          42.753175
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-016",
+        "name": "Synthetic Springfield 16 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Springfield",
+        "latitude": 42.069546,
+        "longitude": -71.855111,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "planned",
+        "planningRole": "distribution_interface",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-101991"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-016-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.855111,
+          42.069546
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-017",
+        "name": "Synthetic Cape 17 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Cape",
+        "latitude": 41.785444,
+        "longitude": -70.994338,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "planned",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-104930"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-017-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-MA-017-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.994338,
+          41.785444
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-018",
+        "name": "Synthetic Auburn 18 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Auburn",
+        "latitude": 42.264929,
+        "longitude": -71.33349,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-110048"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-018-1",
+          "DEV-SYN-MA-018-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-018-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.33349,
+          42.264929
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-019",
+        "name": "Synthetic Central MA 19 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Central MA",
+        "latitude": 42.029449,
+        "longitude": -72.377855,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "proposed",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-138597"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.377855,
+          42.029449
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-020",
+        "name": "Synthetic Worcester 20 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Worcester",
+        "latitude": 42.56043,
+        "longitude": -71.755958,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-127825"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-020-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-020-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.755958,
+          42.56043
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-021",
+        "name": "Synthetic Lowell 21 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Lowell",
+        "latitude": 42.421429,
+        "longitude": -71.945952,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "load_center",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-134897"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-021-1",
+          "DEV-SYN-MA-021-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-MA-021-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.945952,
+          42.421429
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-022",
+        "name": "Synthetic Springfield 22 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Springfield",
+        "latitude": 42.367039,
+        "longitude": -72.148432,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "load_center",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-158164"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-022-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.148432,
+          42.367039
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-023",
+        "name": "Synthetic Cape 23 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Cape",
+        "latitude": 41.833776,
+        "longitude": -70.53986,
+        "voltageClasses": [
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "telecom_hub",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-135946"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-023-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.53986,
+          41.833776
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-024",
+        "name": "Synthetic Auburn 24 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Auburn",
+        "latitude": 42.267631,
+        "longitude": -71.110778,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "load_center",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-157639"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-024-1",
+          "DEV-SYN-MA-024-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-024-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.110778,
+          42.267631
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-025",
+        "name": "Synthetic Central MA 25 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Central MA",
+        "latitude": 42.235135,
+        "longitude": -71.90332,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-132235"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-MA-025-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.90332,
+          42.235135
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-026",
+        "name": "Synthetic Worcester 26 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Worcester",
+        "latitude": 42.425539,
+        "longitude": -71.508313,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-148728"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-026-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-026-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.508313,
+          42.425539
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-027",
+        "name": "Synthetic Lowell 27 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Lowell",
+        "latitude": 42.9,
+        "longitude": -71.704564,
+        "voltageClasses": [
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "telecom_hub",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-118339"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-MA-027-1",
+          "DEV-SYN-MA-027-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.704564,
+          42.9
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-MA-028",
+        "name": "Synthetic Springfield 28 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "MA",
+        "cityHint": "Springfield",
+        "latitude": 42.217061,
+        "longitude": -72.741275,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "load_center",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-122965"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-MA-028-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.741275,
+          42.217061
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-001",
+        "name": "Synthetic Providence 01 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Providence",
+        "latitude": 41.795533,
+        "longitude": -71.562867,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "load_center",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-125459"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-RI-001-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.562867,
+          41.795533
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-002",
+        "name": "Synthetic Bristol 02 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Bristol",
+        "latitude": 41.66456,
+        "longitude": -71.435976,
+        "voltageClasses": [
+          115
+        ],
+        "status": "planned",
+        "planningRole": "telecom_hub",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-100822"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-RI-002-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-RI-002-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.435976,
+          41.66456
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-003",
+        "name": "Synthetic Southern RI 03 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Southern RI",
+        "latitude": 41.49438,
+        "longitude": -71.565078,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "planned",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-145751"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-RI-003-1",
+          "DEV-SYN-RI-003-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.565078,
+          41.49438
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-004",
+        "name": "Synthetic Providence 04 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Providence",
+        "latitude": 41.921196,
+        "longitude": -71.50248,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "existing",
+        "planningRole": "distribution_interface",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-137242"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-RI-004-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.50248,
+          41.921196
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-005",
+        "name": "Synthetic Bristol 05 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Bristol",
+        "latitude": 41.565531,
+        "longitude": -71.170503,
+        "voltageClasses": [
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "telecom_hub",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-130870"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-RI-005-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-RI-005-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.170503,
+          41.565531
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-006",
+        "name": "Synthetic Southern RI 06 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Southern RI",
+        "latitude": 41.447429,
+        "longitude": -71.730908,
+        "voltageClasses": [
+          69,
+          13.8
+        ],
+        "status": "planned",
+        "planningRole": "distribution_interface",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-139568"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-RI-006-1",
+          "DEV-SYN-RI-006-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-RI-006-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.730908,
+          41.447429
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-007",
+        "name": "Synthetic Providence 07 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Providence",
+        "latitude": 41.869527,
+        "longitude": -71.434966,
+        "voltageClasses": [
+          115
+        ],
+        "status": "planned",
+        "planningRole": "telecom_hub",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-121740"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.434966,
+          41.869527
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-008",
+        "name": "Synthetic Bristol 08 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Bristol",
+        "latitude": 41.629539,
+        "longitude": -71.366801,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "load_center",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-100454"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-RI-008-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-RI-008-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.366801,
+          41.629539
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-009",
+        "name": "Synthetic Southern RI 09 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Southern RI",
+        "latitude": 41.509552,
+        "longitude": -71.632253,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "proposed",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-129914"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-RI-009-1",
+          "DEV-SYN-RI-009-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-RI-009-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.632253,
+          41.509552
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-RI-010",
+        "name": "Synthetic Providence 10 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "RI",
+        "cityHint": "Providence",
+        "latitude": 41.725478,
+        "longitude": -71.430351,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "load_center",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-104815"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-RI-010-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.430351,
+          41.725478
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-001",
+        "name": "Synthetic Merrimack 01 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Merrimack",
+        "latitude": 42.747041,
+        "longitude": -71.863126,
+        "voltageClasses": [
+          115
+        ],
+        "status": "planned",
+        "planningRole": "telecom_hub",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-117714"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-NH-001-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.863126,
+          42.747041
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-002",
+        "name": "Synthetic Nashua 02 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Nashua",
+        "latitude": 42.909295,
+        "longitude": -71.056648,
+        "voltageClasses": [
+          115,
+          34.5
+        ],
+        "status": "planned",
+        "planningRole": "renewables_collection",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-139975"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-002-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-NH-002-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.056648,
+          42.909295
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-003",
+        "name": "Synthetic Seacoast 03 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Seacoast",
+        "latitude": 43.058269,
+        "longitude": -70.6,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-101185"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-003-1",
+          "DEV-SYN-NH-003-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.6,
+          43.058269
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-004",
+        "name": "Synthetic White Mountain 04 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "White Mountain",
+        "latitude": 44.430928,
+        "longitude": -71.148422,
+        "voltageClasses": [
+          345,
+          230
+        ],
+        "status": "proposed",
+        "planningRole": "intertie_planning_node",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-134728"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-NH-004-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.148422,
+          44.430928
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-005",
+        "name": "Synthetic Merrimack 05 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Merrimack",
+        "latitude": 42.802985,
+        "longitude": -71.127008,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-129653"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-005-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-NH-005-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.127008,
+          42.802985
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-006",
+        "name": "Synthetic Nashua 06 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Nashua",
+        "latitude": 42.711649,
+        "longitude": -71.25257,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-117680"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-006-1",
+          "DEV-SYN-NH-006-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-NH-006-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.25257,
+          42.711649
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-007",
+        "name": "Synthetic Seacoast 07 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Seacoast",
+        "latitude": 43.061395,
+        "longitude": -70.706014,
+        "voltageClasses": [
+          115
+        ],
+        "status": "existing",
+        "planningRole": "telecom_hub",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-124406"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.706014,
+          43.061395
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-008",
+        "name": "Synthetic White Mountain 08 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "White Mountain",
+        "latitude": 44.088429,
+        "longitude": -71.687975,
+        "voltageClasses": [
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "telecom_hub",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-119680"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-008-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-NH-008-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.687975,
+          44.088429
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-009",
+        "name": "Synthetic Merrimack 09 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Merrimack",
+        "latitude": 43.328299,
+        "longitude": -71.714456,
+        "voltageClasses": [
+          115
+        ],
+        "status": "planned",
+        "planningRole": "telecom_hub",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-110419"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-009-1",
+          "DEV-SYN-NH-009-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-NH-009-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.714456,
+          43.328299
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-010",
+        "name": "Synthetic Nashua 10 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Nashua",
+        "latitude": 43.006691,
+        "longitude": -71.363416,
+        "voltageClasses": [
+          115,
+          34.5
+        ],
+        "status": "existing",
+        "planningRole": "renewables_collection",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-111563"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-NH-010-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.363416,
+          43.006691
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-011",
+        "name": "Synthetic Seacoast 11 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Seacoast",
+        "latitude": 43.265227,
+        "longitude": -70.675309,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "regional_switching_station",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-145079"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-011-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.675309,
+          43.265227
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-012",
+        "name": "Synthetic White Mountain 12 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "White Mountain",
+        "latitude": 43.633249,
+        "longitude": -71.180388,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "regional_switching_station",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-108513"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-012-1",
+          "DEV-SYN-NH-012-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-NH-012-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.180388,
+          43.633249
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-013",
+        "name": "Synthetic Merrimack 13 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Merrimack",
+        "latitude": 42.957673,
+        "longitude": -71.770094,
+        "voltageClasses": [
+          115
+        ],
+        "status": "planned",
+        "planningRole": "telecom_hub",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-137908"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-NH-013-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.770094,
+          42.957673
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-NH-014",
+        "name": "Synthetic Nashua 14 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "NH",
+        "cityHint": "Nashua",
+        "latitude": 42.824589,
+        "longitude": -71.501733,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-157146"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-NH-014-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-NH-014-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.501733,
+          42.824589
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-001",
+        "name": "Synthetic Green Mountain 01 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Green Mountain",
+        "latitude": 43.880026,
+        "longitude": -72.710967,
+        "voltageClasses": [
+          115,
+          34.5
+        ],
+        "status": "proposed",
+        "planningRole": "renewables_collection",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-130933"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-VT-001-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.710967,
+          43.880026
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-002",
+        "name": "Synthetic Champlain 02 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Champlain",
+        "latitude": 44.065243,
+        "longitude": -73.410774,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "planned",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-146102"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-VT-002-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-VT-002-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.410774,
+          44.065243
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-003",
+        "name": "Synthetic Rutland 03 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Rutland",
+        "latitude": 43.851736,
+        "longitude": -73.203136,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "regional_switching_station",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-141376"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-VT-003-1",
+          "DEV-SYN-VT-003-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.203136,
+          43.851736
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-004",
+        "name": "Synthetic Northeast VT 04 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Northeast VT",
+        "latitude": 44.276982,
+        "longitude": -71.907862,
+        "voltageClasses": [
+          115
+        ],
+        "status": "existing",
+        "planningRole": "telecom_hub",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-130450"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-VT-004-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.907862,
+          44.276982
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-005",
+        "name": "Synthetic Green Mountain 05 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Green Mountain",
+        "latitude": 44.054971,
+        "longitude": -72.428441,
+        "voltageClasses": [
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "telecom_hub",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-130933"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-VT-005-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-VT-005-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.428441,
+          44.054971
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-006",
+        "name": "Synthetic Champlain 06 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Champlain",
+        "latitude": 44.006128,
+        "longitude": -73.04798,
+        "voltageClasses": [
+          345,
+          230
+        ],
+        "status": "planned",
+        "planningRole": "intertie_planning_node",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-127093"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-VT-006-1",
+          "DEV-SYN-VT-006-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-VT-006-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.04798,
+          44.006128
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-007",
+        "name": "Synthetic Rutland 07 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Rutland",
+        "latitude": 43.903967,
+        "longitude": -73.03544,
+        "voltageClasses": [
+          115,
+          34.5
+        ],
+        "status": "existing",
+        "planningRole": "renewables_collection",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-119363"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.03544,
+          43.903967
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-008",
+        "name": "Synthetic Northeast VT 08 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Northeast VT",
+        "latitude": 44.789196,
+        "longitude": -72.299432,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-114955"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-VT-008-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-VT-008-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.299432,
+          44.789196
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-009",
+        "name": "Synthetic Green Mountain 09 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Green Mountain",
+        "latitude": 43.75632,
+        "longitude": -72.430058,
+        "voltageClasses": [
+          345,
+          230
+        ],
+        "status": "proposed",
+        "planningRole": "intertie_planning_node",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-121869"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-VT-009-1",
+          "DEV-SYN-VT-009-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-VT-009-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.430058,
+          43.75632
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-010",
+        "name": "Synthetic Champlain 10 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Champlain",
+        "latitude": 44.096519,
+        "longitude": -73.48869,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "planned",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-133123"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-VT-010-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.48869,
+          44.096519
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-011",
+        "name": "Synthetic Rutland 11 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Rutland",
+        "latitude": 43.613386,
+        "longitude": -73.383805,
+        "voltageClasses": [
+          115,
+          34.5
+        ],
+        "status": "existing",
+        "planningRole": "renewables_collection",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-109518"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-VT-011-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.383805,
+          43.613386
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-VT-012",
+        "name": "Synthetic Northeast VT 12 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "VT",
+        "cityHint": "Northeast VT",
+        "latitude": 44.629633,
+        "longitude": -72.322561,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-114955"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-VT-012-1",
+          "DEV-SYN-VT-012-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-VT-012-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.322561,
+          44.629633
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-001",
+        "name": "Synthetic Portland 01 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Portland",
+        "latitude": 44.026176,
+        "longitude": -69.875369,
+        "voltageClasses": [
+          345,
+          230
+        ],
+        "status": "existing",
+        "planningRole": "intertie_planning_node",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-140839"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-ME-001-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.875369,
+          44.026176
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-002",
+        "name": "Synthetic Augusta 02 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Augusta",
+        "latitude": 44.381391,
+        "longitude": -69.709075,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-111243"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-002-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-002-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.709075,
+          44.381391
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-003",
+        "name": "Synthetic Bangor 03 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Bangor",
+        "latitude": 45.342546,
+        "longitude": -68.468965,
+        "voltageClasses": [
+          345,
+          230
+        ],
+        "status": "proposed",
+        "planningRole": "intertie_planning_node",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-121992"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-003-1",
+          "DEV-SYN-ME-003-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -68.468965,
+          45.342546
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-004",
+        "name": "Synthetic Northern ME 04 Planning Yard",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Northern ME",
+        "latitude": 46.046466,
+        "longitude": -68.014892,
+        "voltageClasses": [
+          115,
+          34.5
+        ],
+        "status": "planned",
+        "planningRole": "renewables_collection",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-155801"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-004-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -68.014892,
+          46.046466
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-005",
+        "name": "Synthetic Southern ME 05 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Southern ME",
+        "latitude": 43,
+        "longitude": -70.429424,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "regional_switching_station",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-101185"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-005-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-ME-005-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.429424,
+          43
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-006",
+        "name": "Synthetic Portland 06 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Portland",
+        "latitude": 43.874766,
+        "longitude": -70.043456,
+        "voltageClasses": [
+          345,
+          230
+        ],
+        "status": "existing",
+        "planningRole": "intertie_planning_node",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-108161"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-006-1",
+          "DEV-SYN-ME-006-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-006-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.043456,
+          43.874766
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-007",
+        "name": "Synthetic Augusta 07 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Augusta",
+        "latitude": 43.874766,
+        "longitude": -69.685443,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "planned",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-114526"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.685443,
+          43.874766
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-008",
+        "name": "Synthetic Bangor 08 Junction",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Bangor",
+        "latitude": 44.374608,
+        "longitude": -68.975534,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "planned",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-106085"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-008-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-008-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -68.975534,
+          44.374608
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-009",
+        "name": "Synthetic Northern ME 09 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Northern ME",
+        "latitude": 46.798052,
+        "longitude": -68.082609,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-120392"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-009-1",
+          "DEV-SYN-ME-009-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-ME-009-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -68.082609,
+          46.798052
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-010",
+        "name": "Synthetic Southern ME 10 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Southern ME",
+        "latitude": 44.100113,
+        "longitude": -70.284785,
+        "voltageClasses": [
+          115
+        ],
+        "status": "existing",
+        "planningRole": "telecom_hub",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-142181"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-010-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.284785,
+          44.100113
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-011",
+        "name": "Synthetic Portland 11 Ring Station",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Portland",
+        "latitude": 44.251724,
+        "longitude": -69.462361,
+        "voltageClasses": [
+          115
+        ],
+        "status": "planned",
+        "planningRole": "telecom_hub",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-109951"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-011-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.462361,
+          44.251724
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-012",
+        "name": "Synthetic Augusta 12 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Augusta",
+        "latitude": 43.67749,
+        "longitude": -70.375526,
+        "voltageClasses": [
+          115
+        ],
+        "status": "planned",
+        "planningRole": "telecom_hub",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-116958"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-012-1",
+          "DEV-SYN-ME-012-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-012-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.375526,
+          43.67749
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-013",
+        "name": "Synthetic Bangor 13 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Bangor",
+        "latitude": 45.038852,
+        "longitude": -69.611246,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "regional_switching_station",
+        "criticality": "low",
+        "connectedTransmissionLineIds": [
+          "HIFLD-147162"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-ME-013-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.611246,
+          45.038852
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-014",
+        "name": "Synthetic Northern ME 14 Telecom Hub",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Northern ME",
+        "latitude": 46.116865,
+        "longitude": -67.621101,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "proposed",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-158167"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-014-1"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-014-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.621101,
+          46.116865
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-015",
+        "name": "Synthetic Southern ME 15 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Southern ME",
+        "latitude": 43.514028,
+        "longitude": -69.988616,
+        "voltageClasses": [
+          345,
+          230
+        ],
+        "status": "planned",
+        "planningRole": "intertie_planning_node",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-158581"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-015-1",
+          "DEV-SYN-ME-015-2"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.988616,
+          43.514028
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-016",
+        "name": "Synthetic Portland 16 Switching Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "team",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Portland",
+        "latitude": 44.404372,
+        "longitude": -69.495201,
+        "voltageClasses": [
+          230,
+          115
+        ],
+        "status": "existing",
+        "planningRole": "regional_switching_station",
+        "criticality": "medium",
+        "connectedTransmissionLineIds": [
+          "HIFLD-108661"
+        ],
+        "connectedDeviceIds": [],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-016-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.495201,
+          44.404372
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-017",
+        "name": "Synthetic Augusta 17 Intertie Node",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Augusta",
+        "latitude": 44.993992,
+        "longitude": -70.370208,
+        "voltageClasses": [
+          115,
+          69
+        ],
+        "status": "existing",
+        "planningRole": "fiber_aggregation_site",
+        "criticality": "critical",
+        "connectedTransmissionLineIds": [
+          "HIFLD-114452"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-017-1"
+        ],
+        "connectedCircuitIds": [],
+        "connectedFiberIds": [
+          "FIB-SYN-ME-017-1"
+        ],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.370208,
+          44.993992
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SYN-SUB-ME-018",
+        "name": "Synthetic Bangor 18 Fiber Terminal",
+        "synthetic": true,
+        "labelType": "synthetic",
+        "source": "synthetic-demo",
+        "sourceType": "synthetic-planning",
+        "visibility": "private",
+        "public": false,
+        "state": "ME",
+        "cityHint": "Bangor",
+        "latitude": 45.416899,
+        "longitude": -68.756947,
+        "voltageClasses": [
+          115
+        ],
+        "status": "proposed",
+        "planningRole": "telecom_hub",
+        "criticality": "high",
+        "connectedTransmissionLineIds": [
+          "HIFLD-138130"
+        ],
+        "connectedDeviceIds": [
+          "DEV-SYN-ME-018-1",
+          "DEV-SYN-ME-018-2"
+        ],
+        "connectedCircuitIds": [
+          "CIR-SYN-ME-018-1"
+        ],
+        "connectedFiberIds": [],
+        "notes": "Synthetic ISO-NE demo planning point generated from a deterministic seed. Not an actual substation or verified asset.",
+        "disclaimer": "Synthetic demo/planning substation. Not a real utility asset.",
+        "connectionNote": "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -68.756947,
+          45.416899
+        ]
+      }
+    }
+  ]
+}

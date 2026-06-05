@@ -3,6 +3,8 @@ export type LifecycleState = "Existing" | "Proposed" | "Out of Service";
 export type AssetCriticality = "low" | "normal" | "high" | "critical";
 
 export type Coordinate = [number, number];
+export type IsoNeState = "CT" | "MA" | "RI" | "NH" | "VT" | "ME";
+export type TransmissionVoltageClass = "735+" | "500-734" | "345-499" | "230-344" | "115-229" | "69-114" | "below-69" | "unknown";
 
 export type GeoFeature<TProperties, TGeometry extends "Point" | "LineString" | "Polygon"> = {
   type: "Feature";
@@ -195,6 +197,81 @@ export type TransmissionLine = {
   notes?: string;
 };
 
+export type PublicTransmissionLineProperties = {
+  id: string;
+  name?: string;
+  voltageKv?: number | null;
+  voltageClass?: TransmissionVoltageClass;
+  status?: "existing" | "planned" | "proposed" | "unknown";
+  owner?: string | null;
+  source: "HIFLD" | "OpenStreetMap" | "Public GIS";
+  sourceType: "public-reference";
+  readOnly: true;
+  synthetic: false;
+  states: IsoNeState[];
+  isoNe: true;
+  publicDataNotice: "Public reference transmission-line geometry. Not for operations.";
+};
+
+export type PublicTransmissionLineFeature = {
+  type: "Feature";
+  properties: PublicTransmissionLineProperties;
+  geometry:
+    | { type: "LineString"; coordinates: Coordinate[] }
+    | { type: "MultiLineString"; coordinates: Coordinate[][] };
+};
+
+export type PublicTransmissionLineCollection = {
+  type: "FeatureCollection";
+  features: PublicTransmissionLineFeature[];
+};
+
+export type SyntheticSubstationProperties = {
+  id: string;
+  name: string;
+  synthetic: true;
+  labelType: "synthetic";
+  source: "synthetic-demo";
+  sourceType: "synthetic-planning";
+  visibility: "private" | "team";
+  public: false;
+  state: IsoNeState;
+  county?: string;
+  cityHint?: string;
+  latitude: number;
+  longitude: number;
+  voltageClasses: number[];
+  status: "existing" | "planned" | "proposed";
+  planningRole:
+    | "bulk_transmission_hub"
+    | "regional_switching_station"
+    | "telecom_hub"
+    | "fiber_aggregation_site"
+    | "distribution_interface"
+    | "renewables_collection"
+    | "load_center"
+    | "intertie_planning_node";
+  criticality: "low" | "medium" | "high" | "critical";
+  connectedTransmissionLineIds: string[];
+  connectedDeviceIds: string[];
+  connectedCircuitIds: string[];
+  connectedFiberIds: string[];
+  notes: string;
+  disclaimer: "Synthetic demo/planning substation. Not a real utility asset.";
+  connectionNote: "Synthetic planning association to nearest public transmission corridor. Not a verified physical connection.";
+};
+
+export type SyntheticSubstationFeature = {
+  type: "Feature";
+  properties: SyntheticSubstationProperties;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type SyntheticSubstationCollection = {
+  type: "FeatureCollection";
+  features: SyntheticSubstationFeature[];
+};
+
 export type NodeParameters = {
   nodeId: string;
   nodeName: string;
@@ -316,6 +393,8 @@ export type MapAnnotation = {
 };
 
 export type StreetMapLayerKey =
+  | "publicTransmissionLines"
+  | "syntheticSubstations"
   | "transmissionLines"
   | "substations"
   | "telecomNodes"

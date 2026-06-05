@@ -6,24 +6,29 @@ import type { MapDrawingTool, StreetMapLayerKey } from "@/lib/types/assets";
 type MapLayerControlPanelProps = {
   layers: Record<StreetMapLayerKey, boolean>;
   activeTool: MapDrawingTool;
+  publicLineCount?: number;
+  syntheticSubstationCount?: number;
+  dataWarnings?: { publicLines?: string; syntheticSubstations?: string };
   onToggleLayer: (layer: StreetMapLayerKey) => void;
   onToolChange: (tool: MapDrawingTool) => void;
 };
 
-const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string }> = [
-  { key: "transmissionLines", label: "Transmission lines", note: "Editable line layer" },
-  { key: "substations", label: "Substations", note: "Lat/lon point features" },
-  { key: "telecomNodes", label: "Telecom nodes", note: "Routers, RTUs, OTN" },
-  { key: "selIconNodes", label: "SEL ICON nodes", note: "ICON provisioning points" },
-  { key: "c3794Nodes", label: "C37.94 nodes", note: "Circuit endpoints" },
-  { key: "fiberRoutes", label: "Fiber routes", note: "Fiber/circuit paths" },
-  { key: "opgwRoutes", label: "OPGW routes", note: "Assumed/planned OPGW" },
-  { key: "distributionFiberRoutes", label: "Distribution fiber", note: "Distribution and ADSS" },
-  { key: "circuitEndpoints", label: "Circuit endpoints", note: "Protection/SCADA endpoints" },
-  { key: "workOrderLocations", label: "Work orders", note: "Field task locations" },
-  { key: "proposedChanges", label: "Proposed changes", note: "Staged changes" },
-  { key: "missingLocationAssets", label: "Missing-location assets", note: "Records awaiting lat/lon" },
-  { key: "planningRegions", label: "Planning regions", note: "Polygon overlays" },
+const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges?: string[] }> = [
+  { key: "publicTransmissionLines", label: "Public transmission lines", note: "HIFLD public reference", badges: ["Public", "Read-only"] },
+  { key: "syntheticSubstations", label: "Synthetic substations", note: "100 demo planning points", badges: ["Synthetic", "Private"] },
+  { key: "telecomNodes", label: "Synthetic telecom nodes", note: "Routers, RTUs, OTN", badges: ["Synthetic", "Private"] },
+  { key: "fiberRoutes", label: "Synthetic fiber routes", note: "Fiber/circuit paths", badges: ["Synthetic", "Private"] },
+  { key: "circuitEndpoints", label: "Synthetic circuits", note: "Protection/SCADA endpoints", badges: ["Synthetic", "Private"] },
+  { key: "workOrderLocations", label: "Synthetic work orders", note: "Field task locations", badges: ["Synthetic", "Private"] },
+  { key: "proposedChanges", label: "Proposed synthetic changes", note: "Staged changes", badges: ["Synthetic", "Private"] },
+  { key: "missingLocationAssets", label: "Missing-location assets", note: "Records awaiting lat/lon", badges: ["Private"] },
+  { key: "transmissionLines", label: "Private transmission lines", note: "Editable planning layer", badges: ["Synthetic", "Private"] },
+  { key: "substations", label: "Private substations", note: "Lat/lon point features", badges: ["Synthetic", "Private"] },
+  { key: "selIconNodes", label: "SEL ICON nodes", note: "ICON provisioning points", badges: ["Synthetic", "Private"] },
+  { key: "c3794Nodes", label: "C37.94 nodes", note: "Circuit endpoints", badges: ["Synthetic", "Private"] },
+  { key: "opgwRoutes", label: "OPGW routes", note: "Assumed/planned OPGW", badges: ["Assumed", "Private"] },
+  { key: "distributionFiberRoutes", label: "Distribution fiber", note: "Distribution and ADSS", badges: ["Synthetic", "Private"] },
+  { key: "planningRegions", label: "Planning regions", note: "Polygon overlays", badges: ["Private"] },
   { key: "isoNeReferenceOverlays", label: "ISO-NE overlays", note: "Public reference annotations" },
 ];
 
@@ -39,7 +44,11 @@ const drawingTools: Array<{ key: MapDrawingTool; label: string; Icon: typeof Map
   { key: "delete_geometry", label: "Delete geometry", Icon: Trash2, implemented: false },
 ];
 
-export function MapLayerControlPanel({ layers, activeTool, onToggleLayer, onToolChange }: MapLayerControlPanelProps) {
+export function MapLayerControlPanel({ layers, activeTool, publicLineCount = 0, syntheticSubstationCount = 0, dataWarnings, onToggleLayer, onToolChange }: MapLayerControlPanelProps) {
+  const counts: Partial<Record<StreetMapLayerKey, number>> = {
+    publicTransmissionLines: publicLineCount,
+    syntheticSubstations: syntheticSubstationCount,
+  };
   return (
     <aside className="street-layer-control-panel" aria-label="Street-level layer and drawing controls">
       <div className="street-panel-title"><Layers size={16} />Street Map Layers</div>
@@ -48,8 +57,16 @@ export function MapLayerControlPanel({ layers, activeTool, onToggleLayer, onTool
           <label className={`street-layer-toggle ${layers[layer.key] ? "active" : ""}`} key={layer.key}>
             <input type="checkbox" checked={layers[layer.key]} onChange={() => onToggleLayer(layer.key)} />
             <span>
-              <strong>{layer.label}</strong>
-              <small>{layer.note}</small>
+              <strong>
+                {layer.label}
+                {counts[layer.key] !== undefined ? <em>{counts[layer.key]}</em> : null}
+              </strong>
+              <small>{dataWarningForLayer(layer.key, dataWarnings) || layer.note}</small>
+              {layer.badges?.length ? (
+                <span className="street-layer-badges">
+                  {layer.badges.map((badge) => <b key={badge}>{badge}</b>)}
+                </span>
+              ) : null}
             </span>
           </label>
         ))}
@@ -69,4 +86,10 @@ export function MapLayerControlPanel({ layers, activeTool, onToggleLayer, onTool
       </div>
     </aside>
   );
+}
+
+function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: { publicLines?: string; syntheticSubstations?: string }) {
+  if (layer === "publicTransmissionLines") return warnings?.publicLines;
+  if (layer === "syntheticSubstations") return warnings?.syntheticSubstations;
+  return "";
 }
