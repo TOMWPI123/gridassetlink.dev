@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, ClipboardList, GitCompare, Plus, RefreshCw, Save, Send, Settings, XCircle } from "lucide-react";
+import { BadgeCheck, CheckCircle2, ClipboardList, Cpu, GitCompare, HardDrive, Network, Plus, RefreshCw, Save, Send, Settings, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/Badges";
@@ -11,6 +11,21 @@ import type { JsonRecord } from "@/types";
 
 type SummaryCard = { label: string; value: unknown };
 type SummaryPayload = { latest_snapshot?: JsonRecord | null; cards?: SummaryCard[]; recent_proposed_changes?: JsonRecord[]; recent_work_orders?: JsonRecord[] };
+type ProvisioningDashboardPayload = {
+  cards?: Array<SummaryCard & { href?: string }>;
+  module_cards?: JsonRecord[];
+  device_type_cards?: JsonRecord[];
+  service_type_cards?: JsonRecord[];
+  node_service_summary?: JsonRecord[];
+  provisioning_parameter_cards?: JsonRecord[];
+  nodes?: JsonRecord[];
+  modules?: JsonRecord[];
+  services?: JsonRecord[];
+  circuits?: JsonRecord[];
+  templates?: JsonRecord[];
+  proposed_services?: JsonRecord[];
+  safety_note?: string;
+};
 type DevicePayload = {
   actual?: JsonRecord;
   planned?: JsonRecord | null;
@@ -36,6 +51,7 @@ type DevicePayload = {
 
 const diffColumns = ["field", "actual", "planned", "proposed", "severity", "notes"];
 const serviceColumns = ["service_name", "service_type", "a_end", "z_end", "circuit", "status", "latency_requirement_ms", "measured_latency_ms", "fiber_path"];
+const richServiceColumns = [...serviceColumns, "carried_devices_summary", "payload_summary", "bandwidth_profile", "vlan_or_timeslot", "timing_profile", "commissioning_status"];
 const changeColumns = ["change_number", "title", "change_type", "risk_level", "engineering_status", "approval_status", "related_work_order_id"];
 
 export function DeviceOpsOverviewPage() {
@@ -57,7 +73,7 @@ export function DeviceOpsOverviewPage() {
     <>
       <PageHeader title="DeviceOps Dashboard" subtitle="Actual, planned, proposed, and as-built operational planning for network devices" actions={<><button className="button" onClick={refresh}><RefreshCw size={16} />Refresh Actual State</button><Link className="button primary" href="/deviceops/change-requests"><Plus size={16} />Propose Change</Link></>} />
       {message ? <div className="warning-list"><span className="badge active">{message}</span></div> : null}
-      {busy ? <Loading label="Loading DeviceOps summary..." /> : <MetricCards cards={data?.cards || []} />}
+      {busy ? <Loading label="Loading DeviceOps summary..." /> : <MetricCards cards={data?.cards || []} hrefForCard={deviceOpsCardHref} />}
       <div className="two-column" style={{ marginTop: 16 }}>
         <Section title="Recent Proposed Changes"><DataTable rows={data?.recent_proposed_changes || []} columns={changeColumns} detailBase="/deviceops/change-requests" /></Section>
         <Section title="Generated Work Orders"><DataTable rows={data?.recent_work_orders || []} columns={["work_order_number", "title", "work_type", "priority", "status"]} detailBase="/work-orders" /></Section>
@@ -112,11 +128,11 @@ export function DeviceOpsDeviceDetailPage({ id }: { id: string }) {
       {tab === "Audit Log" ? <EmptyPanel label="Audit events are recorded by backend actions and can be queried from Admin Audit Log." /> : null}
       {tab === "ICON Slots" ? <SlotLayout rows={data.slots || []} /> : null}
       {tab === "ICON Modules" ? <SlotLayout rows={data.modules || []} /> : null}
-      {tab === "ICON Services" ? <DataTable rows={data.services || []} columns={serviceColumns} /> : null}
+      {tab === "ICON Services" ? <DataTable rows={data.services || []} columns={richServiceColumns} /> : null}
       {tab === "Timing" ? <DataTable rows={data.timing || []} columns={["device_name", "timing_status", "source"]} /> : null}
-      {tab === "Protection Services" ? <DataTable rows={(data.services || []).filter((row) => ["C37.94", "87L", "DTT"].includes(displayValue(row.service_type)))} columns={serviceColumns} /> : null}
-      {tab === "TDM / DS1 / DS0" ? <DataTable rows={(data.services || []).filter((row) => ["DS1", "DS0", "E1", "E0"].includes(displayValue(row.service_type)))} columns={serviceColumns} /> : null}
-      {tab === "Ethernet / VLAN / VSN" ? <DataTable rows={(data.services || []).filter((row) => ["Ethernet", "Ethernet_Pipe", "VLAN", "VSN"].includes(displayValue(row.service_type)))} columns={serviceColumns} /> : null}
+      {tab === "Protection Services" ? <DataTable rows={(data.services || []).filter((row) => ["C37.94", "87L", "DTT", "Mirrored_Bits"].includes(displayValue(row.service_type)))} columns={richServiceColumns} /> : null}
+      {tab === "TDM / DS1 / DS0" ? <DataTable rows={(data.services || []).filter((row) => ["DS1", "DS0", "E1", "E0"].includes(displayValue(row.service_type)))} columns={richServiceColumns} /> : null}
+      {tab === "Ethernet / VLAN / VSN" ? <DataTable rows={(data.services || []).filter((row) => ["Ethernet", "Ethernet_Pipe", "VLAN", "VSN", "SCADA_VLAN", "NMS_VLAN", "relay_engineering_VLAN", "PMU", "leased_Ethernet_backup"].includes(displayValue(row.service_type)))} columns={richServiceColumns} /> : null}
       {tab === "NMS / Security" ? <RecordPanel title="Security / Management Parameters" record={data.security_parameters || {}} /> : null}
     </>
   );
@@ -136,8 +152,84 @@ export function DeviceOpsIconPage() {
   useEffect(() => { load(); }, []);
   return (
     <>
-      <PageHeader title="SEL ICON Dashboard" subtitle="ICON node health, timing, firmware, services, ports, alarms, and proposed changes" actions={<button className="icon-button" onClick={refresh} title="Refresh ICON state"><RefreshCw size={16} /></button>} />
-      {busy ? <Loading label="Loading ICON nodes..." /> : <DataTable rows={rows} columns={["device_name", "transport_mode", "timing_status", "firmware_version", "open_alarms", "pending_proposed_changes", "service_count", "active_circuits", "port_utilization", "match_status"]} detailBase="/deviceops/icon" filterField="timing_status" />}
+      <PageHeader title="SEL ICON Dashboard" subtitle="ICON node health, timing, firmware, services, ports, alarms, and proposed changes" actions={<><Link className="button" href="/deviceops/icon/provisioning"><Cpu size={16} />Provisioning Module</Link><button className="icon-button" onClick={refresh} title="Refresh ICON state"><RefreshCw size={16} /></button></>} />
+      {busy ? <Loading label="Loading ICON nodes..." /> : <DataTable rows={rows} columns={["device_name", "transport_mode", "timing_status", "firmware_version", "network_role", "service_count", "services_carried_summary", "carried_device_count", "carried_device_summary", "open_alarms", "active_circuits", "port_utilization", "match_status"]} detailBase="/deviceops/icon" filterField="timing_status" />}
+    </>
+  );
+}
+
+export function DeviceOpsIconProvisioningPage() {
+  const [data, setData] = useState<ProvisioningDashboardPayload | null>(null);
+  const [selectedModule, setSelectedModule] = useState<JsonRecord | null>(null);
+  const [selectedParameter, setSelectedParameter] = useState<JsonRecord | null>(null);
+  const [selectedDeviceType, setSelectedDeviceType] = useState<JsonRecord | null>(null);
+  const [selectedServiceType, setSelectedServiceType] = useState<JsonRecord | null>(null);
+  useEffect(() => {
+    apiFetch<ProvisioningDashboardPayload>("/api/deviceops/icon/provisioning-dashboard").then((payload) => {
+      setData(payload);
+      setSelectedModule(payload.module_cards?.[0] || null);
+      setSelectedParameter(payload.provisioning_parameter_cards?.[0] || null);
+      setSelectedDeviceType(payload.device_type_cards?.[0] || null);
+      setSelectedServiceType(payload.service_type_cards?.[0] || null);
+    });
+  }, []);
+  if (!data) return <Loading label="Loading SEL ICON provisioning module..." />;
+  const moduleRows = data.module_cards || [];
+  const parameterRows = data.provisioning_parameter_cards || [];
+  return (
+    <>
+      <PageHeader
+        title="SEL ICON Provisioning Module"
+        subtitle="Synthetic ICON cards, device types, circuits, services, and parameterized provisioning categories"
+        actions={<><Link className="button" href="/deviceops/icon"><Network size={16} />ICON Ops</Link><Link className="button primary" href="/deviceops/change-requests"><Plus size={16} />Stage Change</Link></>}
+      />
+      <div className="warning-list"><span className="source-badge proposed" style={{ whiteSpace: "normal" }}>{displayValue(data.safety_note)}</span></div>
+      <MetricCards cards={data.cards || []} hrefForCard={(card) => displayValue((card as JsonRecord).href) !== "-" ? displayValue((card as JsonRecord).href) : undefined} />
+      <div className="provisioning-grid" style={{ marginTop: 16 }}>
+        <Section title="Clickable ICON Card Modules">
+          <SelectableCardGrid rows={moduleRows} selected={selectedModule} onSelect={setSelectedModule} icon="module" />
+        </Section>
+        <Section title="Selected Module Details">
+          <RecordPanel title={displayValue(selectedModule?.label || selectedModule?.module_type || "Module")} record={selectedModule || {}} />
+        </Section>
+      </div>
+      <div className="provisioning-grid" style={{ marginTop: 16 }}>
+        <Section title="Provisioning Parameter Categories">
+          <SelectableCardGrid rows={parameterRows} selected={selectedParameter} onSelect={setSelectedParameter} icon="parameter" />
+        </Section>
+        <Section title="Selected Parameter Set">
+          <RecordPanel title={displayValue(selectedParameter?.label || "Provisioning Parameters")} record={selectedParameter || {}} />
+        </Section>
+      </div>
+      <div className="provisioning-grid" style={{ marginTop: 16 }}>
+        <Section title="Device Type Cards">
+          <SelectableCardGrid rows={data.device_type_cards || []} selected={selectedDeviceType} onSelect={setSelectedDeviceType} icon="device" />
+        </Section>
+        <Section title="Selected Device Type">
+          <RecordPanel title={displayValue(selectedDeviceType?.label || selectedDeviceType?.device_type || "Device Type")} record={selectedDeviceType || {}} />
+        </Section>
+      </div>
+      <div className="provisioning-grid" style={{ marginTop: 16 }}>
+        <Section title="Service Classes Carried">
+          <SelectableCardGrid rows={data.service_type_cards || []} selected={selectedServiceType} onSelect={setSelectedServiceType} icon="service" />
+        </Section>
+        <Section title="Selected Service Class">
+          <RecordPanel title={displayValue(selectedServiceType?.label || selectedServiceType?.service_type || "Service Class")} record={selectedServiceType || {}} />
+        </Section>
+      </div>
+      <Section title="SEL ICON Nodes and Services Carried">
+        <DataTable rows={data.node_service_summary || []} columns={["node_name", "substation_code", "network_role", "firmware_version", "timing_status", "alarm_status", "service_count", "service_classes_carried", "critical_service_count", "carried_device_count", "carried_device_summary"]} detailBase="/deviceops/icon" filterField="timing_status" />
+      </Section>
+      <div className="two-column" style={{ marginTop: 16 }}>
+        <Section title="Operational ICON Services"><DataTable rows={data.services || []} columns={[...richServiceColumns, "criticality", "owner_access_group", "source"]} filterField="service_type" /></Section>
+        <Section title="Proposed ICON Services"><DataTable rows={data.proposed_services || []} columns={["service_name", "service_type", "validation_status", "commissioning_status", "service_template_id"]} filterField="service_type" /></Section>
+      </div>
+      <Section title="Synthetic / Planned / Actual ICON Circuits">
+        <DataTable rows={data.circuits || []} columns={["circuit_id", "service_type", "transport_type", "a_end_device", "z_end_device", "carried_devices_summary", "bandwidth_profile", "vlan_or_timeslot", "owner_access_group", "criticality", "status", "source"]} filterField="service_type" />
+      </Section>
+      <Section title="SEL ICON Service Templates">
+        <DataTable rows={data.templates || []} columns={["template_name", "service_type", "manual_reference", "created_by_user_id"]} filterField="service_type" />
+      </Section>
     </>
   );
 }
@@ -155,12 +247,12 @@ export function DeviceOpsIconDetailPage({ id }: { id: string }) {
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
       {tab === "Overview" ? <IconOverview data={data} /> : null}
       {tab === "Slot / Module Layout" ? <SlotLayout rows={data.slots || []} /> : null}
-      {tab === "Provisioned Services" ? <DataTable rows={data.services || []} columns={serviceColumns} /> : null}
+      {tab === "Provisioned Services" ? <DataTable rows={data.services || []} columns={richServiceColumns} /> : null}
       {tab === "Proposed Changes" ? <DataTable rows={data.proposed_changes || []} columns={changeColumns} detailBase="/deviceops/change-requests" /> : null}
       {tab === "Timing" ? <DataTable rows={data.timing || []} columns={["device_name", "timing_status", "source"]} /> : null}
-      {tab === "Protection Services" ? <DataTable rows={(data.services || []).filter((row) => ["C37.94", "87L", "DTT"].includes(displayValue(row.service_type)))} columns={serviceColumns} /> : null}
-      {tab === "TDM / DS1 / DS0" ? <DataTable rows={(data.services || []).filter((row) => ["DS1", "DS0", "E1", "E0"].includes(displayValue(row.service_type)))} columns={serviceColumns} /> : null}
-      {tab === "Ethernet / VLAN / VSN" ? <DataTable rows={(data.services || []).filter((row) => ["Ethernet", "Ethernet_Pipe", "VLAN", "VSN"].includes(displayValue(row.service_type)))} columns={serviceColumns} /> : null}
+      {tab === "Protection Services" ? <DataTable rows={(data.services || []).filter((row) => ["C37.94", "87L", "DTT", "Mirrored_Bits"].includes(displayValue(row.service_type)))} columns={richServiceColumns} /> : null}
+      {tab === "TDM / DS1 / DS0" ? <DataTable rows={(data.services || []).filter((row) => ["DS1", "DS0", "E1", "E0"].includes(displayValue(row.service_type)))} columns={richServiceColumns} /> : null}
+      {tab === "Ethernet / VLAN / VSN" ? <DataTable rows={(data.services || []).filter((row) => ["Ethernet", "Ethernet_Pipe", "VLAN", "VSN", "SCADA_VLAN", "NMS_VLAN", "relay_engineering_VLAN", "PMU", "leased_Ethernet_backup"].includes(displayValue(row.service_type)))} columns={richServiceColumns} /> : null}
       {tab === "Commissioning Checklist" ? <ChecklistList rows={data.commissioning || []} /> : null}
       {tab === "Engineering Profile" ? <RecordPanel title="ICON Engineering Profile" record={data.engineering_profile || {}} /> : null}
       {tab === "NMS / Security" ? <RecordPanel title="Security / Management Parameters" record={data.security_parameters || {}} /> : null}
@@ -175,7 +267,7 @@ export function DeviceOpsIconServicesPage({ id }: { id: string }) {
   return (
     <>
       <PageHeader title="ICON Services" subtitle={displayValue(data.actual?.device_name)} />
-      <Section title="Operational Services"><DataTable rows={data.services || []} columns={[...serviceColumns, "proposed_change_status", "work_order"]} /></Section>
+      <Section title="Operational Services"><DataTable rows={data.services || []} columns={[...richServiceColumns, "endpoint_device_roles", "evidence_requirements", "proposed_change_status", "work_order"]} /></Section>
       <Section title="Proposed New / Removal / Migration Services"><DataTable rows={data.proposed_services || []} columns={["service_name", "service_type", "validation_status", "commissioning_status", "circuit_id", "proposed_change_id"]} /></Section>
     </>
   );
@@ -435,14 +527,57 @@ function IconOverview({ data }: { data: DevicePayload }) {
       ]} />
       <div className="two-column" style={{ marginTop: 16 }}>
         <Section title="Slot Layout"><SlotLayout rows={data.slots || []} /></Section>
-        <Section title="Services"><DataTable rows={data.services || []} columns={serviceColumns} /></Section>
+        <Section title="Services"><DataTable rows={data.services || []} columns={richServiceColumns} /></Section>
       </div>
     </>
   );
 }
 
-function MetricCards({ cards }: { cards: SummaryCard[] }) {
-  return <div className="metric-grid">{cards.map((card) => <div className="metric-card" key={card.label}><div className="subtle">{card.label}</div><div className="metric-value">{displayValue(card.value)}</div></div>)}</div>;
+function SelectableCardGrid({ rows, selected, onSelect, icon }: { rows: JsonRecord[]; selected: JsonRecord | null; onSelect: (row: JsonRecord) => void; icon: "module" | "parameter" | "device" | "service" }) {
+  const Icon = icon === "module" ? Cpu : icon === "parameter" ? BadgeCheck : icon === "service" ? Network : HardDrive;
+  return (
+    <div className="module-grid dense-module-grid">
+      {rows.map((row, index) => {
+        const id = String(row.module_type || row.key || row.device_type || row.service_type || row.label || index);
+        const selectedId = String(selected?.module_type || selected?.key || selected?.device_type || selected?.service_type || selected?.label || "");
+        return (
+          <button className={`module-card ${id === selectedId ? "selected" : ""}`} type="button" key={id} onClick={() => onSelect(row)}>
+            <span className="module-icon"><Icon size={18} /></span>
+            <span>
+              <span className="field-label">{icon === "parameter" ? "Parameter Set" : icon === "device" ? "Device Type" : icon === "service" ? "Service Class" : "ICON Card"}</span>
+              <strong>{displayValue(row.label || row.module_type || row.device_type || row.service_type)}</strong>
+              <span className="subtle">{displayValue(row.detail || row.status || row.payloads_carried || ((row.examples as string[] | undefined) || []).join(", "))}</span>
+            </span>
+            <span className="module-value">{displayValue(row.value || row.field_count)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MetricCards({ cards, hrefForCard }: { cards: SummaryCard[]; hrefForCard?: (card: SummaryCard) => string | undefined }) {
+  return (
+    <div className="metric-grid">
+      {cards.map((card) => {
+        const href = hrefForCard?.(card);
+        const content = <><div className="subtle">{card.label}</div><div className="metric-value">{displayValue(card.value)}</div>{href ? <div className="field-label" style={{ marginTop: 10 }}>Open module</div> : null}</>;
+        return href ? <Link className="metric-card metric-card-link" href={href} key={card.label}>{content}</Link> : <div className="metric-card" key={card.label}>{content}</div>;
+      })}
+    </div>
+  );
+}
+
+function deviceOpsCardHref(card: SummaryCard): string | undefined {
+  const label = card.label.toLowerCase();
+  if (label.includes("provisioning") || label.includes("card modules") || label.includes("line cards") || label.includes("ethernet cards") || label.includes("protection cards") || label.includes("synthetic sel icon circuits")) return "/deviceops/icon/provisioning";
+  if (label.includes("sel icon") || label.includes("icon ports") || label.includes("icon circuits") || label.includes("timing alarm") || label.includes("firmware mismatch")) return "/deviceops/icon";
+  if (label.includes("device")) return "/deviceops/devices";
+  if (label.includes("proposed")) return "/deviceops/change-requests";
+  if (label.includes("work order")) return "/work-orders";
+  if (label.includes("commissioning")) return "/deviceops/commissioning";
+  if (label.includes("leased")) return "/leased-services";
+  return "/deviceops/compare";
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -507,19 +642,23 @@ function SlotLayout({ rows }: { rows: JsonRecord[] }) {
 function moduleDetail(row: JsonRecord): JsonRecord {
   const moduleType = displayValue(row.module_type);
   const portCount = Number(row.port_count || 4);
+  const apiParameters = (row.provisioning_parameters as JsonRecord | undefined) || {};
+  const apiPorts = (row.ports as string[] | undefined) || [];
   const serviceRole = moduleType.toLowerCase().includes("ethernet") ? "Ethernet/VSN service aggregation" : moduleType.toLowerCase().includes("ds1") ? "TDM tributary grooming" : moduleType.toLowerCase().includes("c37") ? "Protection relay channel interface" : "Transport line module";
   return {
-    module_name: `Synthetic ${moduleType} module`,
+    module_name: row.module_name || `Synthetic ${moduleType} module`,
     slot_number: row.slot_number,
+    card_type: row.card_type || moduleType,
     module_type: moduleType,
     status: Number(row.alarms || 0) > 0 ? "needs_review" : "synthetic_planning",
-    module_serial_number: `SYN-${displayValue(row.slot_number)}-${moduleType.replaceAll("_", "-")}`,
-    port_inventory: Array.from({ length: Math.max(portCount, 1) }, (_, index) => `${moduleType}-P${index + 1}`),
+    module_serial_number: (apiParameters.line_module_configuration as JsonRecord | undefined)?.module_serial_number || `SYN-${displayValue(row.slot_number)}-${moduleType.replaceAll("_", "-")}`,
+    port_inventory: apiPorts.length ? apiPorts : Array.from({ length: Math.max(portCount, 1) }, (_, index) => `${moduleType}-P${index + 1}`),
     service_role: serviceRole,
     active_services: row.active_services,
     proposed_services: row.proposed_services,
     work_orders: row.work_orders,
-    engineering_parameters: {
+    provisioning_parameters: apiParameters,
+    engineering_parameters: Object.keys(apiParameters).length ? apiParameters.service_provisioning || apiParameters.line_module_configuration || apiParameters : {
       transport_mode: moduleType.includes("SONET") ? "SONET/mixed transport placeholder" : "Ethernet/TDM service placeholder",
       timing_dependency: moduleType.includes("SONET") ? "SONET timing source placeholder" : "Node timing profile placeholder",
       validation: "Ports, fiber strands, patch panels, circuit IDs, latency, and diversity are checked before work order conversion.",

@@ -62,6 +62,10 @@ def seed_regional_grid_addons(session: Session) -> None:
     _seed_reports(session)
     users = _seed_users(session)
     if session.exec(select(RegionalUtilityOwner)).first() and session.exec(select(RegionalSyntheticCircuit).where(RegionalSyntheticCircuit.circuit_id == "PMU-VT-RUT-MA-BOS-001")).first():
+        owners = {row.owner_name: row for row in session.exec(select(RegionalUtilityOwner)).all()}
+        rings = {row.ring_name: row for row in session.exec(select(RegionalIconRing)).all()}
+        if owners and rings:
+            _seed_synthetic_circuits(session, owners, rings)
         session.commit()
         return
 
@@ -399,8 +403,6 @@ def _seed_rings(session: Session, owners: dict[str, RegionalUtilityOwner], assum
 
 
 def _seed_synthetic_circuits(session: Session, owners: dict[str, RegionalUtilityOwner], rings: dict[str, RegionalIconRing]) -> list[RegionalSyntheticCircuit]:
-    if session.exec(select(RegionalSyntheticCircuit)).first():
-        return session.exec(select(RegionalSyntheticCircuit).order_by(RegionalSyntheticCircuit.circuit_id)).all()
     examples = [
         ("87L-MA-WBS-AUB-001", "87L", "MA-WBS", "MA-AUB", "MA-WBS-ICON-01", "MA-AUB-ICON-01", "C37.94-1", "C37.94-1", "Central Massachusetts ICON Ring", "C37.94 / 87L line differential", "critical", "private_fiber_synthetic", owners["National Grid-style owner"]),
         ("DTT-MA-AUB-MIL-001", "DTT", "MA-AUB", "MA-MIL", "MA-AUB-ICON-01", "MA-MIL-ICON-01", "C37.94-2", "C37.94-2", "Central Massachusetts ICON Ring", "direct transfer trip", "critical", "private_fiber_synthetic", owners["National Grid-style owner"]),
@@ -458,14 +460,20 @@ def _seed_synthetic_circuits(session: Session, owners: dict[str, RegionalUtility
         ("ME-POR", "MA-BOS", "Leased Backup Transport Ring", owners["Regional telecom provider"]),
     ]
     generated = list(examples)
-    for index in range(30):
+    for index in range(54):
         service_type, label, criticality = service_pool[index % len(service_pool)]
         a_site, z_site, ring_name, owner = node_pairs[index % len(node_pairs)]
         circuit_id = f"{service_type.upper().replace('_', '-')}-{a_site}-{z_site}-{index + 2:03d}"
         generated.append((circuit_id, service_type, a_site, z_site, f"{a_site}-ICON-01", f"{z_site}-ICON-01", f"PORT-{(index % 4) + 1}", f"PORT-{(index % 4) + 1}", ring_name, label, criticality, "synthetic_assumed_overlay", owner))
+    existing_by_id = {row.circuit_id: row for row in session.exec(select(RegionalSyntheticCircuit)).all()}
     circuits: list[RegionalSyntheticCircuit] = []
-    for index, (circuit_id, service_type, a_site, z_site, a_node, z_node, a_port, z_port, ring_name, label, criticality, ownership, owner) in enumerate(generated[:40], start=1):
-        ring = rings[ring_name]
+    for index, (circuit_id, service_type, a_site, z_site, a_node, z_node, a_port, z_port, ring_name, label, criticality, ownership, owner) in enumerate(generated[:64], start=1):
+        ring = rings.get(ring_name)
+        if not ring:
+            continue
+        if circuit_id in existing_by_id:
+            circuits.append(existing_by_id[circuit_id])
+            continue
         path_label = "low_confidence_assumed_OPGW" if index % 11 == 0 else "synthetic_assumed"
         status = "pending_host_approval" if index in {6, 10, 31, 36} else "field_verification_pending" if index % 9 == 0 else "synthetic_planning"
         circuit = RegionalSyntheticCircuit(
@@ -495,10 +503,10 @@ def _seed_synthetic_circuits(session: Session, owners: dict[str, RegionalUtility
         circuits.append(circuit)
     session.commit()
     for ring in rings.values():
-        ring.circuit_count = len([c for c in circuits if c.ring_id == ring.id])
+        ring.circuit_count = len(session.exec(select(RegionalSyntheticCircuit).where(RegionalSyntheticCircuit.ring_id == ring.id)).all())
         session.add(ring)
     session.commit()
-    return circuits
+    return session.exec(select(RegionalSyntheticCircuit).order_by(RegionalSyntheticCircuit.circuit_id)).all()
 
 
 def _seed_regional_work_orders(session: Session, users: dict[str, User], internal_subs: dict[str, Substation], circuits: list[RegionalSyntheticCircuit]) -> list[WorkOrder]:

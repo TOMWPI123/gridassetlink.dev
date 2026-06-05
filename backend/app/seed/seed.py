@@ -31,6 +31,7 @@ from app.models import (
     Provider,
     QRCode,
     Rack,
+    RegionalSyntheticCircuit,
     SQLReport,
     SpliceClosure,
     SpliceTray,
@@ -497,6 +498,8 @@ def seed_database() -> None:
             ], start=1):
                 session.add(CommissioningChecklistItem(checklist_id=checklist.id, item_number=index, category=category, task_text=task_text, expected_result=expected, status="not_started"))
 
+        _seed_sel_icon_expansion(session, engineer, field_tech)
+
         for entity_type, entity_id, url, label in [
             ("substations", "WBS", "/substations/WBS", "Webster Substation"),
             ("devices", "WBS-ICON-01", "/devices/WBS-ICON-01", "WBS-ICON-01"),
@@ -519,13 +522,14 @@ def _seed_deviceops_addons(session: Session) -> None:
         if report["report_name"] not in existing_reports:
             session.add(SQLReport(**report))
 
-    if session.exec(select(IconServiceTemplate)).first():
-        session.commit()
-        return
-
     engineer = session.exec(select(User).where(User.role == "engineer")).first() or session.exec(select(User)).first()
     field_tech = session.exec(select(User).where(User.role == "field_tech")).first()
     if engineer is None:
+        session.commit()
+        return
+
+    if session.exec(select(IconServiceTemplate)).first():
+        _seed_sel_icon_expansion(session, engineer, field_tech)
         session.commit()
         return
 
@@ -650,6 +654,222 @@ def _seed_deviceops_addons(session: Session) -> None:
         session.refresh(checklist)
         for index, (category, task_text, expected) in enumerate([("Engineering", "Verify approved engineering package.", "Package matches proposed change and internal standard placeholder."), ("Physical", "Verify ICON slot/module/port and patch panel assignments.", "Assignments match work order."), ("Fiber", "Verify fiber continuity and optical loss evidence.", "Continuity and loss are within approved limits."), ("Service", "Turn up service and record operational state.", "Service is active without unexpected alarms."), ("Test", "Upload screenshots, test sheets, and as-built photos.", "Evidence is available for engineer closeout.")], start=1):
             session.add(CommissioningChecklistItem(checklist_id=checklist.id, item_number=index, category=category, task_text=task_text, expected_result=expected, status="not_started"))
+    _seed_sel_icon_expansion(session, engineer, field_tech)
+    session.commit()
+
+
+def _seed_sel_icon_expansion(session: Session, engineer: User, field_tech: User | None) -> None:
+    parameter_categories = {
+        "node_identity": ["node name", "site/substation", "management IP", "firmware revision", "chassis type", "rack location", "serial number", "operational role", "network role"],
+        "transport_configuration": ["transport mode", "SONET transport", "Ethernet transport", "VSN container", "Ethernet pipe", "VLAN ID", "bandwidth allocation", "primary path", "backup path", "topology type", "path restoration behavior"],
+        "line_module_configuration": ["chassis slot", "module type", "module serial number", "port count", "line port", "tributary port", "service role", "optical interface type", "SFP type", "fiber pair", "patch panel port", "remote node"],
+        "service_provisioning": ["service name", "service type", "A-end node", "Z-end node", "A-end port", "Z-end port", "circuit ID", "criticality", "bandwidth", "latency requirement", "measured latency", "protection class", "service status"],
+        "protection_telecom_service": ["scheme type", "87L", "DTT", "Mirrored Bits", "C37.94", "relay A", "relay B", "maximum latency requirement", "asymmetry limit", "primary communications path", "backup communications path", "diversity required", "end-to-end test status"],
+        "tdm_legacy_service": ["DS1", "DS0", "E1", "E0", "channel bank use", "grooming path", "timeslot assignment", "analog 4-wire", "FXO", "FXS", "legacy migration status"],
+        "ethernet_service": ["Ethernet service type", "VLAN ID", "Ethernet pipe", "port speed", "duplex", "MTU", "QoS class", "traffic class", "SCADA/noncritical traffic flag", "IEC 61850 / GOOSE support flag", "broadcast containment flag"],
+        "timing_parameters": ["timing source", "GPS", "IRIG-B", "IEEE 1588 PTP Telecom Profile", "SONET timing", "Stratum 1 source", "primary timing source", "backup timing source", "timing quality", "holdover/fallback behavior", "timing alarm status"],
+        "security_management": ["user role model", "authentication mode", "centralized authentication", "local account fallback", "NMS integration", "SEL-5051/5052 reference", "SNMP status", "syslog status", "change log status", "firmware tracking"],
+        "commissioning_test_parameters": ["pre-install checklist status", "bench configuration status", "field installation status", "fiber continuity test", "optical loss", "OTDR attachment", "service turnup test", "latency test", "failover/restoration test", "timing verification", "as-built photos", "final engineer approval"],
+    }
+    for template in session.exec(select(IconServiceTemplate)).all():
+        defaults = dict(template.default_parameters_json or {})
+        defaults.setdefault("manual_reference", "SEL manual section placeholder")
+        defaults["provisioning_parameter_categories"] = parameter_categories
+        defaults["synthetic_data_notice"] = "Fictional demo parameters only; no real protection settings or private network topology."
+        template.default_parameters_json = defaults
+        rules = dict(template.validation_rules_json or {})
+        rule_list = list(rules.get("rules", []))
+        for rule in [
+            "Verify SEL ICON provisioning parameter categories are complete.",
+            "Warn when a protection service uses a low-confidence assumed path.",
+            "Require manual/internal standard references before commissioning closeout.",
+        ]:
+            if rule not in rule_list:
+                rule_list.append(rule)
+        rules["rules"] = rule_list
+        template.validation_rules_json = rules
+        session.add(template)
+
+    substations = {row.substation_code: row for row in session.exec(select(Substation)).all()}
+    racks = {row.substation_id: row for row in session.exec(select(Rack)).all() if row.substation_id}
+    provider = session.exec(select(Provider).where(Provider.provider_name == "Internal Utility Fiber")).first() or session.exec(select(Provider)).first()
+    device_specs = [
+        ("MA-BOS-SW-01", "switch", "Arista", "Utility Ethernet switch", "MA-BOS", "10.200.6.20", "high"),
+        ("MA-WOR-RTU-01", "RTU", "SEL", "RTU planning placeholder", "MA-WOR", "10.200.4.30", "high"),
+        ("RI-PVD-REC-AGG-01", "recloser_controller", "SEL", "Recloser aggregation controller", "RI-PVD", "10.200.7.31", "high"),
+        ("CT-HFD-OTN-01", "OTN_DWDM_shelf", "FictionalOptics", "OTN/DWDM shelf", "CT-HFD", "10.200.8.40", "critical"),
+        ("ME-POR-NID-01", "provider_NID", "Provider", "Leased Ethernet NID", "ME-POR", "10.200.12.50", "normal"),
+        ("MA-FRA-FW-01", "firewall", "Palo Alto", "Substation security gateway", "MA-FRA", "10.200.5.60", "high"),
+        ("MA-WBS-GPS-01", "timing_clock", "SEL", "GPS/PTP clock", "MA-WBS", "10.200.1.70", "critical"),
+    ]
+    for name, device_type, manufacturer, model, substation_code, ip_address, criticality in device_specs:
+        if session.exec(select(Device).where(Device.device_name == name)).first():
+            continue
+        substation = substations.get(substation_code) or next(iter(substations.values()), None)
+        device = Device(
+            device_name=name,
+            device_type=device_type,
+            manufacturer=manufacturer,
+            model=model,
+            firmware_version="synthetic-standard",
+            substation_id=substation.id if substation else None,
+            rack_id=racks.get(substation.id).id if substation and racks.get(substation.id) else None,
+            ip_address=ip_address,
+            status="synthetic_planning",
+            criticality=criticality,
+            notes="Synthetic DeviceOps device type example for dashboard/module filtering.",
+            created_by=engineer.id,
+            updated_by=engineer.id,
+        )
+        session.add(device)
+        session.commit()
+        session.refresh(device)
+        for index, port_name in enumerate(["MGMT-1", "SVC-1"], start=1):
+            session.add(
+                DevicePort(
+                    device_id=device.id,
+                    port_name=port_name,
+                    port_type="ethernet",
+                    speed="1G",
+                    connector_type="RJ45",
+                    port_role="synthetic_service_handoff" if index == 2 else "management",
+                    physical_label=f"{name} {port_name}",
+                    status="available",
+                )
+            )
+
+    module_specs = [
+        (1, "control_processor", 2, "management/control"),
+        (2, "SONET_line", 4, "ring transport"),
+        (3, "C37_94", 4, "protection relay channels"),
+        (4, "DS1_tributary", 8, "TDM grooming"),
+        (5, "Ethernet_transport", 6, "Ethernet/SCADA aggregation"),
+        (6, "VSN_packet", 6, "VSN and packet containers"),
+        (7, "timing_IO", 4, "PTP/IRIG-B timing"),
+    ]
+    for node in session.exec(select(IconNode)).all():
+        for slot_number, module_type, port_count, role in module_specs:
+            module = session.exec(select(IconModule).where(IconModule.icon_node_id == node.id, IconModule.slot_number == slot_number)).first()
+            if not module:
+                module = IconModule(
+                    icon_node_id=node.id,
+                    slot_number=slot_number,
+                    module_type=module_type,
+                    model=f"ICON {module_type}",
+                    serial_number=f"SYN-{node.node_name}-{slot_number}-{module_type}".replace("_", "-"),
+                    firmware_version=node.firmware_version or "4.2.1",
+                    port_count=port_count,
+                    service_role=role,
+                    status="synthetic_planning" if node.status == "synthetic_planning" else "active",
+                    notes="Synthetic SEL ICON card/module row with parameterized provisioning placeholders.",
+                    created_by=engineer.id,
+                    updated_by=engineer.id,
+                )
+                session.add(module)
+                session.commit()
+                session.refresh(module)
+            slot = session.exec(select(IconSlot).where(IconSlot.icon_node_id == node.id, IconSlot.slot_number == slot_number)).first()
+            if not slot:
+                session.add(IconSlot(icon_node_id=node.id, slot_number=slot_number, module_id=module.id, notes=f"Synthetic {module_type} slot/card dashboard row.", created_by=engineer.id, updated_by=engineer.id))
+        if not session.exec(select(IconEngineeringProfile).where(IconEngineeringProfile.icon_node_id == node.id)).first():
+            session.add(
+                IconEngineeringProfile(
+                    icon_node_id=node.id,
+                    profile_name=f"{node.node_name} synthetic provisioning profile",
+                    profile_revision="REV-SYN-A",
+                    manual_reference="SEL manual/application guide section placeholder",
+                    engineering_standard_reference="TelecomNE ICON provisioning standard placeholder",
+                    transport_mode=node.transport_mode or "mixed_ethernet_sonet",
+                    topology_type="ring",
+                    timing_mode="SONET_timing",
+                    redundancy_mode="ring_protected",
+                    security_profile="centralized_auth_with_local_fallback",
+                    commissioning_status="synthetic_planning",
+                    notes="Parameter categories are modeled as fields and placeholders only.",
+                    created_by=engineer.id,
+                    updated_by=engineer.id,
+                )
+            )
+
+    nodes = {row.node_name: row for row in session.exec(select(IconNode)).all()}
+    devices = {row.device_name: row for row in session.exec(select(Device)).all()}
+    templates = {row.service_type: row for row in session.exec(select(IconServiceTemplate)).all()}
+    circuit_specs = [
+        ("ICON-C37-MA-WBS-AUB-003", "Webster Auburn synthetic C37.94 relay channel", "C37.94", "MA-WBS-ICON-01", "MA-AUB-ICON-01", "critical", 8, 3.1),
+        ("ICON-DTT-MA-AUB-MIL-003", "Auburn Millbury synthetic DTT channel", "DTT", "MA-AUB-ICON-01", "MA-MIL-ICON-01", "critical", 8, 3.8),
+        ("ICON-MB-NH-VT-002", "Manchester Rutland Mirrored Bits service", "Mirrored_Bits", "NH-MAN-ICON-01", "VT-RUT-ICON-01", "critical", 8, 4.3),
+        ("ICON-DS1-MA-WBS-CTRL-003", "Webster control synthetic DS1 migration", "DS1", "MA-WBS-ICON-01", "ME-POR-ICON-01", "normal", 20, 8.6),
+        ("ICON-DS0-CT-HFD-NHV-001", "Hartford New Haven DS0 grooming bundle", "DS0", "CT-HFD-ICON-01", "CT-NHV-ICON-01", "normal", 20, 9.1),
+        ("ICON-ETH-MA-FRA-BOS-002", "Framingham Boston Ethernet pipe", "Ethernet_Pipe", "MA-FRA-ICON-01", "MA-BOS-ICON-01", "high", 25, 4.8),
+        ("ICON-VSN-RI-BOS-002", "Providence Boston synthetic VSN service", "VSN", "RI-PVD-ICON-01", "MA-BOS-ICON-01", "high", 20, 6.1),
+        ("ICON-PTP-CT-HFD-NHV-002", "Hartford New Haven PTP timing", "PTP", "CT-HFD-ICON-01", "CT-NHV-ICON-01", "critical", 5, 1.9),
+        ("ICON-SCADA-MA-WOR-WBS-002", "Worcester Webster SCADA VLAN", "SCADA", "MA-WOR-ICON-01", "MA-WBS-ICON-01", "high", 30, 5.4),
+        ("ICON-NMS-MA-BOS-CT-HFD-001", "Boston Hartford NMS VLAN", "Ethernet", "MA-BOS-ICON-01", "CT-HFD-ICON-01", "normal", 30, 6.8),
+        ("ICON-PMU-VT-BOS-002", "Rutland Boston PMU data circuit", "PMU", "VT-RUT-ICON-01", "MA-BOS-ICON-01", "high", 16, 7.2),
+        ("ICON-LEASED-ME-BOS-002", "Portland Boston leased backup transport", "leased_Ethernet_backup", "ME-POR-ICON-01", "MA-BOS-ICON-01", "high", 35, 14.5),
+    ]
+    for circuit_id, name, service_type, a_node_name, z_node_name, criticality, latency_requirement, measured_latency in circuit_specs:
+        if not session.exec(select(Circuit).where(Circuit.circuit_id == circuit_id)).first():
+            a_device = devices.get(a_node_name)
+            z_device = devices.get(z_node_name)
+            session.add(
+                Circuit(
+                    circuit_id=circuit_id,
+                    circuit_name=name,
+                    service_type=service_type,
+                    transport_type="SEL ICON synthetic provisioning",
+                    ownership_type="synthetic_planning",
+                    provider_id=provider.id if provider else None,
+                    a_end_site_id=a_device.substation_id if a_device else None,
+                    z_end_site_id=z_device.substation_id if z_device else None,
+                    a_end_device_id=a_device.id if a_device else None,
+                    z_end_device_id=z_device.id if z_device else None,
+                    bandwidth="64 kbps" if service_type in {"C37.94", "DTT", "Mirrored_Bits"} else "100 Mbps",
+                    latency_requirement_ms=latency_requirement,
+                    measured_latency_ms=measured_latency,
+                    protection_class=service_type,
+                    criticality=criticality,
+                    status="synthetic_planning",
+                    notes="Synthetic SEL ICON provisioning circuit. Fictional demo data only.",
+                    created_by=engineer.id,
+                    updated_by=engineer.id,
+                )
+            )
+        if not session.exec(select(IconProposedService).where(IconProposedService.service_name == circuit_id)).first():
+            template = templates.get(service_type) or templates.get("Ethernet")
+            a_node = nodes.get(a_node_name)
+            z_node = nodes.get(z_node_name)
+            session.add(
+                IconProposedService(
+                    icon_node_id=a_node.id if a_node else None,
+                    service_template_id=template.id if template else None,
+                    service_name=circuit_id,
+                    service_type=service_type,
+                    a_end_node_id=a_node.id if a_node else None,
+                    z_end_node_id=z_node.id if z_node else None,
+                    proposed_parameters_json={
+                        "service_type": service_type,
+                        "circuit_id": circuit_id,
+                        "a_end_node": a_node_name,
+                        "z_end_node": z_node_name,
+                        "latency_requirement_ms": latency_requirement,
+                        "measured_latency_ms": measured_latency,
+                        "parameter_categories": parameter_categories,
+                        "manual_reference": "SEL manual section placeholder",
+                        "engineering_standard_reference": "TelecomNE ICON provisioning standard placeholder",
+                        "synthetic": True,
+                    },
+                    validation_status="valid" if criticality != "critical" else "warning",
+                    commissioning_status="ready_for_field",
+                    notes="Synthetic proposed ICON service used by dashboard module cards.",
+                )
+            )
+
+    for regional in session.exec(select(RegionalSyntheticCircuit)).all():
+        if regional.notes and "Provisioning parameter categories" in regional.notes:
+            continue
+        regional.notes = f"{regional.notes or ''} Provisioning parameter categories are available in DeviceOps SEL ICON provisioning dashboard; data is synthetic."
+        session.add(regional)
     session.commit()
 
 

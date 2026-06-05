@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +17,7 @@ from app.models import (
     FiberAssignment,
     FiberStrand,
     IconEngineeringProfile,
+    IconModule,
     IconNode,
     IconProposedService,
     IconServiceTemplate,
@@ -25,6 +27,7 @@ from app.models import (
     OperationalSnapshot,
     ProposedChange,
     ProposedChangeDiff,
+    RegionalSyntheticCircuit,
     Substation,
     WorkOrder,
     WorkOrderTask,
@@ -45,6 +48,10 @@ def deviceops_summary(session: SessionDep, _: CurrentUser) -> dict[str, Any]:
     proposed = session.exec(select(ProposedChange)).all()
     checklists = session.exec(select(CommissioningChecklist)).all()
     work_orders = session.exec(select(WorkOrder)).all()
+    modules = session.exec(select(IconModule)).all()
+    templates = session.exec(select(IconServiceTemplate)).all()
+    regional_circuits = session.exec(select(RegionalSyntheticCircuit)).all()
+    device_type_count = len({item.device_type for item in devices if item.device_type} | {item.get("device_type") for item in operational_api.get_devices() if item.get("device_type")})
 
     cards = [
         {"label": "Total managed devices", "value": len(devices)},
@@ -72,12 +79,97 @@ def deviceops_summary(session: SessionDep, _: CurrentUser) -> dict[str, Any]:
         {"label": "Proposed changes awaiting approval", "value": len([item for item in proposed if item.approval_status == "pending_approval"])},
         {"label": "Proposed changes ready for field installation", "value": len([item for item in proposed if item.engineering_status == "converted_to_work_order"])},
         {"label": "Commissioning checklists incomplete", "value": len([item for item in checklists if item.status not in {"complete", "completed", "commissioned"}])},
+        {"label": "SEL ICON card modules", "value": len(modules) + sum(len(operational_api.get_icon_modules(item["id"])) for item in operational_api.get_icon_nodes())},
+        {"label": "SEL ICON line cards", "value": len([item for item in modules if "line" in item.module_type.lower()]) + _operational_module_count("line")},
+        {"label": "SEL ICON protection cards", "value": len([item for item in modules if "c37" in item.module_type.lower()]) + _operational_module_count("c37")},
+        {"label": "SEL ICON Ethernet cards", "value": len([item for item in modules if "ethernet" in item.module_type.lower() or "vsn" in item.module_type.lower()]) + _operational_module_count("ethernet") + _operational_module_count("vsn")},
+        {"label": "Device type modules", "value": device_type_count},
+        {"label": "Synthetic SEL ICON circuits", "value": len(regional_circuits) + len(operational_api.get_circuits())},
+        {"label": "SEL ICON provisioning templates", "value": len(templates)},
+        {"label": "SEL ICON provisioning parameter sets", "value": len(_icon_parameter_categories())},
     ]
     return {
         "latest_snapshot": _dump(snapshot) if snapshot else None,
         "cards": cards,
         "recent_proposed_changes": [_dump(item) for item in proposed[-8:]],
         "recent_work_orders": [_dump(item) for item in work_orders[-8:]],
+    }
+
+
+@router.get("/deviceops/icon/provisioning-dashboard")
+def icon_provisioning_dashboard(session: SessionDep, _: CurrentUser) -> dict[str, Any]:
+    operational_nodes = operational_api.get_icon_nodes()
+    operational_modules = [
+        {**module, "node_name": node["device_name"], "source": "actual_operational_api"}
+        for node in operational_nodes
+        for module in operational_api.get_icon_modules(node["id"])
+    ]
+    operational_services = [
+        {**service, "source": "actual_operational_api"}
+        for node in operational_nodes
+        for service in operational_api.get_icon_services(node["id"])
+    ]
+    module_counter = Counter(item.get("module_type", "unknown") for item in operational_modules)
+    device_rows = [_dump(item) for item in session.exec(select(Device)).all()] + operational_api.get_devices()
+    device_counter = Counter(row.get("device_type", "unknown") for row in device_rows)
+    actual_circuits = [{**item, "source": "actual_operational_api", "synthetic": True} for item in operational_api.get_circuits()]
+    regional_circuits = [
+        {**_dump(item), "source": "regional_synthetic_planning", "synthetic": True}
+        for item in session.exec(select(RegionalSyntheticCircuit).order_by(RegionalSyntheticCircuit.circuit_id)).all()
+    ]
+    planned_circuits = [
+        {**_dump(item), "source": "planned_database"}
+        for item in session.exec(select(Circuit).where(Circuit.transport_type.like("%ICON%"))).all()
+    ]
+    templates = session.exec(select(IconServiceTemplate).order_by(IconServiceTemplate.template_name)).all()
+    proposed_services = session.exec(select(IconProposedService).order_by(IconProposedService.service_type, IconProposedService.service_name)).all()
+    parameter_cards = _icon_parameter_categories()
+    service_type_cards = _service_type_cards(operational_services)
+    node_service_summary = _node_service_summary(operational_nodes, operational_services)
+    return {
+        "cards": [
+            {"label": "Operational SEL ICON nodes", "value": len(operational_nodes), "href": "/deviceops/icon"},
+            {"label": "SEL ICON card modules", "value": len(operational_modules), "href": "/deviceops/icon/provisioning"},
+            {"label": "Device type modules", "value": len(device_counter), "href": "/deviceops/devices"},
+            {"label": "Operational ICON services", "value": len({item["id"] for item in operational_services}), "href": "/deviceops/icon/provisioning"},
+            {"label": "Service classes carried", "value": len(service_type_cards), "href": "/deviceops/icon/provisioning"},
+            {"label": "Endpoint devices carried", "value": sum(int(item.get("carried_device_count") or 0) for item in node_service_summary), "href": "/deviceops/devices"},
+            {"label": "Synthetic regional circuits", "value": len(regional_circuits), "href": "/regional-grid/sel-icon-synthetic-network"},
+            {"label": "Planned ICON circuits", "value": len(planned_circuits), "href": "/circuits"},
+            {"label": "Proposed ICON services", "value": len(proposed_services), "href": "/deviceops/change-requests"},
+            {"label": "Provisioning parameter categories", "value": len(parameter_cards), "href": "/deviceops/service-templates"},
+        ],
+        "module_cards": [
+            {
+                "module_type": module_type,
+                "label": _module_label(module_type),
+                "value": count,
+                "detail": _module_detail_text(module_type),
+                "manual_reference": "SEL manual/application guide section placeholder",
+                "engineering_standard_reference": "TelecomNE ICON module standard placeholder",
+            }
+            for module_type, count in sorted(module_counter.items())
+        ],
+        "device_type_cards": [
+            {
+                "device_type": device_type,
+                "label": _device_type_label(device_type),
+                "value": count,
+                "examples": [row.get("device_name") for row in device_rows if row.get("device_type") == device_type][:8],
+                "href": "/deviceops/devices",
+            }
+            for device_type, count in sorted(device_counter.items())
+        ],
+        "service_type_cards": service_type_cards,
+        "node_service_summary": node_service_summary,
+        "provisioning_parameter_cards": parameter_cards,
+        "nodes": operational_nodes,
+        "modules": operational_modules,
+        "services": _unique_by(operational_services, "id"),
+        "circuits": actual_circuits + planned_circuits + regional_circuits,
+        "templates": [_dump(item) for item in templates],
+        "proposed_services": [_dump(item) for item in proposed_services],
+        "safety_note": "All demo provisioning values are fictional placeholders. The operational adapter remains read-only and no SEL manual text is copied.",
     }
 
 
@@ -788,6 +880,147 @@ def _sync_icon_proposed_service(session: SessionDep, change: ProposedChange) -> 
         session.add(existing)
     else:
         session.add(IconProposedService.model_validate(payload))
+
+
+def _service_type_cards(services: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for service_type in sorted({str(item.get("service_type") or "unknown") for item in services}):
+        matching = [item for item in services if str(item.get("service_type") or "unknown") == service_type]
+        carried = _flatten_summary_values(matching, "carried_devices_summary", limit=8)
+        payloads = _flatten_summary_values(matching, "payload_summary", limit=4)
+        bandwidths = _flatten_summary_values(matching, "bandwidth_profile", limit=4)
+        timing = _flatten_summary_values(matching, "timing_profile", limit=4)
+        rows.append(
+            {
+                "service_type": service_type,
+                "label": _module_label(service_type),
+                "value": len(matching),
+                "carried_devices": "; ".join(carried) if carried else "No endpoint devices listed",
+                "payloads_carried": "; ".join(payloads) if payloads else "Synthetic payload placeholder",
+                "bandwidth_profiles": "; ".join(bandwidths) if bandwidths else "Engineering bandwidth placeholder",
+                "timing_profiles": "; ".join(timing) if timing else "Timing profile placeholder",
+                "critical_services": len([item for item in matching if item.get("criticality") == "critical"]),
+                "commissioning_statuses": ", ".join(sorted({str(item.get("commissioning_status")) for item in matching if item.get("commissioning_status")})),
+            }
+        )
+    return rows
+
+
+def _node_service_summary(nodes: list[dict[str, Any]], services: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = []
+    for node in nodes:
+        node_name = node["device_name"]
+        matching = [item for item in services if node_name in str(item.get("a_end")) or node_name in str(item.get("z_end")) or item.get("node_id") == node.get("id")]
+        service_types = sorted({str(item.get("service_type")) for item in matching if item.get("service_type")})
+        carried = _flatten_summary_values(matching, "carried_devices_summary", limit=10)
+        rows.append(
+            {
+                "id": node.get("id"),
+                "node_name": node_name,
+                "substation_code": node.get("substation_code"),
+                "network_role": node.get("network_role"),
+                "firmware_version": node.get("firmware_version"),
+                "timing_status": node.get("timing_status"),
+                "alarm_status": node.get("alarm_status"),
+                "service_count": len({item.get("id") for item in matching}),
+                "service_classes_carried": ", ".join(service_types) or "none",
+                "critical_service_count": len([item for item in matching if item.get("criticality") == "critical"]),
+                "carried_device_count": len(carried),
+                "carried_device_summary": "; ".join(carried) if carried else "No synthetic endpoint devices assigned",
+                "circuits_carried": ", ".join([str(item.get("circuit")) for item in matching[:8] if item.get("circuit")]),
+            }
+        )
+    return rows
+
+
+def _flatten_summary_values(rows: list[dict[str, Any]], key: str, limit: int = 8) -> list[str]:
+    values: list[str] = []
+    for row in rows:
+        raw = row.get(key)
+        if isinstance(raw, list):
+            candidates = [str(item) for item in raw]
+        else:
+            candidates = [part.strip() for part in str(raw or "").split(";")]
+        for candidate in candidates:
+            if candidate and candidate not in values:
+                values.append(candidate)
+            if len(values) >= limit:
+                return values
+    return values
+
+
+def _icon_parameter_categories() -> list[dict[str, Any]]:
+    categories = [
+        ("node_identity", "Node identity", ["node name", "site/substation", "management IP", "firmware revision", "chassis type", "rack location", "serial number", "operational role", "network role"]),
+        ("transport_configuration", "Transport configuration", ["transport mode", "SONET transport", "Ethernet transport", "VSN container", "Ethernet pipe", "VLAN ID", "bandwidth allocation", "primary path", "backup path", "topology type", "path restoration behavior"]),
+        ("line_module_configuration", "Line/module configuration", ["chassis slot", "module type", "module serial number", "port count", "line port", "tributary port", "service role", "optical interface type", "SFP type", "fiber pair", "patch panel port", "remote node"]),
+        ("service_provisioning", "Service provisioning", ["service name", "service type", "A-end node", "Z-end node", "A-end port", "Z-end port", "circuit ID", "criticality", "bandwidth", "latency requirement", "measured latency", "protection class", "service status"]),
+        ("protection_telecom_service", "Protection telecom service", ["scheme type", "87L", "DTT", "Mirrored Bits", "C37.94", "relay A", "relay B", "maximum latency requirement", "asymmetry limit", "primary communications path", "backup communications path", "diversity required", "end-to-end test status"]),
+        ("tdm_legacy_service", "TDM / legacy service", ["DS1", "DS0", "E1", "E0", "channel bank use", "grooming path", "timeslot assignment", "analog 4-wire", "FXO", "FXS", "legacy migration status"]),
+        ("ethernet_service", "Ethernet service", ["Ethernet service type", "VLAN ID", "Ethernet pipe", "port speed", "duplex", "MTU", "QoS class", "traffic class", "SCADA/noncritical traffic flag", "IEC 61850 / GOOSE support flag", "broadcast containment flag"]),
+        ("timing_parameters", "Timing parameters", ["timing source", "GPS", "IRIG-B", "IEEE 1588 PTP Telecom Profile", "SONET timing", "Stratum 1 source", "primary timing source", "backup timing source", "timing quality", "holdover/fallback behavior", "timing alarm status"]),
+        ("security_management", "Security / management", ["user role model", "authentication mode", "centralized authentication", "local account fallback", "NMS integration", "SEL-5051/5052 reference", "SNMP status", "syslog status", "change log status", "firmware tracking"]),
+        ("commissioning_test_parameters", "Commissioning and test", ["pre-install checklist status", "bench configuration status", "field installation status", "fiber continuity test", "optical loss", "OTDR attachment", "service turnup test", "latency test", "failover/restoration test", "timing verification", "as-built photos", "final engineer approval"]),
+    ]
+    return [
+        {
+            "key": key,
+            "label": label,
+            "field_count": len(fields),
+            "fields": fields,
+            "manual_reference": "SEL manual/application guide section placeholder",
+            "engineering_standard_reference": "TelecomNE internal engineering standard placeholder",
+            "status": "parameterized_placeholder",
+        }
+        for key, label, fields in categories
+    ]
+
+
+def _operational_module_count(fragment: str) -> int:
+    fragment = fragment.lower()
+    return len(
+        [
+            module
+            for node in operational_api.get_icon_nodes()
+            for module in operational_api.get_icon_modules(node["id"])
+            if fragment in str(module.get("module_type", "")).lower()
+        ]
+    )
+
+
+def _module_label(module_type: str) -> str:
+    return module_type.replace("_", " ").replace("-", " ").title()
+
+
+def _module_detail_text(module_type: str) -> str:
+    value = module_type.lower()
+    if "c37" in value:
+        return "Protection relay channel cards with C37.94-style placeholders."
+    if "ds1" in value or "tributary" in value:
+        return "TDM tributary cards for DS1/DS0 grooming and migration planning."
+    if "ethernet" in value or "vsn" in value:
+        return "Packet cards for Ethernet pipes, VLANs, SCADA, NMS, and VSN containers."
+    if "timing" in value:
+        return "Timing I/O cards for PTP, IRIG-B, SONET timing, and holdover verification."
+    if "processor" in value:
+        return "Control/management card with NMS, security, firmware, and commissioning references."
+    return "Transport card with synthetic provisioning fields and commissioning placeholders."
+
+
+def _device_type_label(device_type: str) -> str:
+    return device_type.replace("_", " ").replace("-", " ").upper() if device_type == "RTU" else device_type.replace("_", " ").replace("-", " ").title()
+
+
+def _unique_by(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    seen = set()
+    result = []
+    for row in rows:
+        value = row.get(key)
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(row)
+    return result
 
 
 def _device_dashboard_payload(row: OperationalDeviceState, session: SessionDep) -> dict[str, Any]:

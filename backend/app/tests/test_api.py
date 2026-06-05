@@ -25,6 +25,19 @@ def test_login_and_dashboard() -> None:
     assert response.json()["recent_work_orders"]
 
 
+def test_dashboard_map_payload() -> None:
+    response = client.get("/api/dashboard/map", headers=auth_headers())
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["map"]["official_pdf_url"].endswith("new-england-geographic-diagram-transmission-planning.pdf")
+    assert payload["counts"]
+    assert payload["devices"]
+    assert payload["substations"]
+    assert payload["search_index"]
+    assert any(row["label"] == "Devices missing location/substation mapping" for row in payload["counts"])
+    assert all("xPercent" in row and "yPercent" in row for row in payload["annotations"])
+
+
 def test_core_lists() -> None:
     headers = auth_headers("engineer@example.com", "engineer123")
     for path in ["/api/substations", "/api/devices", "/api/icon-nodes", "/api/fiber-cables", "/api/circuits", "/api/work-orders"]:
@@ -91,6 +104,24 @@ def test_deviceops_refresh_and_compare() -> None:
         response = client.get(f"/api/compare/{mode}", headers=headers)
         assert response.status_code == 200
         assert isinstance(response.json(), list)
+
+
+def test_deviceops_icon_provisioning_dashboard() -> None:
+    headers = auth_headers("engineer@example.com", "engineer123")
+    response = client.get("/api/deviceops/icon/provisioning-dashboard", headers=headers)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["module_cards"]
+    assert payload["device_type_cards"]
+    assert len(payload["provisioning_parameter_cards"]) >= 10
+    assert len(payload["circuits"]) >= 60
+    assert len(payload["services"]) >= 35
+    assert len(payload["service_type_cards"]) >= 10
+    assert len(payload["node_service_summary"]) >= 12
+    assert any(row["module_type"] == "C37_94" for row in payload["module_cards"])
+    assert any("carried_devices_summary" in row and row["carried_devices_summary"] for row in payload["services"])
+    assert any(row["service_type"] == "PTP" and "timing" in row["payloads_carried"].lower() for row in payload["service_type_cards"])
+    assert any(row["carried_device_count"] >= 4 for row in payload["node_service_summary"])
 
 
 def test_deviceops_proposed_change_to_work_order_and_checklist() -> None:
@@ -186,12 +217,12 @@ def test_regional_grid_synthetic_network_access_and_reports() -> None:
     summary = client.get("/api/regional-grid/summary", headers=engineer_headers)
     assert summary.status_code == 200
     card_map = {row["label"]: row["value"] for row in summary.json()["cards"]}
-    assert int(card_map["Proposed SEL ICON circuits"]) >= 40
+    assert int(card_map["Proposed SEL ICON circuits"]) >= 64
 
     network = client.get("/api/regional-grid/sel-icon-synthetic-network", headers=engineer_headers)
     assert network.status_code == 200
     assert len(network.json()["rings"]) == 7
-    assert len(network.json()["circuits"]) >= 40
+    assert len(network.json()["circuits"]) >= 64
     assert any(row["circuit_id"] == "87L-MA-WBS-AUB-001" for row in network.json()["circuits"])
 
     contractor_login = client.post("/api/auth/login", json={"email": "contractor@example.com", "password": "contractor123"})

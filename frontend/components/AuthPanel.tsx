@@ -1,6 +1,6 @@
 "use client";
 
-import { Cable, ClipboardList, Database, GitBranch, LogIn, Map, Network, Shield } from "lucide-react";
+import { Cable, ClipboardList, Cpu, Database, GitBranch, LogIn, Map, Network, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { login } from "@/lib/api";
@@ -8,9 +8,10 @@ import { login } from "@/lib/api";
 const demos = [["admin@example.com", "admin123"], ["engineer@example.com", "engineer123"], ["fieldtech@example.com", "fieldtech123"], ["viewer@example.com", "viewer123"], ["sqlanalyst@example.com", "sql123"]];
 const modules = [
   { label: "RegionalGrid map", detail: "Browse New England assets", href: "/regional-grid", icon: Map },
-  { label: "Synthetic ICON", detail: "Rings and 40 circuits", href: "/regional-grid/sel-icon-synthetic-network", icon: Network },
+  { label: "Synthetic ICON", detail: "Rings and 64 circuits", href: "/regional-grid/sel-icon-synthetic-network", icon: Network },
   { label: "DeviceOps", detail: "Actual/planned/proposed state", href: "/deviceops", icon: Shield },
   { label: "ICON modules", detail: "Clickable slot dashboards", href: "/deviceops/icon", icon: Network },
+  { label: "ICON provisioning", detail: "Cards, circuits, parameters", href: "/deviceops/icon/provisioning", icon: Cpu },
   { label: "OPGW assumptions", detail: "Assumed route queue", href: "/regional-grid/opgw-assumptions", icon: Cable },
   { label: "Regional lines", detail: "Voltage and owner filters", href: "/regional-grid/transmission-lines", icon: GitBranch },
   { label: "Work orders", detail: "Field installation tasks", href: "/work-orders", icon: ClipboardList },

@@ -51,6 +51,40 @@ npm install
 npm run dev
 ```
 
+## Telecom Asset Map
+
+The `/dashboard` page is an original dark New England utility telecom planning map. It renders mock GeoJSON layers for substations, SEL ICON and telecom nodes, fiber routes, microwave paths, telecom circuits, work orders, and proposed changes.
+
+The dashboard now supports three map modes:
+
+- `ISO-NE Diagram`: static public planning reference with percentage-only annotations.
+- `Street-Level Map`: MapLibre-backed editable lat/lon planning map for substations, nodes, lines, planning regions, and missing-location placement.
+- `Hybrid Dashboard`: side-by-side public-reference context, street-level editing, layer controls, missing-location workflow, linked asset details, and node parameter editing.
+
+Mock map data is served from `/data/*.geojson` and lives in:
+
+- `frontend/public/data/substations.geojson`
+- `frontend/public/data/telecomNodes.geojson`
+- `frontend/public/data/fiberRoutes.geojson`
+- `frontend/public/data/telecomCircuits.geojson`
+- `frontend/public/data/microwavePaths.geojson`
+- `frontend/public/data/workOrders.geojson`
+- `frontend/public/data/proposedChanges.geojson`
+
+The map includes collapsible search and filters, layer controls, current/proposed/diff view modes, a KPI strip, clickable asset detail drawers, SEL ICON provisioning context, and a planning mode for staging synthetic proposed routes.
+
+Production boundary: replace `frontend/lib/api/assets.ts` with authenticated API calls, RBAC, audit logging, server-side filtering, and redaction. Do not ship sensitive utility telecom topology, protection settings, credentials, or private operational details in public static files. All generated telecom routes, circuits, OPGW paths, and SEL ICON service examples in this repo are fictional, assumed, synthetic, proposed, or user-verifiable demo records.
+
+Editable street-map seed data lives in:
+
+- `frontend/data/transmissionMaps.ts`
+- `frontend/data/substations.ts`
+- `frontend/data/transmissionLines.ts`
+- `frontend/data/nodeParameters.ts`
+- `frontend/data/mapAnnotations.ts`
+
+The street-level dashboard uses `maplibre-gl` installed through npm. It keeps the typed planning data and editor callbacks while rendering a MapLibre basemap with selectable GeoJSON overlays for substations, SEL ICON nodes, transmission/fiber paths, planning regions, and work-order locations.
+
 ## Demo Users
 
 These credentials are demo-only:

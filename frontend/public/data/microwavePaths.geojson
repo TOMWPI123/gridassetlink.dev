@@ -1,0 +1,7 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "pathId": "MW-NH-VT-001", "aSite": "SUB-NH-MAN", "zSite": "SUB-VT-RUT", "frequencyBand": "11 GHz", "bandwidth": "250 Mbps", "status": "active", "fadeMargin": "31 dB", "pathLengthMiles": 55.2 }, "geometry": { "type": "LineString", "coordinates": [[-71.45, 42.99], [-72.97, 43.61]] } },
+    { "type": "Feature", "properties": { "pathId": "MW-ME-NH-002", "aSite": "SUB-ME-POR", "zSite": "SUB-NH-MAN", "frequencyBand": "6 GHz", "bandwidth": "150 Mbps", "status": "proposed", "fadeMargin": "engineering study", "pathLengthMiles": 72.8 }, "geometry": { "type": "LineString", "coordinates": [[-70.26, 43.66], [-71.45, 42.99]] } }
+  ]
+}
