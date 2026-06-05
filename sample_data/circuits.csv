@@ -1,0 +1,6 @@
+circuit_id,circuit_name,service_type,transport_type,ownership_type,bandwidth,criticality,status
+87L-WBS-AUB-001,Webster to Auburn line differential protection,87L,C37.94 over SEL ICON,private_fiber,64 kbps,critical,in_service
+DTT-WBS-AUB-001,Webster Auburn direct transfer trip,DTT,SEL ICON TDM,private_fiber,DS0,critical,testing
+SCADA-F12-REC004,F12 recloser REC004 SCADA,SCADA,Ethernet,private_fiber,100 Mbps,high,installing
+LEASED-ETH-CTRL-001,Control center leased Ethernet handoff,leased_Ethernet,Ethernet,leased_service,100 Mbps,high,ordered
+LEASED-DS1-RTU-002,Legacy leased DS1 RTU pending migration,leased_T1,DS1,leased_service,1.544 Mbps,normal,in_service

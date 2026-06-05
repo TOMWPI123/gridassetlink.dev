@@ -1,0 +1,5 @@
+cable_id,cable_type,fiber_count,owner,manufacturer,model,install_date,route_name,route_miles,status
+OPGW-L143-WBS-AUB-48F,OPGW,48,Internal Utility Fiber,Prysmian,48F OPGW,2020-05-12,Line 143 Webster-Auburn,13.4,active
+OPGW-L172-AUB-MIL-72F,OPGW,72,Internal Utility Fiber,AFL,72F OPGW,2021-09-18,Line 172 Auburn-Millbury,9.2,active
+DIST-FIBER-F12-24F,aerial_distribution_fiber,24,Internal Utility Fiber,Corning,ALTOS 24F,2023-07-10,F12 DA backbone,4.7,active
+DIST-FIBER-F07-12F,underground_distribution_fiber,12,Internal Utility Fiber,Corning,ALTOS 12F,2024-03-04,F07 underground loop,2.8,active

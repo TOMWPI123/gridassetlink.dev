@@ -1,0 +1,2 @@
+import Link from "next/link"; import { Plus } from "lucide-react"; import { EntityListPage } from "@/components/EntityListPage"; import { entityConfigs } from "@/lib/entities";
+export default function Page() { return <><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}><Link className="button primary" href="/work-orders/new"><Plus size={16} />New</Link></div><EntityListPage config={entityConfigs["work-orders"]} /></>; }

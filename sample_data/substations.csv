@@ -1,0 +1,5 @@
+substation_code,name,voltage_level,region,address,latitude,longitude,status,notes
+WBS,Webster Substation,115/13.8 kV,Central MA,"100 Fictional Station Rd, Webster, MA",42.0501,-71.8809,active,Primary telecom hub
+AUB,Auburn Substation,115/13.8 kV,Central MA,"200 Example Grid Dr, Auburn, MA",42.1945,-71.8356,active,ICON midpoint
+MIL,Millbury Substation,115/13.8 kV,Central MA,"300 Planning Way, Millbury, MA",42.1934,-71.7606,active,Feeder aggregation
+OXF,Oxford Substation,69/13.8 kV,Central MA,"400 Sample Ave, Oxford, MA",42.1168,-71.8648,planned,Future expansion

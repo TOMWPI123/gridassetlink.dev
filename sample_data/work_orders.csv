@@ -1,0 +1,6 @@
+work_order_number,title,work_type,priority,status
+WO-2026-0041,Install ICON C37.94 circuit for Webster to Auburn 87L,ICON_install,critical,engineering_review
+WO-2026-0042,Install distribution fiber service to recloser REC-F12-004,distribution_device_install,high,in_progress
+WO-2026-0043,Leased Ethernet provider turnup waiting on provider,leased_service_turnup,normal,waiting_on_provider
+WO-2026-0044,OTDR test OPGW-L143 strands 1-12,OTDR_test,normal,assigned
+WO-2026-0045,Migrate leased DS1 to SEL ICON transport,migration,high,waiting_on_material

@@ -1,0 +1,6 @@
+fiber_cable_id,strand_number,tube_number,color,status,assigned_service
+OPGW-L143-WBS-AUB-48F,1,1,blue,assigned,SEL ICON protection transport
+OPGW-L143-WBS-AUB-48F,2,1,orange,assigned,SEL ICON protection transport
+OPGW-L143-WBS-AUB-48F,9,1,yellow,available,
+DIST-FIBER-F12-24F,1,1,blue,assigned,SCADA-F12-REC004
+DIST-FIBER-F07-12F,7,1,red,faulted,

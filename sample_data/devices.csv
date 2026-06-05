@@ -1,0 +1,5 @@
+device_name,device_type,manufacturer,model,serial_number,firmware_version,substation_code,ip_address,status,criticality
+WBS-ICON-01,SEL_ICON,SEL,ICON,FIC-WBS-ICON-001,4.2.1,WBS,10.14.3.10,active,critical
+AUB-ICON-01,SEL_ICON,SEL,ICON,FIC-AUB-ICON-001,4.2.1,AUB,10.14.3.20,active,critical
+MIL-ICON-01,SEL_ICON,SEL,ICON,FIC-MIL-ICON-001,4.2.1,MIL,10.14.3.30,active,critical
+REC-F12-004,recloser_controller,SEL,651R,FIC-REC-F12-004,,WBS,,active,high
