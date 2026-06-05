@@ -468,15 +468,66 @@ function RecordPanel({ title, record }: { title: string; record: JsonRecord }) {
 }
 
 function SlotLayout({ rows }: { rows: JsonRecord[] }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
   if (!rows.length) return <EmptyPanel label="No slot/module records found." />;
+  const selected = rows[Math.min(selectedIndex, rows.length - 1)] || rows[0];
+  const detail = moduleDetail(selected);
   return (
-    <div className="panel">
-      <div className="panel-header"><strong>ICON Slot Layout</strong><span className="subtle">{rows.length} slots/modules</span></div>
-      <div className="panel-body slot-grid">
-        {rows.map((row, index) => <div className="slot-card" key={String(row.slot_number || index)}><div className="slot-number">Slot {displayValue(row.slot_number)}</div><strong>{displayValue(row.module_type)}</strong><span>{displayValue(row.port_count)} ports</span><span>Active services {displayValue(row.active_services)}</span><span>Proposed {displayValue(row.proposed_services)}</span><div className="toolbar"><Badge value={Number(row.alarms || 0) > 0 ? "alarm" : "normal"} /><Badge value={`${displayValue(row.work_orders)} WO`} /></div></div>)}
+    <div className="module-browser">
+      <div className="panel">
+        <div className="panel-header"><strong>ICON Slot Layout</strong><span className="subtle">{rows.length} slots/modules</span></div>
+        <div className="panel-body slot-grid">
+          {rows.map((row, index) => (
+            <button className={`slot-card interactive ${index === selectedIndex ? "selected" : ""}`} key={String(row.slot_number || index)} onClick={() => setSelectedIndex(index)}>
+              <div className="slot-number">Slot {displayValue(row.slot_number)}</div>
+              <strong>{displayValue(row.module_type)}</strong>
+              <span>{displayValue(row.port_count)} ports</span>
+              <span>Active services {displayValue(row.active_services)}</span>
+              <span>Proposed {displayValue(row.proposed_services)}</span>
+              <div className="toolbar"><Badge value={Number(row.alarms || 0) > 0 ? "alarm" : "normal"} /><Badge value={`${displayValue(row.work_orders)} WO`} /></div>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel-header"><strong>{displayValue(detail.module_name)}</strong><Badge value={detail.status} /></div>
+        <div className="panel-body detail-grid">
+          {Object.entries(detail).map(([key, value]) => (
+            <div className="field" key={key}>
+              <div className="field-label">{formatLabel(key)}</div>
+              <div className="field-value">{Array.isArray(value) ? value.join(", ") : typeof value === "object" && value !== null ? <pre className="json-block">{JSON.stringify(value, null, 2)}</pre> : displayValue(value)}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
+}
+
+function moduleDetail(row: JsonRecord): JsonRecord {
+  const moduleType = displayValue(row.module_type);
+  const portCount = Number(row.port_count || 4);
+  const serviceRole = moduleType.toLowerCase().includes("ethernet") ? "Ethernet/VSN service aggregation" : moduleType.toLowerCase().includes("ds1") ? "TDM tributary grooming" : moduleType.toLowerCase().includes("c37") ? "Protection relay channel interface" : "Transport line module";
+  return {
+    module_name: `Synthetic ${moduleType} module`,
+    slot_number: row.slot_number,
+    module_type: moduleType,
+    status: Number(row.alarms || 0) > 0 ? "needs_review" : "synthetic_planning",
+    module_serial_number: `SYN-${displayValue(row.slot_number)}-${moduleType.replaceAll("_", "-")}`,
+    port_inventory: Array.from({ length: Math.max(portCount, 1) }, (_, index) => `${moduleType}-P${index + 1}`),
+    service_role: serviceRole,
+    active_services: row.active_services,
+    proposed_services: row.proposed_services,
+    work_orders: row.work_orders,
+    engineering_parameters: {
+      transport_mode: moduleType.includes("SONET") ? "SONET/mixed transport placeholder" : "Ethernet/TDM service placeholder",
+      timing_dependency: moduleType.includes("SONET") ? "SONET timing source placeholder" : "Node timing profile placeholder",
+      validation: "Ports, fiber strands, patch panels, circuit IDs, latency, and diversity are checked before work order conversion.",
+    },
+    commissioning_template: "SEL ICON module add checklist placeholder",
+    manual_reference: "SEL manual section placeholder",
+    internal_standard_reference: "TelecomNE ICON module engineering standard placeholder",
+  };
 }
 
 function ChecklistList({ rows }: { rows: JsonRecord[] }) {

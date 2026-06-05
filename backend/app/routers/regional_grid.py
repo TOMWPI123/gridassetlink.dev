@@ -20,6 +20,7 @@ from app.integrations.public_grid_sources.common import normalize_name, normaliz
 from app.models import (
     AssumedOPGWRoute,
     Circuit,
+    Device,
     FiberCable,
     FiberSegment,
     FiberStrand,
@@ -517,15 +518,171 @@ def _ring_payload(row: RegionalIconRing, session: SessionDep) -> dict[str, Any]:
 
 
 def _map_layers(session: SessionDep, user: CurrentUser) -> dict[str, list[dict[str, Any]]]:
+    regional_substations = session.exec(select(RegionalSubstation)).all()
+    regional_lines = session.exec(select(RegionalTransmissionLine)).all()
+    line_by_id = {row.id: row for row in regional_lines if row.id is not None}
+    regional_by_site = {_regional_site_code(row): row for row in regional_substations}
+    internal_substations = {row.id: row for row in session.exec(select(Substation)).all() if row.id is not None}
+    devices = {row.id: row for row in session.exec(select(Device)).all() if row.id is not None}
     return {
-        "substations": [_regional_substation_payload(row, session) for row in session.exec(select(RegionalSubstation)).all()],
-        "transmission_lines": [_regional_line_payload(row, session) for row in session.exec(select(RegionalTransmissionLine)).all()],
-        "assumed_opgw": [_dump(row) for row in session.exec(select(AssumedOPGWRoute)).all()],
-        "verified_fiber": [_dump(row) for row in session.exec(select(FiberCable)).all() if row.status in {"active", "verified", "as_built"}],
-        "sel_icon_nodes": [_dump(row) for row in session.exec(select(IconNode)).all()],
-        "circuit_paths": [_dump(row) for row in _visible_synthetic_circuits(session, user)],
-        "work_order_locations": [_dump(row) for row in _visible_work_orders(session, user)],
+        "substations": [_regional_substation_map_payload(row, session) for row in regional_substations],
+        "transmission_lines": [_regional_line_map_payload(row, session) for row in regional_lines],
+        "assumed_opgw": [_assumed_opgw_map_payload(row, line_by_id, session) for row in session.exec(select(AssumedOPGWRoute)).all()],
+        "verified_fiber": [_fiber_map_payload(row, internal_substations) for row in session.exec(select(FiberCable)).all() if row.status in {"active", "verified", "as_built", "planned_assumed"}],
+        "sel_icon_nodes": [_icon_node_map_payload(row, devices, internal_substations) for row in session.exec(select(IconNode)).all()],
+        "circuit_paths": [_synthetic_circuit_map_payload(row, regional_by_site, session) for row in _visible_synthetic_circuits(session, user)],
+        "work_order_locations": [_work_order_map_payload(row, internal_substations) for row in _visible_work_orders(session, user)],
     }
+
+
+def _regional_substation_map_payload(row: RegionalSubstation, session: SessionDep) -> dict[str, Any]:
+    payload = _regional_substation_payload(row, session)
+    return {
+        **payload,
+        "asset_type": "substation",
+        "asset_label": row.substation_name,
+        "site_code": _regional_site_code(row),
+        "latitude": row.latitude,
+        "longitude": row.longitude,
+        "href": f"/regional-grid/substations/{row.id}",
+        "synthetic_status": "public_reference",
+    }
+
+
+def _regional_line_map_payload(row: RegionalTransmissionLine, session: SessionDep) -> dict[str, Any]:
+    payload = _regional_line_payload(row, session)
+    return {
+        **payload,
+        "asset_type": "transmission_line",
+        "asset_label": row.line_name,
+        "geometry_coordinates": _line_coordinates(row),
+        "href": f"/regional-grid/transmission-lines/{row.id}",
+        "synthetic_status": "public_reference",
+    }
+
+
+def _assumed_opgw_map_payload(row: AssumedOPGWRoute, lines: dict[int, RegionalTransmissionLine], session: SessionDep) -> dict[str, Any]:
+    line = lines.get(row.regional_transmission_line_id or -1)
+    return {
+        **_dump(row),
+        "asset_type": "assumed_opgw",
+        "asset_label": row.assumption_name,
+        "line_name": line.line_name if line else None,
+        "state": line.state if line else None,
+        "owner_id": line.owner_id if line else None,
+        "owner_name": _owner_name(session, line.owner_id) if line else "Unknown",
+        "voltage_class": line.voltage_class if line else None,
+        "geometry_coordinates": _line_coordinates(line) if line else [],
+        "href": f"/regional-grid/transmission-lines/{line.id}" if line else "/regional-grid/opgw-assumptions",
+        "synthetic_status": row.status,
+    }
+
+
+def _fiber_map_payload(row: FiberCable, substations: dict[int, Substation]) -> dict[str, Any]:
+    a_sub = substations.get(row.a_end_substation_id or -1)
+    z_sub = substations.get(row.z_end_substation_id or -1)
+    return {
+        **_dump(row),
+        "asset_type": "verified_fiber",
+        "asset_label": row.cable_id,
+        "a_latitude": a_sub.latitude if a_sub else None,
+        "a_longitude": a_sub.longitude if a_sub else None,
+        "z_latitude": z_sub.latitude if z_sub else None,
+        "z_longitude": z_sub.longitude if z_sub else None,
+        "state": _state_from_site_code(a_sub.substation_code if a_sub else None),
+        "href": f"/fiber-cables/{row.id}",
+        "synthetic_status": row.status,
+    }
+
+
+def _icon_node_map_payload(row: IconNode, devices: dict[int, Device], substations: dict[int, Substation]) -> dict[str, Any]:
+    device = devices.get(row.device_id or -1)
+    substation = substations.get(device.substation_id or -1) if device else None
+    return {
+        **_dump(row),
+        "asset_type": "sel_icon_node",
+        "asset_label": row.node_name,
+        "device_name": device.device_name if device else row.node_name,
+        "substation_code": substation.substation_code if substation else _site_code_from_node_name(row.node_name),
+        "state": _state_from_site_code(substation.substation_code if substation else row.node_name),
+        "latitude": substation.latitude if substation else None,
+        "longitude": substation.longitude if substation else None,
+        "href": f"/icon/{row.id}",
+        "synthetic_status": row.status,
+    }
+
+
+def _synthetic_circuit_map_payload(row: RegionalSyntheticCircuit, substations_by_site: dict[str, RegionalSubstation], session: SessionDep) -> dict[str, Any]:
+    a_sub = substations_by_site.get(row.a_end_site)
+    z_sub = substations_by_site.get(row.z_end_site)
+    ring = session.get(RegionalIconRing, row.ring_id) if row.ring_id else None
+    return {
+        **_dump(row),
+        "asset_type": "circuit_path",
+        "asset_label": row.circuit_id,
+        "ring_name": ring.ring_name if ring else None,
+        "owner_name": _owner_name(session, row.owner_id),
+        "state": a_sub.state if a_sub else _state_from_site_code(row.a_end_site),
+        "a_latitude": a_sub.latitude if a_sub else None,
+        "a_longitude": a_sub.longitude if a_sub else None,
+        "z_latitude": z_sub.latitude if z_sub else None,
+        "z_longitude": z_sub.longitude if z_sub else None,
+        "href": "/regional-grid/sel-icon-synthetic-network",
+        "synthetic_status": row.status,
+    }
+
+
+def _work_order_map_payload(row: WorkOrder, substations: dict[int, Substation]) -> dict[str, Any]:
+    substation = substations.get(row.substation_id or -1)
+    return {
+        **_dump(row),
+        "asset_type": "work_order_location",
+        "asset_label": row.work_order_number,
+        "state": _state_from_site_code(substation.substation_code if substation else None),
+        "latitude": substation.latitude if substation else None,
+        "longitude": substation.longitude if substation else None,
+        "substation_code": substation.substation_code if substation else None,
+        "href": f"/work-orders/{row.id}",
+        "synthetic_status": row.status,
+    }
+
+
+def _line_coordinates(row: RegionalTransmissionLine | None) -> list[list[float]]:
+    geometry = row.geometry_json if row else None
+    coordinates = geometry.get("coordinates") if isinstance(geometry, dict) else None
+    if not isinstance(coordinates, list):
+        return []
+    return [point for point in coordinates if isinstance(point, list) and len(point) >= 2]
+
+
+def _regional_site_code(row: RegionalSubstation) -> str:
+    if row.external_source_id and row.external_source_id.startswith("seed-"):
+        return row.external_source_id.removeprefix("seed-")
+    name = row.substation_name or ""
+    return name.split(" ", 1)[0]
+
+
+def _site_code_from_node_name(value: str | None) -> str | None:
+    if not value:
+        return None
+    parts = value.split("-")
+    if len(parts) >= 2:
+        return "-".join(parts[:2])
+    return value
+
+
+def _state_from_site_code(value: str | None) -> str | None:
+    if not value:
+        return None
+    prefix = value.split("-", 1)[0].upper()
+    return {
+        "MA": "Massachusetts",
+        "RI": "Rhode Island",
+        "CT": "Connecticut",
+        "NH": "New Hampshire",
+        "VT": "Vermont",
+        "ME": "Maine",
+    }.get(prefix)
 
 
 def _visible_synthetic_circuits(session: SessionDep, user: CurrentUser) -> list[RegionalSyntheticCircuit]:

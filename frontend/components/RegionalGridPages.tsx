@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Cable, CheckCircle2, Database, GitBranch, Map, Network, Plus, RefreshCw, Shield, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { AssetBrowserMap } from "@/components/AssetBrowserMap";
 import { Badge } from "@/components/Badges";
 import { DataTable } from "@/components/DataTable";
 import { apiFetch, displayValue } from "@/lib/api";
@@ -80,17 +81,17 @@ export function RegionalGridOverviewPage() {
       />
       <SafetyNotice text={summary?.safety_note} message={message} />
       {busy ? <Loading label="Loading RegionalGrid Planner..." /> : <MetricCards cards={summary?.cards || []} />}
+      <Section title="Regional Asset Browser Map">
+        <MapPanel mapData={mapData} />
+      </Section>
       <div className="two-column" style={{ marginTop: 16 }}>
-        <Section title="Regional Map Payload">
-          <MapPanel mapData={mapData} />
-        </Section>
         <Section title="Recent Public Imports">
           <DataTable rows={summary?.recent_import_batches || []} columns={["import_batch_name", "import_time", "record_count", "imported_substation_count", "imported_line_count", "status"]} />
         </Section>
+        <Section title="Visible Regional Work Orders">
+          <DataTable rows={summary?.visible_work_orders || []} columns={workOrderColumns} detailBase="/work-orders" filterField="status" />
+        </Section>
       </div>
-      <Section title="Visible Regional Work Orders">
-        <DataTable rows={summary?.visible_work_orders || []} columns={workOrderColumns} detailBase="/work-orders" filterField="status" />
-      </Section>
     </>
   );
 }
@@ -283,7 +284,7 @@ export function RegionalTelecomOverlayPage() {
     <>
       <PageHeader title="Regional Telecom Overlay" subtitle="Public grid reference layers with internal synthetic and assumed telecom planning overlays" actions={<Link className="button" href="/regional-grid/sel-icon-synthetic-network"><Network size={16} />Synthetic ICON</Link>} />
       <SafetyNotice text="Public grid references are visible broadly; internal telecom details follow utility-owner permissions." />
-      <Section title="Map-Ready Layers"><MapPanel mapData={{ layers: data.map_layers || {} }} /></Section>
+      <Section title="Browse Map-Ready Layers"><MapPanel mapData={{ layers: data.map_layers || {} }} /></Section>
       <div className="two-column">
         <Section title="Telecom Overlays"><DataTable rows={data.overlays || []} columns={["overlay_name", "overlay_type", "confidence_level", "status", "regional_substation_id", "regional_transmission_line_id", "fiber_cable_id", "icon_node_id"]} filterField="overlay_type" /></Section>
         <Section title="Assumed Routes"><DataTable rows={data.assumptions || []} columns={["assumption_name", "confidence_level", "status", "fiber_count_assumption", "linked_fiber_cable_id"]} filterField="status" /></Section>
@@ -294,13 +295,23 @@ export function RegionalTelecomOverlayPage() {
 
 export function RegionalSyntheticNetworkPage() {
   const [data, setData] = useState<SyntheticNetworkPayload | null>(null);
+  const [selectedRingId, setSelectedRingId] = useState<string | null>(null);
   useEffect(() => { apiFetch<SyntheticNetworkPayload>("/api/regional-grid/sel-icon-synthetic-network").then(setData); }, []);
   if (!data) return <Loading label="Loading synthetic SEL ICON network..." />;
+  const rings = data.rings || [];
+  const selectedRing = rings.find((row) => String(row.id) === selectedRingId) || rings[0];
+  const selectedRingCircuits = ((selectedRing?.circuits as JsonRecord[] | undefined) || []).length ? (selectedRing?.circuits as JsonRecord[]) : (data.circuits || []).filter((row) => String(row.ring_id) === String(selectedRing?.id));
   return (
     <>
       <PageHeader title="Synthetic SEL ICON Network" subtitle="Fictional New England-scale planning model with rings, assumed paths, access controls, and circuit examples" actions={<Link className="button" href="/regional-grid/mixed-access"><Shield size={16} />Access Matrix</Link>} />
       <SafetyNotice text={data.disclaimer || "Synthetic planning model only."} />
-      <Section title="Synthetic ICON Rings"><RingGrid rows={data.rings || []} /></Section>
+      <Section title="Synthetic ICON Rings"><RingGrid rows={rings} selectedId={String(selectedRing?.id || "")} onSelect={(row) => setSelectedRingId(String(row.id || ""))} /></Section>
+      <Section title={`Selected Ring: ${displayValue(selectedRing?.ring_name)}`}>
+        <div className="two-column">
+          <RecordPanel title="Ring Engineering Summary" record={selectedRing || {}} />
+          <DataTable rows={selectedRingCircuits} columns={circuitColumns} filterField="service_type" />
+        </div>
+      </Section>
       <Section title="Synthetic SEL ICON Circuits"><DataTable rows={data.circuits || []} columns={circuitColumns} filterField="service_type" /></Section>
     </>
   );
@@ -360,13 +371,7 @@ function MapPanel({ mapData }: { mapData: MapPayload | null }) {
   const layerRows = Object.entries(layers).map(([layer, values]) => ({ id: layer, layer, feature_count: values.length }));
   return (
     <>
-      <div className="map-ready">
-        <div style={{ textAlign: "center" }}>
-          <Map size={32} />
-          <div>New England Map-Ready Layers</div>
-          <div className="subtle">Leaflet/MapLibre placeholder payload</div>
-        </div>
-      </div>
+      <AssetBrowserMap mapData={mapData} />
       <DataTable rows={layerRows} columns={["layer", "feature_count"]} />
     </>
   );
@@ -383,13 +388,13 @@ function MapMini({ geometry }: { geometry: unknown }) {
   );
 }
 
-function RingGrid({ rows }: { rows: JsonRecord[] }) {
+function RingGrid({ rows, selectedId, onSelect }: { rows: JsonRecord[]; selectedId?: string; onSelect: (row: JsonRecord) => void }) {
   return (
     <div className="slot-grid">
       {rows.map((row) => {
         const nodes = ((row.nodes_json as JsonRecord | undefined)?.nodes as unknown[] | undefined) || [];
         return (
-          <div className="slot-card" key={String(row.id)}>
+          <button className={`slot-card interactive ${String(row.id) === selectedId ? "selected" : ""}`} key={String(row.id)} onClick={() => onSelect(row)}>
             <div className="slot-number">{displayValue(row.ring_name)}</div>
             <div className="subtle">{displayValue(row.owner_name)}</div>
             <div><Badge value={row.status} /></div>
@@ -397,7 +402,7 @@ function RingGrid({ rows }: { rows: JsonRecord[] }) {
             <div className="field-value">{nodes.map(displayValue).join(", ")}</div>
             <div className="field-label">Circuits</div>
             <div className="field-value">{displayValue(row.circuit_count)}</div>
-          </div>
+          </button>
         );
       })}
     </div>
