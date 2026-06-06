@@ -2510,6 +2510,11 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   font-weight: 700;
 }
 
+.dashboard-map-global-search-wrap {
+  position: relative;
+  min-width: 0;
+}
+
 .dashboard-map-global-search,
 .dashboard-panel-search {
   display: grid;
@@ -2535,6 +2540,55 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 .dashboard-map-global-search input::placeholder,
 .dashboard-panel-search input::placeholder {
   color: rgba(238,252,251,.56);
+}
+
+.dashboard-map-search-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 8;
+  display: grid;
+  gap: 6px;
+  max-height: min(390px, calc(100vh - 110px));
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgba(238,252,251,.16);
+  border-radius: 8px;
+  background: rgba(7,16,18,.96);
+  box-shadow: 0 22px 56px rgba(0,0,0,.42);
+  backdrop-filter: blur(18px);
+}
+
+.dashboard-map-search-popover button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid rgba(238,252,251,.1);
+  border-radius: 7px;
+  background: rgba(238,252,251,.055);
+  color: var(--dash-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-map-search-popover button:hover,
+.dashboard-map-search-popover button.active {
+  border-color: rgba(105,215,228,.42);
+  background: rgba(105,215,228,.13);
+}
+
+.dashboard-map-search-popover strong {
+  color: var(--dash-text);
+  font-size: 12px;
+}
+
+.dashboard-map-search-popover span,
+.dashboard-map-search-popover p {
+  color: var(--dash-muted);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .dashboard-map-status-pill {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AlertTriangle, Cable, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { appNavGroups } from "@/components/navigation";
 import { seedMapNodes } from "@/data/nodeParameters";
 import { seedEditableSubstations } from "@/data/substations";
@@ -89,6 +89,8 @@ export function DashboardPage() {
   const [addAssetKind, setAddAssetKind] = useState<AddAssetKind | null>(null);
   const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [assetTypeFilter, setAssetTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
@@ -226,12 +228,24 @@ export function DashboardPage() {
     () => buildOwnerOptions(visiblePublicSubstations, visiblePublicTransmissionLines),
     [visiblePublicSubstations, visiblePublicTransmissionLines],
   );
+  const rawSearchResults = useMemo(
+    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search),
+    [search, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionStructures],
+  );
+  const mapSearchResults = useMemo(
+    () => search.trim() ? rawSearchResults.filter(isDashboardMapSearchResult).slice(0, 8) : [],
+    [rawSearchResults, search],
+  );
   const searchResults = useMemo(
-    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search)
+    () => rawSearchResults
       .filter((selection) => matchesDashboardFilters(selection, assetTypeFilter, statusFilter, regionFilter, visibilityFilter, ownerFilter))
       .slice(0, 12),
-    [assetTypeFilter, ownerFilter, regionFilter, search, statusFilter, visibilityFilter, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionStructures],
+    [assetTypeFilter, ownerFilter, rawSearchResults, regionFilter, statusFilter, visibilityFilter],
   );
+
+  useEffect(() => {
+    setActiveSearchIndex(0);
+  }, [search]);
 
   const handleMapStatusChange = useCallback((status: MapStatus, message?: string) => {
     setMapStatus(status);
@@ -312,6 +326,46 @@ export function DashboardPage() {
     setFocusRequest({ selection, sequence: Date.now() });
     setRightMode("details");
     setRightCollapsed(false);
+  }
+
+  function focusSearchResult(selection: StreetMapSelection) {
+    focusSelection(selection);
+    setSearch(selection.label);
+    setSearchOpen(false);
+    setActiveSearchIndex(0);
+    showToast(`Zoomed to ${selection.label}.`);
+  }
+
+  function handleGlobalSearchChange(value: string) {
+    setSearch(value);
+    setSearchOpen(Boolean(value.trim()));
+  }
+
+  function handleGlobalSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setSearchOpen(false);
+      return;
+    }
+    if (!mapSearchResults.length) {
+      if (event.key === "Enter" && search.trim()) showToast("No map asset matched that search.");
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSearchOpen(true);
+      setActiveSearchIndex((current) => Math.min(current + 1, mapSearchResults.length - 1));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSearchOpen(true);
+      setActiveSearchIndex((current) => Math.max(current - 1, 0));
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      focusSearchResult(mapSearchResults[Math.min(activeSearchIndex, mapSearchResults.length - 1)]);
+    }
   }
 
   function handleMapSelect(selection: StreetMapSelection) {
@@ -423,10 +477,38 @@ export function DashboardPage() {
           <strong>GridAssetLink</strong>
           <span>HIFLD lines, substations, structures, and splices</span>
         </div>
-        <label className="dashboard-map-global-search">
-          <Search size={16} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HIFLD lines, substations, owners, structures, or splice closures" />
-        </label>
+        <div className="dashboard-map-global-search-wrap">
+          <label className="dashboard-map-global-search">
+            <Search size={16} />
+            <input
+              value={search}
+              onChange={(event) => handleGlobalSearchChange(event.target.value)}
+              onFocus={() => setSearchOpen(Boolean(search.trim()))}
+              onKeyDown={handleGlobalSearchKeyDown}
+              placeholder="Search HIFLD lines, substations, owners, structures, or splice closures"
+              aria-autocomplete="list"
+              aria-expanded={searchOpen && mapSearchResults.length > 0}
+            />
+          </label>
+          {searchOpen && search.trim() ? (
+            <div className="dashboard-map-search-popover" role="listbox" aria-label="Map search results">
+              {mapSearchResults.length ? mapSearchResults.map((result, index) => (
+                <button
+                  type="button"
+                  className={index === activeSearchIndex ? "active" : ""}
+                  key={`${result.kind}-${result.id}`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => focusSearchResult(result)}
+                  role="option"
+                  aria-selected={index === activeSearchIndex}
+                >
+                  <strong>{result.label}</strong>
+                  <span>{formatSelectionKind(result.kind)} / {selectionStatus(result)}</span>
+                </button>
+              )) : <p>No matching map assets.</p>}
+            </div>
+          ) : null}
+        </div>
         <div className={`dashboard-map-status-pill ${mapStatus}`}>
           <RadioTower size={15} />
           <span>{mapStatus === "active" ? "MapLibre active" : mapStatus === "error" ? "MapLibre error" : "MapLibre loading"}</span>
@@ -1110,7 +1192,7 @@ function buildSearchResults(
   ];
   const lowered = query.trim().toLowerCase();
   if (!lowered) return all;
-  return all.filter((asset) => JSON.stringify(asset.record).toLowerCase().includes(lowered));
+  return all.filter((asset) => selectionSearchText(asset).toLowerCase().includes(lowered));
 }
 
 function publicLineLabel(record: PublicTransmissionLineFeature) {
@@ -1119,6 +1201,13 @@ function publicLineLabel(record: PublicTransmissionLineFeature) {
 
 function publicSubstationLabel(record: PublicSubstationFeature) {
   return `${record.properties.name} / ${record.properties.utilityOwner}`;
+}
+
+function isDashboardMapSearchResult(selection: StreetMapSelection) {
+  return selection.kind === "public_transmission_line"
+    || selection.kind === "public_substation"
+    || selection.kind === "transmission_structure"
+    || selection.kind === "splice_closure";
 }
 
 function matchesDashboardFilters(selection: StreetMapSelection, assetType: string, status: string, region: string, visibility: string, owner: string) {
@@ -1187,6 +1276,26 @@ function ownerCountsFor(publicSubstations: PublicSubstationFeature[], publicLine
 
 function formatSelectionKind(kind: StreetMapSelection["kind"]) {
   return kind.replaceAll("_", " ");
+}
+
+function selectionSearchText(selection: StreetMapSelection) {
+  if (selection.kind === "public_transmission_line") {
+    const properties = selection.record.properties;
+    return [selection.label, properties.id, properties.name, properties.owner, properties.voltageClass, properties.states.join(" ")].join(" ");
+  }
+  if (selection.kind === "public_substation") {
+    const properties = selection.record.properties;
+    return [selection.label, properties.id, properties.name, properties.utilityOwner, properties.city, properties.county, properties.state, properties.nearestPublicLineId].join(" ");
+  }
+  if (selection.kind === "transmission_structure") {
+    const properties = selection.record.properties;
+    return [selection.label, properties.id, properties.structureNumber, properties.lineId, properties.lineName, properties.structureType].join(" ");
+  }
+  if (selection.kind === "splice_closure") {
+    const properties = selection.record.properties;
+    return [selection.label, properties.id, properties.name, properties.structureNumber, properties.closureType, properties.status].join(" ");
+  }
+  return JSON.stringify(selection.record);
 }
 
 function filterSubstationsForScope(substations: Substation[], publicOnly: boolean) {
