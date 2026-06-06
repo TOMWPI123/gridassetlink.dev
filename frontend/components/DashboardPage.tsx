@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Cable, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Workflow } from "lucide-react";
+import { AlertTriangle, Cable, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { appNavGroups } from "@/components/navigation";
+import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
 import { seedMapNodes } from "@/data/nodeParameters";
 import { seedEditableSubstations } from "@/data/substations";
 import { seedPlanningRegions, seedTransmissionLines } from "@/data/transmissionLines";
@@ -52,7 +53,7 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
 };
 
 type MapStatus = "loading" | "active" | "error";
-type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "details" | "strands" | "splices" | "assignments" | "editor";
+type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
 
 const availableDeviceIds = ["NODE-WBS-ICON", "NODE-AUB-ICON", "NODE-BOS-OTN", "NODE-RI-RTR", "NODE-NH-MW"];
@@ -160,6 +161,14 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const drawer = new URLSearchParams(window.location.search).get("drawer");
+    if (drawer === "sources") {
+      setRightMode("sources");
+      setRightCollapsed(false);
+    }
   }, []);
 
   const publicOnly = true;
@@ -591,6 +600,7 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "summary" ? "active" : ""} onClick={() => setRightMode("summary")}><Gauge size={14} />Summary</button>
               <button type="button" className={rightMode === "filters" ? "active" : ""} onClick={() => setRightMode("filters")}><Filter size={14} />Filters</button>
               <button type="button" className={rightMode === "layers" ? "active" : ""} onClick={() => setRightMode("layers")}><Layers size={14} />Layers</button>
+              <button type="button" className={rightMode === "sources" ? "active" : ""} onClick={() => setRightMode("sources")}><TableProperties size={14} />Sources</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
               <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
             </div>
@@ -647,6 +657,7 @@ export function DashboardPage() {
                   ) : null}
                 </div>
               ) : null}
+              {rightMode === "sources" ? <DashboardDataSourcesPanel /> : null}
               {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} /> : null}
               {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} onUpdateStrands={updateFiberStrands} /> : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
@@ -698,6 +709,42 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
         {options.map((option) => <option value={option} key={option}>{option === "all" ? "All" : option}</option>)}
       </select>
     </label>
+  );
+}
+
+function DashboardDataSourcesPanel() {
+  return (
+    <section className="dashboard-source-disclosure-panel" aria-label="Dashboard data sourcing">
+      <div className="dashboard-panel-heading">
+        <TableProperties size={16} />
+        <div>
+          <strong>Data sourcing</strong>
+          <span>Public references, attribution, and synthetic-data boundary</span>
+        </div>
+      </div>
+      <div className="dashboard-source-boundary">
+        {dataSourceSafetyNotes.map((note) => <p key={note}>{note}</p>)}
+      </div>
+      <div className="dashboard-source-list">
+        {dataSourceRecords.map((source) => (
+          <article className="dashboard-source-card" key={source.name}>
+            <div className="dashboard-source-card-title">
+              <div>
+                <strong>{source.name}</strong>
+                <span>{source.category}</span>
+              </div>
+              {source.url ? (
+                <a href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.name} source information`}>
+                  <ExternalLink size={14} />
+                </a>
+              ) : null}
+            </div>
+            <p>{source.role}</p>
+            <small>{source.handling}</small>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 

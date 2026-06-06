@@ -1,11 +1,12 @@
 "use client";
 
-import { Download, Play, QrCode, Shield, Upload } from "lucide-react";
+import { Download, ExternalLink, Play, QrCode, Shield, TableProperties, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiDownload, apiFetch, displayValue } from "@/lib/api";
 import type { JsonRecord } from "@/types";
 import { Badge } from "@/components/Badges";
 import { DataTable } from "@/components/DataTable";
+import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
 
 export function SQLReportsPage() {
   const [reports, setReports] = useState<JsonRecord[]>([]);
@@ -35,6 +36,55 @@ export function ImportExportPage() {
   const [entity, setEntity] = useState("substations");
   const [result, setResult] = useState<JsonRecord | null>(null);
   return <><div className="page-header"><div><h1 className="eyebrowless-title">Import / Export</h1><div className="subtle">CSV templates, validation preview, and table exports</div></div><div className="toolbar"><button className="button" onClick={() => apiFetch<JsonRecord>("/api/import/csv", { method: "POST", body: JSON.stringify({ entity, rows: [{ substation_code: "DEMO", name: "Demo Substation" }] }) }).then(setResult)}><Upload size={16} />Validate</button><button className="button primary" onClick={() => apiDownload(`/api/export/${entity}`, `${entity}.csv`)}><Download size={16} />Export</button></div></div><div className="panel"><div className="panel-body"><select className="select" value={entity} onChange={(e) => setEntity(e.target.value)}>{["substations", "devices", "device-ports", "icon-nodes", "fiber-cables", "fiber-strands", "patch-panels", "patch-panel-ports", "splice-closures", "circuits", "leased-services", "work-orders"].map((item) => <option key={item} value={item}>{item}</option>)}</select></div></div>{result ? <DataTable rows={[result]} columns={["entity", "row_count", "valid", "commit_supported"]} /> : null}</>;
+}
+
+export function DataSourcesPage() {
+  return (
+    <>
+      <div className="page-header">
+        <div>
+          <h1 className="eyebrowless-title">Data Sources</h1>
+          <div className="subtle">Public references, OpenStreetMap attribution, and synthetic planning-data boundaries</div>
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel-header">
+          <strong>Operating boundary</strong>
+          <Badge value="no sensitive data" />
+        </div>
+        <div className="panel-body data-source-note-list">
+          {dataSourceSafetyNotes.map((note) => <p key={note}>{note}</p>)}
+        </div>
+      </div>
+      <div className="data-source-page-grid">
+        {dataSourceRecords.map((source) => (
+          <article className="panel data-source-page-card" key={source.name}>
+            <div className="panel-header">
+              <div>
+                <strong>{source.name}</strong>
+                <div className="subtle">{source.category}</div>
+              </div>
+              {source.url ? (
+                <a className="button" href={source.url} target="_blank" rel="noreferrer">
+                  <ExternalLink size={15} />
+                  Source
+                </a>
+              ) : <TableProperties size={16} />}
+            </div>
+            <div className="panel-body">
+              <p>{source.role}</p>
+              <div className="subtle">{source.handling}</div>
+              {source.generatedFiles?.length ? (
+                <div className="data-source-files">
+                  {source.generatedFiles.map((file) => <code key={file}>{file}</code>)}
+                </div>
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </div>
+    </>
+  );
 }
 
 export function AdminSettingsPage() {
