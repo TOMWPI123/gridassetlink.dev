@@ -226,6 +226,48 @@ export type PublicTransmissionLineCollection = {
   features: PublicTransmissionLineFeature[];
 };
 
+export type PublicSubstationOwnerSource =
+  | "public_substation_owner_field"
+  | "public_substation_source_field"
+  | "nearest_public_hifld_transmission_line_owner"
+  | "unknown";
+
+export type PublicSubstationProperties = {
+  id: string;
+  name: string;
+  city?: string | null;
+  county?: string | null;
+  state: IsoNeState;
+  substationType?: string | null;
+  status?: "existing" | "planned" | "proposed" | "unknown";
+  maxVoltageKv?: number | null;
+  minVoltageKv?: number | null;
+  lineCount?: number | null;
+  utilityOwner: string;
+  ownerSource: PublicSubstationOwnerSource;
+  ownerConfidence: "public_record" | "public_source_label" | "public_line_inferred" | "unknown";
+  nearestPublicLineId?: string | null;
+  nearestPublicLineDistanceMiles?: number | null;
+  source: "HIFLD" | "OpenStreetMap" | "Public GIS";
+  sourceType: "public-reference";
+  readOnly: true;
+  synthetic: false;
+  isoNe: true;
+  rawSource?: string | null;
+  publicDataNotice: "Public substation reference point. Not for operations.";
+};
+
+export type PublicSubstationFeature = {
+  type: "Feature";
+  properties: PublicSubstationProperties;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type PublicSubstationCollection = {
+  type: "FeatureCollection";
+  features: PublicSubstationFeature[];
+};
+
 export type SyntheticSubstationProperties = {
   id: string;
   name: string;
@@ -560,6 +602,7 @@ export type MapAnnotation = {
 
 export type StreetMapLayerKey =
   | "publicTransmissionLines"
+  | "publicSubstations"
   | "syntheticSubstations"
   | "transmissionStructures"
   | "syntheticOpgwCables"

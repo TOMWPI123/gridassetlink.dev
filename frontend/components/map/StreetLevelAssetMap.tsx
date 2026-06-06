@@ -2,13 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
   | { kind: "node"; id: string; label: string; record: MapNode }
   | { kind: "transmission_line"; id: string; label: string; record: TransmissionLine }
   | { kind: "public_transmission_line"; id: string; label: string; record: PublicTransmissionLineFeature }
+  | { kind: "public_substation"; id: string; label: string; record: PublicSubstationFeature }
   | { kind: "synthetic_substation"; id: string; label: string; record: SyntheticSubstationFeature }
   | { kind: "transmission_structure"; id: string; label: string; record: TransmissionStructureFeature }
   | { kind: "opgw_cable"; id: string; label: string; record: OpgwCableFeature }
@@ -30,6 +31,7 @@ type StreetLevelAssetMapProps = {
   nodes: MapNode[];
   transmissionLines: TransmissionLine[];
   publicTransmissionLines: PublicTransmissionLineFeature[];
+  publicSubstations: PublicSubstationFeature[];
   syntheticSubstations: SyntheticSubstationFeature[];
   transmissionStructures: TransmissionStructureFeature[];
   opgwCables: OpgwCableFeature[];
@@ -58,6 +60,7 @@ export function StreetLevelAssetMap({
   nodes,
   transmissionLines,
   publicTransmissionLines,
+  publicSubstations,
   syntheticSubstations,
   transmissionStructures,
   opgwCables,
@@ -83,6 +86,7 @@ export function StreetLevelAssetMap({
           nodes={nodes}
           transmissionLines={transmissionLines}
           publicTransmissionLines={publicTransmissionLines}
+          publicSubstations={publicSubstations}
           syntheticSubstations={syntheticSubstations}
           transmissionStructures={transmissionStructures}
           opgwCables={opgwCables}

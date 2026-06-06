@@ -16,10 +16,11 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableFeature, PatchPanel, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
+  publicSubstations: true,
   syntheticSubstations: false,
   transmissionStructures: true,
   syntheticOpgwCables: false,
@@ -45,6 +46,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
 const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   ...initialStreetLayers,
   publicTransmissionLines: true,
+  publicSubstations: true,
   transmissionStructures: true,
   spliceClosures: true,
 };
@@ -91,6 +93,7 @@ export function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
   const [rightCollapsed, setRightCollapsed] = useState(true);
   const [rightMode, setRightMode] = useState<RightDrawerMode>("modules");
   const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
@@ -98,6 +101,7 @@ export function DashboardPage() {
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
   const [publicTransmissionLines, setPublicTransmissionLines] = useState<PublicTransmissionLineFeature[]>([]);
+  const [publicSubstations, setPublicSubstations] = useState<PublicSubstationFeature[]>([]);
   const [syntheticSubstations, setSyntheticSubstations] = useState<SyntheticSubstationFeature[]>([]);
   const [transmissionStructures, setTransmissionStructures] = useState<TransmissionStructureFeature[]>([]);
   const [opgwCables, setOpgwCables] = useState<OpgwCableFeature[]>([]);
@@ -118,6 +122,12 @@ export function DashboardPage() {
           warnings.publicLines = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
           return [] as PublicTransmissionLineFeature[];
         });
+      const publicSubstationRecords = await fetchGeoJson<PublicSubstationCollection>("/data/iso-ne-public-substations.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.publicSubstations = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as PublicSubstationFeature[];
+        });
       const structures = await fetchGeoJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson")
         .then((collection) => collection.features || [])
         .catch((error) => {
@@ -136,6 +146,7 @@ export function DashboardPage() {
       });
       if (cancelled) return;
       setPublicTransmissionLines(publicLines);
+      setPublicSubstations(publicSubstationRecords);
       setTransmissionStructures(structures);
       setSpliceClosures(closures);
       setFiberSplices(splices);
@@ -169,6 +180,10 @@ export function DashboardPage() {
   const visiblePublicTransmissionLines = useMemo(
     () => publicTransmissionLines.filter((feature) => feature.properties.isoNe),
     [publicTransmissionLines],
+  );
+  const visiblePublicSubstations = useMemo(
+    () => publicSubstations.filter((feature) => feature.properties.isoNe),
+    [publicSubstations],
   );
   const visibleSyntheticSubstations = useMemo(
     () => syntheticSubstations.filter((feature) => feature.properties.synthetic && feature.properties.public === false),
@@ -204,14 +219,18 @@ export function DashboardPage() {
   );
 
   const summaryCards = useMemo(
-    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, mapStatus),
-    [mapStatus, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
+    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, mapStatus),
+    [mapStatus, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
+  );
+  const ownerOptions = useMemo(
+    () => buildOwnerOptions(visiblePublicSubstations, visiblePublicTransmissionLines),
+    [visiblePublicSubstations, visiblePublicTransmissionLines],
   );
   const searchResults = useMemo(
-    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search)
-      .filter((selection) => matchesDashboardFilters(selection, assetTypeFilter, statusFilter, regionFilter, visibilityFilter))
+    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search)
+      .filter((selection) => matchesDashboardFilters(selection, assetTypeFilter, statusFilter, regionFilter, visibilityFilter, ownerFilter))
       .slice(0, 12),
-    [assetTypeFilter, regionFilter, search, statusFilter, visibilityFilter, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionStructures],
+    [assetTypeFilter, ownerFilter, regionFilter, search, statusFilter, visibilityFilter, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionStructures],
   );
 
   const handleMapStatusChange = useCallback((status: MapStatus, message?: string) => {
@@ -381,6 +400,7 @@ export function DashboardPage() {
         nodes={visibleNodes}
         transmissionLines={visibleTransmissionLines}
         publicTransmissionLines={visiblePublicTransmissionLines}
+        publicSubstations={visiblePublicSubstations}
         syntheticSubstations={visibleSyntheticSubstations}
         transmissionStructures={visibleTransmissionStructures}
         opgwCables={visibleOpgwCables}
@@ -401,11 +421,11 @@ export function DashboardPage() {
       <div className="dashboard-floating-topbar">
         <div className="dashboard-compact-brand">
           <strong>GridAssetLink</strong>
-          <span>HIFLD lines with synthetic structure/splice context</span>
+          <span>HIFLD lines, substations, structures, and splices</span>
         </div>
         <label className="dashboard-map-global-search">
           <Search size={16} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HIFLD lines, structures, or splice closures" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HIFLD lines, substations, owners, structures, or splice closures" />
         </label>
         <div className={`dashboard-map-status-pill ${mapStatus}`}>
           <RadioTower size={15} />
@@ -443,12 +463,15 @@ export function DashboardPage() {
                   statusFilter={statusFilter}
                   regionFilter={regionFilter}
                   visibilityFilter={visibilityFilter}
+                  ownerFilter={ownerFilter}
+                  ownerOptions={ownerOptions}
                   searchResults={searchResults}
                   onSearchChange={setSearch}
                   onAssetTypeChange={setAssetTypeFilter}
                   onStatusChange={setStatusFilter}
                   onRegionChange={setRegionFilter}
                   onVisibilityChange={setVisibilityFilter}
+                  onOwnerChange={setOwnerFilter}
                   onSelectResult={focusSelection}
                 />
               ) : null}
@@ -457,6 +480,8 @@ export function DashboardPage() {
                   <MapLayerControlPanel
                     layers={effectiveStreetLayers}
                     publicLineCount={visiblePublicTransmissionLines.length}
+                    publicSubstationCount={visiblePublicSubstations.length}
+                    utilityOwnerCount={ownerOptions.length - 1}
                     structureCount={visibleTransmissionStructures.length}
                     spliceClosureCount={visibleSpliceClosures.length}
                     dataWarnings={mapDataWarnings}
@@ -510,7 +535,7 @@ export function DashboardPage() {
 
       <div className="dashboard-security-note map-overlay-note">
         <AlertTriangle size={15} />
-        <span>Dashboard map shows public HIFLD lines plus synthetic demo structures and splice closures. Do not enter or infer CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
+        <span>Dashboard map shows public HIFLD lines/substations plus synthetic demo structures and splice closures. Utility-owner buckets use public fields or explicit nearest-line public inference. Do not enter CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
       </div>
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
@@ -564,12 +589,15 @@ function FiltersResultsDrawer({
   statusFilter,
   regionFilter,
   visibilityFilter,
+  ownerFilter,
+  ownerOptions,
   searchResults,
   onSearchChange,
   onAssetTypeChange,
   onStatusChange,
   onRegionChange,
   onVisibilityChange,
+  onOwnerChange,
   onSelectResult,
 }: {
   publicOnly: boolean;
@@ -578,12 +606,15 @@ function FiltersResultsDrawer({
   statusFilter: string;
   regionFilter: string;
   visibilityFilter: string;
+  ownerFilter: string;
+  ownerOptions: string[];
   searchResults: StreetMapSelection[];
   onSearchChange: (value: string) => void;
   onAssetTypeChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onRegionChange: (value: string) => void;
   onVisibilityChange: (value: string) => void;
+  onOwnerChange: (value: string) => void;
   onSelectResult: (selection: StreetMapSelection) => void;
 }) {
   return (
@@ -600,9 +631,10 @@ function FiltersResultsDrawer({
         <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search map records" />
       </label>
       <div className="dashboard-filter-grid">
-        <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={onAssetTypeChange} options={["all", "public_transmission_line", "transmission_structure", "opgw_cable", "splice_closure", "fiber_assignment", "patch_panel", "synthetic_substation", "substation", "node", "transmission_line", "work_order"]} />
+        <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={onAssetTypeChange} options={["all", "public_transmission_line", "public_substation", "transmission_structure", "opgw_cable", "splice_closure", "fiber_assignment", "patch_panel", "synthetic_substation", "substation", "node", "transmission_line", "work_order"]} />
         <FilterSelect label="Status" value={statusFilter} onChange={onStatusChange} options={["all", "existing", "planned", "proposed", "reserved", "assigned", "open"]} />
         <FilterSelect label="Region" value={regionFilter} onChange={onRegionChange} options={["all", "MA", "RI", "CT", "NH", "VT", "ME"]} />
+        <FilterSelect label="Utility Owner" value={ownerFilter} onChange={onOwnerChange} options={ownerOptions} />
         <FilterSelect label="Criticality" value="all" onChange={() => undefined} options={["all", "critical", "high", "normal"]} />
         <FilterSelect label="Manufacturer" value="all" onChange={() => undefined} options={["all", "SEL", "Cisco", "Nokia", "Other"]} />
         <FilterSelect label="Lifecycle" value="all" onChange={() => undefined} options={["all", "Existing", "Proposed", "Out of Service"]} />
@@ -1021,6 +1053,7 @@ function buildSummaryCards(
   nodes: MapNode[],
   lines: TransmissionLine[],
   publicLines: PublicTransmissionLineFeature[],
+  publicSubstations: PublicSubstationFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
   structures: TransmissionStructureFeature[],
   opgw: OpgwCableFeature[],
@@ -1031,9 +1064,15 @@ function buildSummaryCards(
 ) {
   const stateCount = new Set(publicLines.flatMap((line) => line.properties.states)).size;
   const voltageClassCount = new Set(publicLines.map((line) => line.properties.voltageClass || "unknown")).size;
+  const ownerCounts = ownerCountsFor(publicSubstations, publicLines);
+  const utilityOwnerCount = ownerCounts.filter(({ owner }) => owner !== "Unknown public owner").length;
+  const topOwner = ownerCounts.find(({ owner }) => owner !== "Unknown public owner") || ownerCounts[0];
   return [
     { label: "Transmission Maps", value: maps.length, note: "public HIFLD reference", Icon: Network },
     { label: "HIFLD Lines", value: publicLines.length, note: "read-only public reference", Icon: Route },
+    { label: "Substation Nodes", value: publicSubstations.length, note: "public HIFLD reference", Icon: MapPin },
+    { label: "Utility Owners", value: utilityOwnerCount, note: "public/inferred buckets", Icon: Layers },
+    { label: "Top Owner Bucket", value: topOwner?.count || 0, note: topOwner?.owner || "none", Icon: Gauge },
     { label: "Structures", value: structures.length, note: "synthetic demo points", Icon: MapPin },
     { label: "Splice Closures", value: closures.length, note: "synthetic demo closures", Icon: Cable },
     { label: "States Covered", value: stateCount, note: "ISO New England states", Icon: MapPin },
@@ -1047,6 +1086,7 @@ function buildSearchResults(
   nodes: MapNode[],
   lines: TransmissionLine[],
   publicLines: PublicTransmissionLineFeature[],
+  publicSubstations: PublicSubstationFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
   structures: TransmissionStructureFeature[],
   opgw: OpgwCableFeature[],
@@ -1057,6 +1097,7 @@ function buildSearchResults(
 ): StreetMapSelection[] {
   const all: StreetMapSelection[] = [
     ...publicLines.map((record) => ({ kind: "public_transmission_line" as const, id: record.properties.id, label: publicLineLabel(record), record })),
+    ...publicSubstations.map((record) => ({ kind: "public_substation" as const, id: record.properties.id, label: publicSubstationLabel(record), record })),
     ...syntheticSubstations.map((record) => ({ kind: "synthetic_substation" as const, id: record.properties.id, label: record.properties.name, record })),
     ...structures.map((record) => ({ kind: "transmission_structure" as const, id: record.properties.id, label: record.properties.structureNumber, record })),
     ...opgw.map((record) => ({ kind: "opgw_cable" as const, id: record.properties.id, label: record.properties.cableName, record })),
@@ -1076,16 +1117,22 @@ function publicLineLabel(record: PublicTransmissionLineFeature) {
   return record.properties.name ? `${record.properties.name} (${record.properties.id})` : record.properties.id;
 }
 
-function matchesDashboardFilters(selection: StreetMapSelection, assetType: string, status: string, region: string, visibility: string) {
+function publicSubstationLabel(record: PublicSubstationFeature) {
+  return `${record.properties.name} / ${record.properties.utilityOwner}`;
+}
+
+function matchesDashboardFilters(selection: StreetMapSelection, assetType: string, status: string, region: string, visibility: string, owner: string) {
   if (assetType !== "all" && selection.kind !== assetType) return false;
   if (status !== "all" && selectionStatus(selection) !== status) return false;
   if (region !== "all" && selectionRegion(selection) !== region) return false;
   if (visibility !== "all" && selectionVisibility(selection) !== visibility) return false;
+  if (owner !== "all" && selectionUtilityOwner(selection) !== owner) return false;
   return true;
 }
 
 function selectionStatus(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return selection.record.properties.status || "unknown";
+  if (selection.kind === "public_substation") return selection.record.properties.status || "unknown";
   if (selection.kind === "synthetic_substation") return selection.record.properties.status;
   if (selection.kind === "transmission_structure") return selection.record.properties.hasSplice ? "assigned" : selection.record.properties.hasOpgw ? "existing" : "planned";
   if (selection.kind === "opgw_cable") return selection.record.properties.status;
@@ -1098,6 +1145,7 @@ function selectionStatus(selection: StreetMapSelection) {
 
 function selectionRegion(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return selection.record.properties.states[0] || "MA";
+  if (selection.kind === "public_substation") return selection.record.properties.state;
   if (selection.kind === "synthetic_substation") return selection.record.properties.state;
   if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "MA";
   const record = selection.record as { state?: string };
@@ -1106,10 +1154,35 @@ function selectionRegion(selection: StreetMapSelection) {
 
 function selectionVisibility(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return "public";
+  if (selection.kind === "public_substation") return "public";
   if (selection.kind === "synthetic_substation") return selection.record.properties.visibility;
   if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "synthetic-demo";
   const record = selection.record as { visibility?: string };
   return record.visibility || "private";
+}
+
+function selectionUtilityOwner(selection: StreetMapSelection) {
+  if (selection.kind === "public_transmission_line") return selection.record.properties.owner || "Unknown public owner";
+  if (selection.kind === "public_substation") return selection.record.properties.utilityOwner;
+  return "Unknown public owner";
+}
+
+function buildOwnerOptions(publicSubstations: PublicSubstationFeature[], publicLines: PublicTransmissionLineFeature[]) {
+  return ["all", ...ownerCountsFor(publicSubstations, publicLines).map(({ owner }) => owner)];
+}
+
+function ownerCountsFor(publicSubstations: PublicSubstationFeature[], publicLines: PublicTransmissionLineFeature[]) {
+  const counts = new Map<string, number>();
+  publicSubstations.forEach((record) => {
+    counts.set(record.properties.utilityOwner, (counts.get(record.properties.utilityOwner) || 0) + 1);
+  });
+  publicLines.forEach((record) => {
+    const owner = record.properties.owner || "Unknown public owner";
+    counts.set(owner, (counts.get(owner) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([owner, count]) => ({ owner, count }))
+    .sort((a, b) => b.count - a.count || a.owner.localeCompare(b.owner));
 }
 
 function formatSelectionKind(kind: StreetMapSelection["kind"]) {

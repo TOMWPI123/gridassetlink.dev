@@ -6,6 +6,8 @@ import type { StreetMapLayerKey } from "@/lib/types/assets";
 type MapLayerControlPanelProps = {
   layers: Record<StreetMapLayerKey, boolean>;
   publicLineCount?: number;
+  publicSubstationCount?: number;
+  utilityOwnerCount?: number;
   structureCount?: number;
   spliceClosureCount?: number;
   dataWarnings?: Record<string, string>;
@@ -13,13 +15,15 @@ type MapLayerControlPanelProps = {
 
 const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges?: string[] }> = [
   { key: "publicTransmissionLines", label: "HIFLD transmission lines", note: "Public HIFLD reference geometry only", badges: ["Public", "Read-only"] },
+  { key: "publicSubstations", label: "Public substation nodes", note: "Open-source substation reference nodes grouped by public/inferred utility owner", badges: ["Public", "Owner buckets"] },
   { key: "transmissionStructures", label: "Transmission structures", note: "Synthetic demo structure points sampled from public line geometry", badges: ["Synthetic", "Demo"] },
   { key: "spliceClosures", label: "Splice closures", note: "Synthetic demo splice closures mounted on synthetic structures", badges: ["Synthetic", "Demo"] },
 ];
 
-export function MapLayerControlPanel({ layers, publicLineCount = 0, structureCount = 0, spliceClosureCount = 0, dataWarnings }: MapLayerControlPanelProps) {
+export function MapLayerControlPanel({ layers, publicLineCount = 0, publicSubstationCount = 0, utilityOwnerCount = 0, structureCount = 0, spliceClosureCount = 0, dataWarnings }: MapLayerControlPanelProps) {
   const counts: Partial<Record<StreetMapLayerKey, number>> = {
     publicTransmissionLines: publicLineCount,
+    publicSubstations: publicSubstationCount,
     transmissionStructures: structureCount,
     spliceClosures: spliceClosureCount,
   };
@@ -46,7 +50,7 @@ export function MapLayerControlPanel({ layers, publicLineCount = 0, structureCou
         ))}
       </div>
       <div className="street-map-todo-note">
-        Dashboard map is limited to public HIFLD transmission-line geometry plus synthetic demo transmission structures and splice closures. Telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
+        Dashboard map is limited to public HIFLD transmission-line and substation references plus synthetic demo transmission structures and splice closures. Utility owner filters use {utilityOwnerCount} public/inferred owner buckets; telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
       </div>
     </aside>
   );
@@ -54,6 +58,7 @@ export function MapLayerControlPanel({ layers, publicLineCount = 0, structureCou
 
 function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string, string>) {
   if (layer === "publicTransmissionLines") return warnings?.publicLines;
+  if (layer === "publicSubstations") return warnings?.publicSubstations;
   if (layer === "transmissionStructures") return warnings?.structures;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   return "";

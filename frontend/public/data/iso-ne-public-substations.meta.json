@@ -1,0 +1,27 @@
+{
+  "sourceName": "HIFLD Electric Substations",
+  "sourceType": "public-reference",
+  "sourceUrl": "https://services5.arcgis.com/HDRa0B57OVrv2E1q/ArcGIS/rest/services/Electric_Substations/FeatureServer/0",
+  "generatedAt": "2026-06-06T03:05:57.704Z",
+  "featureCount": 1914,
+  "statesIncluded": [
+    "CT",
+    "MA",
+    "RI",
+    "NH",
+    "VT",
+    "ME"
+  ],
+  "ownerInferenceMaxMiles": 4,
+  "ownerSummary": {
+    "Unknown public owner": 1130,
+    "PUBLIC SERVICE CO OF NH": 247,
+    "VERMONT ELECTRIC POWER CO": 156,
+    "CONNECTICUT LIGHT & POWER CO": 146,
+    "CENTRAL MAINE POWER CO": 160,
+    "CITIZENS UTILITIES CO": 5,
+    "NSTAR ELECTRIC COMPANY": 30,
+    "WESTERN MASSACHUSETTS ELEC CO": 40
+  },
+  "notes": "Public substation reference data only. Not for operations. Utility-owner buckets are public-field values when available, otherwise inferred from nearest public HIFLD transmission-line owner."
+}
