@@ -6,16 +6,22 @@ import type { StreetMapLayerKey } from "@/lib/types/assets";
 type MapLayerControlPanelProps = {
   layers: Record<StreetMapLayerKey, boolean>;
   publicLineCount?: number;
+  structureCount?: number;
+  spliceClosureCount?: number;
   dataWarnings?: Record<string, string>;
 };
 
 const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges?: string[] }> = [
   { key: "publicTransmissionLines", label: "HIFLD transmission lines", note: "Public HIFLD reference geometry only", badges: ["Public", "Read-only"] },
+  { key: "transmissionStructures", label: "Transmission structures", note: "Synthetic demo structure points sampled from public line geometry", badges: ["Synthetic", "Demo"] },
+  { key: "spliceClosures", label: "Splice closures", note: "Synthetic demo splice closures mounted on synthetic structures", badges: ["Synthetic", "Demo"] },
 ];
 
-export function MapLayerControlPanel({ layers, publicLineCount = 0, dataWarnings }: MapLayerControlPanelProps) {
+export function MapLayerControlPanel({ layers, publicLineCount = 0, structureCount = 0, spliceClosureCount = 0, dataWarnings }: MapLayerControlPanelProps) {
   const counts: Partial<Record<StreetMapLayerKey, number>> = {
     publicTransmissionLines: publicLineCount,
+    transmissionStructures: structureCount,
+    spliceClosures: spliceClosureCount,
   };
   return (
     <aside className="street-layer-control-panel" aria-label="Street-level layer and drawing controls">
@@ -40,7 +46,7 @@ export function MapLayerControlPanel({ layers, publicLineCount = 0, dataWarnings
         ))}
       </div>
       <div className="street-map-todo-note">
-        Dashboard map is locked to public HIFLD transmission-line geometry. Synthetic OPGW, splicing, circuits, devices, work orders, and planning overlays are not rendered here.
+        Dashboard map is limited to public HIFLD transmission-line geometry plus synthetic demo transmission structures and splice closures. Telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
       </div>
     </aside>
   );
@@ -48,5 +54,7 @@ export function MapLayerControlPanel({ layers, publicLineCount = 0, dataWarnings
 
 function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string, string>) {
   if (layer === "publicTransmissionLines") return warnings?.publicLines;
+  if (layer === "transmissionStructures") return warnings?.structures;
+  if (layer === "spliceClosures") return warnings?.spliceClosures;
   return "";
 }

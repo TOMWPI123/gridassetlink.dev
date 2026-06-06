@@ -16,14 +16,14 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableFeature, PatchPanel, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableFeature, PatchPanel, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
   syntheticSubstations: false,
-  transmissionStructures: false,
+  transmissionStructures: true,
   syntheticOpgwCables: false,
-  spliceClosures: false,
+  spliceClosures: true,
   fiberAssignments: false,
   patchPanels: false,
   transmissionLines: false,
@@ -42,9 +42,11 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   isoNeReferenceOverlays: false,
 };
 
-const hifldOnlyStreetLayers: Record<StreetMapLayerKey, boolean> = {
+const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   ...initialStreetLayers,
   publicTransmissionLines: true,
+  transmissionStructures: true,
+  spliceClosures: true,
 };
 
 type MapStatus = "loading" | "active" | "error";
@@ -116,8 +118,27 @@ export function DashboardPage() {
           warnings.publicLines = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
           return [] as PublicTransmissionLineFeature[];
         });
+      const structures = await fetchGeoJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.structures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as TransmissionStructureFeature[];
+        });
+      const closures = await fetchGeoJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.spliceClosures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as SpliceClosureFeature[];
+        });
+      const splices = await fetchGeoJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json").catch((error) => {
+        warnings.splices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+        return [] as FiberSplice[];
+      });
       if (cancelled) return;
       setPublicTransmissionLines(publicLines);
+      setTransmissionStructures(structures);
+      setSpliceClosures(closures);
+      setFiberSplices(splices);
       setMapDataWarnings(warnings);
     }
     void loadStaticMapData();
@@ -178,7 +199,7 @@ export function DashboardPage() {
     [planningRegions, publicOnly],
   );
   const effectiveStreetLayers = useMemo(
-    () => hifldOnlyStreetLayers,
+    () => dashboardStreetLayers,
     [],
   );
 
@@ -380,11 +401,11 @@ export function DashboardPage() {
       <div className="dashboard-floating-topbar">
         <div className="dashboard-compact-brand">
           <strong>GridAssetLink</strong>
-          <span>HIFLD transmission-line map</span>
+          <span>HIFLD lines with synthetic structure/splice context</span>
         </div>
         <label className="dashboard-map-global-search">
           <Search size={16} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HIFLD transmission lines" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HIFLD lines, structures, or splice closures" />
         </label>
         <div className={`dashboard-map-status-pill ${mapStatus}`}>
           <RadioTower size={15} />
@@ -409,6 +430,7 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "filters" ? "active" : ""} onClick={() => setRightMode("filters")}><Filter size={14} />Filters</button>
               <button type="button" className={rightMode === "layers" ? "active" : ""} onClick={() => setRightMode("layers")}><Layers size={14} />Layers</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
+              <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
             </div>
             <div className="dashboard-drawer-body">
               {rightMode === "modules" ? <ModulesDrawer pathname={pathname} /> : null}
@@ -435,6 +457,8 @@ export function DashboardPage() {
                   <MapLayerControlPanel
                     layers={effectiveStreetLayers}
                     publicLineCount={visiblePublicTransmissionLines.length}
+                    structureCount={visibleTransmissionStructures.length}
+                    spliceClosureCount={visibleSpliceClosures.length}
                     dataWarnings={mapDataWarnings}
                   />
                   {effectiveStreetLayers.missingLocationAssets ? (
@@ -486,7 +510,7 @@ export function DashboardPage() {
 
       <div className="dashboard-security-note map-overlay-note">
         <AlertTriangle size={15} />
-        <span>Dashboard map shows public HIFLD transmission-line reference data only. Do not enter or infer CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
+        <span>Dashboard map shows public HIFLD lines plus synthetic demo structures and splice closures. Do not enter or infer CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
       </div>
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
@@ -1010,6 +1034,8 @@ function buildSummaryCards(
   return [
     { label: "Transmission Maps", value: maps.length, note: "public HIFLD reference", Icon: Network },
     { label: "HIFLD Lines", value: publicLines.length, note: "read-only public reference", Icon: Route },
+    { label: "Structures", value: structures.length, note: "synthetic demo points", Icon: MapPin },
+    { label: "Splice Closures", value: closures.length, note: "synthetic demo closures", Icon: Cable },
     { label: "States Covered", value: stateCount, note: "ISO New England states", Icon: MapPin },
     { label: "Voltage Classes", value: voltageClassCount, note: "HIFLD normalized classes", Icon: Gauge },
     { label: "MapLibre", value: mapStatus === "active" ? "Active" : mapStatus === "error" ? "Error" : "Loading", note: mapStatus === "active" ? "MapLibre active" : mapStatus === "error" ? "clear failure state" : "waiting for load", Icon: RadioTower },
