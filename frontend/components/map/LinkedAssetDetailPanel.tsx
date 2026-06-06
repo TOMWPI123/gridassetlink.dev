@@ -50,12 +50,12 @@ export function LinkedAssetDetailPanel({ selection }: LinkedAssetDetailPanelProp
           <pre>{JSON.stringify(nodeParameters, null, 2)}</pre>
         </details>
       ) : null}
-      {selection.kind === "synthetic_substation" ? (
+      {selection.kind === "synthetic_substation" || selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure" ? (
         <div className="linked-asset-actions">
-          <button type="button">Create synthetic telecom node</button>
-          <button type="button">Create synthetic fiber route</button>
-          <button type="button">Create circuit endpoint</button>
-          <button type="button">Create work order</button>
+          <button type="button">Add splice closure</button>
+          <button type="button">Add patch panel</button>
+          <button type="button">Start fiber assignment</button>
+          <button type="button">Add proposed change</button>
         </div>
       ) : null}
     </section>
@@ -72,18 +72,37 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
   if (selection.kind === "synthetic_substation") {
     return selection.record.properties as unknown as Record<string, unknown>;
   }
+  if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure") {
+    return {
+      ...selection.record.properties,
+      geometryType: selection.record.geometry.type,
+    } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "fiber_assignment" || selection.kind === "patch_panel") {
+    return selection.record as unknown as Record<string, unknown>;
+  }
   return selection.record as Record<string, unknown>;
 }
 
 function detailBadgesForSelection(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return ["Public", "Read-only"];
   if (selection.kind === "synthetic_substation") return ["Synthetic", "Demo", "Private"];
+  if (selection.kind === "transmission_structure") return ["Synthetic structure", "Demo"];
+  if (selection.kind === "opgw_cable") return ["Synthetic OPGW", "Demo"];
+  if (selection.kind === "splice_closure") return ["Synthetic splice", "Demo"];
+  if (selection.kind === "fiber_assignment") return ["Synthetic assignment", "Demo"];
+  if (selection.kind === "patch_panel") return ["Synthetic panel", "Demo"];
   return [];
 }
 
 function detailNoticeForSelection(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return "Public transmission line reference geometry. Read-only and not for operations.";
   if (selection.kind === "synthetic_substation") return "Synthetic demo/planning substation. Not a real utility asset.";
+  if (selection.kind === "transmission_structure") return "Synthetic transmission structure point generated from public line geometry. It is not a real pole, tower, or utility structure location.";
+  if (selection.kind === "opgw_cable") return "Synthetic OPGW planning route. Do not treat this as verified fiber or an operational telecom path.";
+  if (selection.kind === "splice_closure") return "Synthetic splice closure at a synthetic structure point. It is for demo splicing workflows only.";
+  if (selection.kind === "fiber_assignment") return "Synthetic fiber assignment for planning demonstration. It is not an actual circuit path.";
+  if (selection.kind === "patch_panel") return "Synthetic patch panel and termination ports for demo planning.";
   return "";
 }
 

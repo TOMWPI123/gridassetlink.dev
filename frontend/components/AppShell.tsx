@@ -1,22 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Search } from "lucide-react";
-import { clearSession, getSession } from "@/lib/api";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { Search } from "lucide-react";
 import { appNavGroups } from "@/components/navigation";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [name, setName] = useState("Not signed in");
-  const [role, setRole] = useState("");
-  useEffect(() => {
-    const session = getSession();
-    setName(session?.user.full_name || "Not signed in");
-    setRole(session?.user.role || "");
-  }, [pathname]);
   const isDashboard = pathname === "/" || pathname === "/dashboard";
   return (
     <div className={`shell ${isDashboard ? "dashboard-shell" : ""}`}>
@@ -35,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {!isDashboard ? (
           <div className="topbar">
             <div className="toolbar" style={{ width: "100%" }}><Search size={16} /><input className="input" placeholder="Search assets, circuits, work orders, providers" /></div>
-            <div className="toolbar"><span className="subtle">{name}</span>{role ? <span className="badge gray">{role.replaceAll("_", " ")}</span> : null}<button className="icon-button" onClick={() => { clearSession(); router.push("/"); }} title="Sign out"><LogOut size={16} /></button></div>
+            <div className="toolbar"><span className="badge gray">No-account synthetic demo</span></div>
           </div>
         ) : null}
         <div className={`content ${isDashboard ? "dashboard-content" : ""}`}>{children}</div>

@@ -272,6 +272,172 @@ export type SyntheticSubstationCollection = {
   features: SyntheticSubstationFeature[];
 };
 
+export type TransmissionStructure = {
+  id: string;
+  structureNumber: string;
+  lineId: string;
+  lineName?: string;
+  sequenceIndex: number;
+  latitude: number;
+  longitude: number;
+  milepost?: number;
+  structureType: "tangent" | "angle" | "deadend" | "tap" | "splice" | "riser" | "terminal" | "unknown";
+  voltageKv?: number;
+  source: "synthetic-demo";
+  synthetic: true;
+  hasOpgw: boolean;
+  hasSplice: boolean;
+  spliceClosureIds: string[];
+  connectedFiberCableIds: string[];
+  notes?: string;
+};
+
+export type TransmissionStructureFeature = {
+  type: "Feature";
+  properties: TransmissionStructure;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type TransmissionStructureCollection = {
+  type: "FeatureCollection";
+  features: TransmissionStructureFeature[];
+};
+
+export type OpgwCable = {
+  id: string;
+  cableName: string;
+  lineId: string;
+  lineName?: string;
+  synthetic: true;
+  source: "synthetic-demo";
+  status: "existing" | "planned" | "proposed";
+  fiberCount: 24 | 48 | 72 | 96 | 144;
+  fiberType: "OPGW";
+  startStructureId: string;
+  endStructureId: string;
+  structureIds: string[];
+  routeMiles: number;
+  manufacturer?: string;
+  cableSpec?: string;
+  bufferTubeCount?: number;
+  fibersPerTube?: number;
+  connectedSpliceClosureIds: string[];
+  notes?: string;
+};
+
+export type OpgwCableFeature = {
+  type: "Feature";
+  properties: OpgwCable;
+  geometry:
+    | { type: "LineString"; coordinates: Coordinate[] }
+    | { type: "MultiLineString"; coordinates: Coordinate[][] };
+};
+
+export type OpgwCableCollection = {
+  type: "FeatureCollection";
+  features: OpgwCableFeature[];
+};
+
+export type FiberStrand = {
+  id: string;
+  cableId: string;
+  strandNumber: number;
+  tubeNumber?: number;
+  colorCode?: string;
+  status: "available" | "assigned" | "reserved" | "dark" | "spare" | "faulted" | "retired";
+  assignmentId?: string;
+  circuitId?: string;
+  notes?: string;
+};
+
+export type SpliceClosure = {
+  id: string;
+  name: string;
+  synthetic: true;
+  source: "synthetic-demo";
+  closureType: "aerial_opgw_splice" | "transition_splice" | "tap_splice" | "midspan_splice" | "terminal_splice";
+  structureId: string;
+  structureNumber: string;
+  latitude: number;
+  longitude: number;
+  cableIds: string[];
+  spliceCount: number;
+  status: "existing" | "planned" | "proposed";
+  installType: "aerial" | "riser" | "terminal" | "unknown";
+  notes?: string;
+};
+
+export type SpliceClosureFeature = {
+  type: "Feature";
+  properties: SpliceClosure;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type SpliceClosureCollection = {
+  type: "FeatureCollection";
+  features: SpliceClosureFeature[];
+};
+
+export type FiberSplice = {
+  id: string;
+  spliceClosureId: string;
+  fromCableId: string;
+  fromStrandNumber: number;
+  toCableId: string;
+  toStrandNumber: number;
+  spliceType: "straight_through" | "express" | "branch" | "patch" | "open" | "reserved";
+  lossDb?: number;
+  status: "existing" | "planned" | "proposed" | "faulted";
+  assignmentId?: string;
+  notes?: string;
+};
+
+export type FiberAssignment = {
+  id: string;
+  assignmentName: string;
+  synthetic: true;
+  serviceType: "SEL_ICON" | "C37_94" | "Ethernet" | "MPLS_TP" | "OTN" | "SCADA" | "Protection" | "DTT" | "Leased" | "Spare" | "Other";
+  status: "active" | "planned" | "proposed" | "reserved" | "retired";
+  aEndStructureId?: string;
+  zEndStructureId?: string;
+  aEndNodeId?: string;
+  zEndNodeId?: string;
+  cableIds: string[];
+  strandSegments: Array<{
+    cableId: string;
+    strandNumbers: number[];
+    fromStructureId: string;
+    toStructureId: string;
+  }>;
+  spliceIds: string[];
+  estimatedDistanceMiles?: number;
+  estimatedLossDb?: number;
+  notes?: string;
+};
+
+export type PatchPanelPort = {
+  id: string;
+  panelId: string;
+  portNumber: number;
+  cableId?: string;
+  strandNumber?: number;
+  assignmentId?: string;
+  status: "available" | "assigned" | "reserved" | "faulted";
+};
+
+export type PatchPanel = {
+  id: string;
+  name: string;
+  synthetic: true;
+  locationType: "structure" | "substation" | "telecom_node";
+  locationId: string;
+  fiberCableIds: string[];
+  portCount: 12 | 24 | 48 | 72 | 96 | 144;
+  connectorType: "LC" | "SC" | "ST" | "FC" | "Unknown";
+  ports: PatchPanelPort[];
+  notes?: string;
+};
+
 export type NodeParameters = {
   nodeId: string;
   nodeName: string;
@@ -395,6 +561,11 @@ export type MapAnnotation = {
 export type StreetMapLayerKey =
   | "publicTransmissionLines"
   | "syntheticSubstations"
+  | "transmissionStructures"
+  | "syntheticOpgwCables"
+  | "spliceClosures"
+  | "fiberAssignments"
+  | "patchPanels"
   | "transmissionLines"
   | "substations"
   | "telecomNodes"

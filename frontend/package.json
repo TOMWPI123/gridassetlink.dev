@@ -10,7 +10,15 @@
     "typecheck": "tsc --noEmit",
     "data:transmission": "tsx scripts/ingest-public-transmission-lines.ts",
     "data:synthetic-substations": "tsx scripts/generate-synthetic-substations.ts",
-    "data:map": "npm run data:transmission && npm run data:synthetic-substations"
+    "data:structures": "tsx scripts/generate-transmission-structures.ts",
+    "data:opgw": "tsx scripts/generate-synthetic-opgw.ts",
+    "data:strands": "tsx scripts/generate-fiber-strands.ts",
+    "data:splices": "tsx scripts/generate-splice-closures.ts && tsx scripts/generate-fiber-splices.ts",
+    "data:patch-panels": "tsx scripts/generate-patch-panels.ts",
+    "data:fiber-assignments": "tsx scripts/generate-fiber-assignments.ts",
+    "data:fiber-network": "npm run data:structures && npm run data:opgw && npm run data:strands && npm run data:splices && npm run data:patch-panels && npm run data:fiber-assignments",
+    "data:validate-fiber-network": "tsx scripts/validate-fiber-network.ts",
+    "data:map": "npm run data:transmission && npm run data:synthetic-substations && npm run data:fiber-network && npm run data:validate-fiber-network"
   },
   "dependencies": {
     "lucide-react": "^0.475.0",

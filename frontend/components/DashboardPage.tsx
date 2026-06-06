@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Cable, Cpu, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, ShieldCheck, SlidersHorizontal, Workflow, X } from "lucide-react";
+import { AlertTriangle, Cable, Cpu, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, ShieldCheck, SlidersHorizontal, TableProperties, Workflow, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getSession } from "@/lib/api";
 import { appNavGroups } from "@/components/navigation";
 import { isoNeDiagramAnnotations } from "@/data/mapAnnotations";
 import { seedMapNodes } from "@/data/nodeParameters";
@@ -21,11 +20,16 @@ import { StreetLevelAssetMap, type FocusRequest, type MapCommand, type StreetMap
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
 import { TransmissionMapSelector } from "@/components/map/TransmissionMapSelector";
-import type { Coordinate, DashboardMapMode, MapDrawingTool, MapNode, NodeParameters, PublicTransmissionLineCollection, PublicTransmissionLineFeature, StreetMapLayerKey, Substation, SyntheticSubstationCollection, SyntheticSubstationFeature, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, PatchPanel, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationCollection, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
   syntheticSubstations: true,
+  transmissionStructures: true,
+  syntheticOpgwCables: true,
+  spliceClosures: true,
+  fiberAssignments: true,
+  patchPanels: true,
   transmissionLines: true,
   substations: true,
   telecomNodes: true,
@@ -43,7 +47,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
 };
 
 type MapStatus = "loading" | "active" | "error";
-type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "details" | "editor";
+type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "details" | "strands" | "splices" | "assignments" | "editor";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
 
 const availableDeviceIds = ["NODE-WBS-ICON", "NODE-AUB-ICON", "NODE-BOS-OTN", "NODE-RI-RTR", "NODE-NH-MW"];
@@ -91,19 +95,21 @@ export function DashboardPage() {
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [publicTransmissionLines, setPublicTransmissionLines] = useState<PublicTransmissionLineFeature[]>([]);
   const [syntheticSubstations, setSyntheticSubstations] = useState<SyntheticSubstationFeature[]>([]);
-  const [mapDataWarnings, setMapDataWarnings] = useState<{ publicLines?: string; syntheticSubstations?: string }>({});
-
-  useEffect(() => {
-    setIsAuthenticated(Boolean(getSession()));
-  }, []);
+  const [transmissionStructures, setTransmissionStructures] = useState<TransmissionStructureFeature[]>([]);
+  const [opgwCables, setOpgwCables] = useState<OpgwCableFeature[]>([]);
+  const [spliceClosures, setSpliceClosures] = useState<SpliceClosureFeature[]>([]);
+  const [fiberStrands, setFiberStrands] = useState<FiberStrand[]>([]);
+  const [fiberSplices, setFiberSplices] = useState<FiberSplice[]>([]);
+  const [patchPanels, setPatchPanels] = useState<PatchPanel[]>([]);
+  const [fiberAssignments, setFiberAssignments] = useState<FiberAssignment[]>([]);
+  const [mapDataWarnings, setMapDataWarnings] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
     async function loadStaticMapData() {
-      const warnings: { publicLines?: string; syntheticSubstations?: string } = {};
+      const warnings: Record<string, string> = {};
       const publicLines = await fetchGeoJson<PublicTransmissionLineCollection>("/data/iso-ne-public-transmission-lines.geojson")
         .then((collection) => collection.features || [])
         .catch((error) => {
@@ -116,9 +122,50 @@ export function DashboardPage() {
           warnings.syntheticSubstations = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
           return [] as SyntheticSubstationFeature[];
         });
+      const structures = await fetchGeoJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.structures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as TransmissionStructureFeature[];
+        });
+      const opgw = await fetchGeoJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.opgw = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as OpgwCableFeature[];
+        });
+      const closures = await fetchGeoJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.spliceClosures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as SpliceClosureFeature[];
+        });
+      const strands = await fetchGeoJson<FiberStrand[]>("/data/iso-ne-synthetic-fiber-strands.json").catch((error) => {
+        warnings.strands = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+        return [] as FiberStrand[];
+      });
+      const splices = await fetchGeoJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json").catch((error) => {
+        warnings.splices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+        return [] as FiberSplice[];
+      });
+      const panels = await fetchGeoJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json").catch((error) => {
+        warnings.patchPanels = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+        return [] as PatchPanel[];
+      });
+      const assignments = await fetchGeoJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json").catch((error) => {
+        warnings.assignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+        return [] as FiberAssignment[];
+      });
       if (cancelled) return;
       setPublicTransmissionLines(publicLines);
       setSyntheticSubstations(synthetic);
+      setTransmissionStructures(structures);
+      setOpgwCables(opgw);
+      setSpliceClosures(closures);
+      setFiberStrands(strands);
+      setFiberSplices(splices);
+      setPatchPanels(panels);
+      setFiberAssignments(assignments);
       setMapDataWarnings(warnings);
     }
     void loadStaticMapData();
@@ -127,10 +174,10 @@ export function DashboardPage() {
     };
   }, []);
 
-  const publicOnly = !isAuthenticated;
+  const publicOnly = false;
   const visibleTransmissionMaps = useMemo(
-    () => publicOnly ? transmissionMaps.filter((map) => map.visibility === "public") : transmissionMaps,
-    [publicOnly, transmissionMaps],
+    () => transmissionMaps,
+    [transmissionMaps],
   );
   const activeMap = visibleTransmissionMaps.find((map) => map.id === activeMapId) || visibleTransmissionMaps[0] || transmissionMaps[0];
 
@@ -151,27 +198,47 @@ export function DashboardPage() {
     [publicTransmissionLines],
   );
   const visibleSyntheticSubstations = useMemo(
-    () => publicOnly ? [] : syntheticSubstations.filter((feature) => feature.properties.synthetic && feature.properties.public === false),
-    [publicOnly, syntheticSubstations],
+    () => syntheticSubstations.filter((feature) => feature.properties.synthetic && feature.properties.public === false),
+    [syntheticSubstations],
+  );
+  const visibleTransmissionStructures = useMemo(
+    () => transmissionStructures.filter((feature) => feature.properties.synthetic),
+    [transmissionStructures],
+  );
+  const visibleOpgwCables = useMemo(
+    () => opgwCables.filter((feature) => feature.properties.synthetic),
+    [opgwCables],
+  );
+  const visibleSpliceClosures = useMemo(
+    () => spliceClosures.filter((feature) => feature.properties.synthetic),
+    [spliceClosures],
+  );
+  const visiblePatchPanels = useMemo(
+    () => patchPanels.filter((panel) => panel.synthetic),
+    [patchPanels],
+  );
+  const visibleFiberAssignments = useMemo(
+    () => fiberAssignments.filter((assignment) => assignment.synthetic),
+    [fiberAssignments],
   );
   const visiblePlanningRegions = useMemo(
-    () => publicOnly ? [] : planningRegions,
-    [planningRegions, publicOnly],
+    () => planningRegions,
+    [planningRegions],
   );
   const effectiveStreetLayers = useMemo(
-    () => publicOnly ? publicLayerSet(streetLayers) : streetLayers,
-    [publicOnly, streetLayers],
+    () => streetLayers,
+    [streetLayers],
   );
 
   const summaryCards = useMemo(
-    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visibleSyntheticSubstations, mapStatus),
-    [mapStatus, visibleNodes, visiblePublicTransmissionLines, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps],
+    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, mapStatus),
+    [mapStatus, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
   );
   const searchResults = useMemo(
-    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visibleSyntheticSubstations, search)
+    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search)
       .filter((selection) => matchesDashboardFilters(selection, assetTypeFilter, statusFilter, regionFilter, visibilityFilter))
       .slice(0, 12),
-    [assetTypeFilter, regionFilter, search, statusFilter, visibilityFilter, visibleNodes, visiblePublicTransmissionLines, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
+    [assetTypeFilter, regionFilter, search, statusFilter, visibilityFilter, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionStructures],
   );
 
   const handleMapStatusChange = useCallback((status: MapStatus, message?: string) => {
@@ -189,10 +256,6 @@ export function DashboardPage() {
   }
 
   function handleMapClick(coordinate: Coordinate) {
-    if (publicOnly) {
-      showToast("Sign in to create private planning overlays.");
-      return;
-    }
     if (activeTool === "add_substation") {
       setDraftSubstation(createSubstationDraft(coordinate));
       openEditorDrawer();
@@ -283,10 +346,6 @@ export function DashboardPage() {
   }
 
   function selectAddAsset(kind: AddAssetKind) {
-    if (publicOnly) {
-      showToast("Sign in to add private planning assets.");
-      return;
-    }
     setAddAssetKind(kind);
     setPlacementTarget(null);
     setDraftNode(null);
@@ -309,10 +368,48 @@ export function DashboardPage() {
     window.setTimeout(() => setToast(""), 3800);
   }
 
+  function updateFiberStrands(cableId: string, strandNumbers: number[], status: FiberStrand["status"], assignmentId?: string) {
+    const selected = new Set(strandNumbers);
+    setFiberStrands((current) => current.map((strand) => {
+      if (strand.cableId !== cableId || !selected.has(strand.strandNumber)) return strand;
+      return {
+        ...strand,
+        status,
+        assignmentId: status === "available" || status === "spare" || status === "dark" ? undefined : assignmentId || strand.assignmentId,
+      };
+    }));
+    showToast(`${strandNumbers.length} strands on ${cableId} marked ${status}.`);
+  }
+
+  function createSyntheticFiberAssignment(assignment: FiberAssignment) {
+    setFiberAssignments((current) => [assignment, ...current.filter((item) => item.id !== assignment.id)]);
+    setFiberStrands((current) => current.map((strand) => {
+      const matchingSegment = assignment.strandSegments.find((segment) => segment.cableId === strand.cableId && segment.strandNumbers.includes(strand.strandNumber));
+      if (!matchingSegment) return strand;
+      return { ...strand, status: assignment.status === "active" ? "assigned" : "reserved", assignmentId: assignment.id };
+    }));
+    showToast(`Created synthetic ${assignment.serviceType} assignment ${assignment.assignmentName}.`);
+  }
+
+  function addSyntheticSplice(splice: FiberSplice) {
+    setFiberSplices((current) => [splice, ...current]);
+    showToast(`Added planned splice ${splice.id}.`);
+  }
+
+  function deleteSyntheticSplice(spliceId: string) {
+    const target = fiberSplices.find((splice) => splice.id === spliceId);
+    if (!target || target.status === "existing") {
+      showToast("Generated existing splice records are read-only in this demo.");
+      return;
+    }
+    setFiberSplices((current) => current.filter((splice) => splice.id !== spliceId));
+    showToast(`Deleted planned splice ${spliceId}.`);
+  }
+
   const placementHint = placementTarget
     ? `Place ${placementTarget.label} with street-level lat/lon. Do not use fake coordinates.`
     : addAssetKind
-      ? `Add Asset: ${addAssetLabel(addAssetKind)}. Click the ISO-NE map to place a private proposed record.`
+      ? `Add Asset: ${addAssetLabel(addAssetKind)}. Click the ISO-NE map to place a synthetic proposed record.`
       : undefined;
 
   return (
@@ -324,6 +421,11 @@ export function DashboardPage() {
         transmissionLines={visibleTransmissionLines}
         publicTransmissionLines={visiblePublicTransmissionLines}
         syntheticSubstations={visibleSyntheticSubstations}
+        transmissionStructures={visibleTransmissionStructures}
+        opgwCables={visibleOpgwCables}
+        spliceClosures={visibleSpliceClosures}
+        fiberAssignments={visibleFiberAssignments}
+        patchPanels={visiblePatchPanels}
         planningRegions={visiblePlanningRegions}
         layers={effectiveStreetLayers}
         activeTool={activeTool}
@@ -369,6 +471,9 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "filters" ? "active" : ""} onClick={() => setRightMode("filters")}><Filter size={14} />Filters</button>
               <button type="button" className={rightMode === "layers" ? "active" : ""} onClick={() => setRightMode("layers")}><Layers size={14} />Layers</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
+              <button type="button" className={rightMode === "strands" ? "active" : ""} onClick={() => setRightMode("strands")}><TableProperties size={14} />Strands</button>
+              <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
+              <button type="button" className={rightMode === "assignments" ? "active" : ""} onClick={() => setRightMode("assignments")}><Workflow size={14} />Assign</button>
               <button type="button" className={rightMode === "editor" ? "active" : ""} onClick={() => setRightMode("editor")}><Plus size={14} />Add</button>
             </div>
             <div className="dashboard-drawer-body">
@@ -398,13 +503,14 @@ export function DashboardPage() {
                     activeTool={activeTool}
                     publicLineCount={visiblePublicTransmissionLines.length}
                     syntheticSubstationCount={visibleSyntheticSubstations.length}
+                    structureCount={visibleTransmissionStructures.length}
+                    opgwCableCount={visibleOpgwCables.length}
+                    spliceClosureCount={visibleSpliceClosures.length}
+                    fiberAssignmentCount={visibleFiberAssignments.length}
+                    patchPanelCount={visiblePatchPanels.length}
                     dataWarnings={mapDataWarnings}
                     onToggleLayer={(layer) => setStreetLayers((current) => ({ ...current, [layer]: !current[layer] }))}
                     onToolChange={(tool) => {
-                      if (publicOnly) {
-                        showToast("Sign in to edit private map geometry.");
-                        return;
-                      }
                       setActiveTool(tool);
                       if (tool !== "place_missing") setPlacementTarget(null);
                     }}
@@ -415,10 +521,6 @@ export function DashboardPage() {
                       nodes={nodes}
                       placementTargetId={placementTarget?.id}
                       onPlaceMissing={(item) => {
-                        if (publicOnly) {
-                          showToast("Sign in to place missing private assets.");
-                          return;
-                        }
                         setPlacementTarget(item);
                         setActiveTool("place_missing");
                       }}
@@ -427,6 +529,9 @@ export function DashboardPage() {
                 </div>
               ) : null}
               {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} /> : null}
+              {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} onUpdateStrands={updateFiberStrands} /> : null}
+              {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
+              {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
               {rightMode === "editor" ? (
                 <div className="dashboard-drawer-stack">
                   {showMapEditor ? <TransmissionMapEditor open={showMapEditor} onCancel={() => setShowMapEditor(false)} onSave={handleCreateMap} /> : null}
@@ -476,17 +581,14 @@ export function DashboardPage() {
 
       <div className="dashboard-active-map-floating">
         <TransmissionMapSelector maps={visibleTransmissionMaps} activeMapId={activeMap.id} onChange={setActiveMapId} onCreateNew={() => {
-          if (publicOnly) showToast("Sign in to create private transmission maps.");
-          else {
-            setShowMapEditor(true);
-            openEditorDrawer();
-          }
+          setShowMapEditor(true);
+          openEditorDrawer();
         }} />
       </div>
 
       <div className="dashboard-security-note map-overlay-note">
         <AlertTriangle size={15} />
-        <span>{publicOnly ? "Public view: only public ISO-NE reference context is shown. Private telecom routes, protection channels, fiber strands, and SEL ICON service paths are hidden." : "Authenticated planning view: user-created layers default to private. Do not publish real telecom paths, protection settings, fiber strand routes, or CEII-restricted data."}</span>
+        <span>This demo has no user accounts. Use synthetic/demo data only. Do not enter real CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
       </div>
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
@@ -511,7 +613,7 @@ function ModulesDrawer({ pathname }: { pathname: string }) {
         <Network size={16} />
         <div>
           <strong>TelecomNE modules</strong>
-          <span>Operate, plan, analyze, and admin sections</span>
+          <span>No-account synthetic planning modules</span>
         </div>
       </div>
       <div className="dashboard-module-sections">
@@ -568,7 +670,7 @@ function FiltersResultsDrawer({
         <Filter size={16} />
         <div>
           <strong>Filters and results</strong>
-          <span>{publicOnly ? "Public reference only" : "Private planning overlays"}</span>
+          <span>{publicOnly ? "Public reference only" : "Synthetic/demo planning overlays"}</span>
         </div>
       </div>
       <label className="dashboard-panel-search">
@@ -576,15 +678,15 @@ function FiltersResultsDrawer({
         <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search map records" />
       </label>
       <div className="dashboard-filter-grid">
-        <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={onAssetTypeChange} options={["all", "public_transmission_line", "synthetic_substation", "substation", "node", "transmission_line", "work_order"]} />
-        <FilterSelect label="Status" value={statusFilter} onChange={onStatusChange} options={["all", "existing", "planned", "proposed", "open"]} />
+        <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={onAssetTypeChange} options={["all", "public_transmission_line", "transmission_structure", "opgw_cable", "splice_closure", "fiber_assignment", "patch_panel", "synthetic_substation", "substation", "node", "transmission_line", "work_order"]} />
+        <FilterSelect label="Status" value={statusFilter} onChange={onStatusChange} options={["all", "existing", "planned", "proposed", "reserved", "assigned", "open"]} />
         <FilterSelect label="Region" value={regionFilter} onChange={onRegionChange} options={["all", "MA", "RI", "CT", "NH", "VT", "ME"]} />
         <FilterSelect label="Criticality" value="all" onChange={() => undefined} options={["all", "critical", "high", "normal"]} />
         <FilterSelect label="Manufacturer" value="all" onChange={() => undefined} options={["all", "SEL", "Cisco", "Nokia", "Other"]} />
         <FilterSelect label="Lifecycle" value="all" onChange={() => undefined} options={["all", "Existing", "Proposed", "Out of Service"]} />
         <FilterSelect label="Phase Type" value="all" onChange={() => undefined} options={["all", "ABC", "A", "B", "C"]} />
         <FilterSelect label="Circuit Type" value="all" onChange={() => undefined} options={["all", "C37.94", "SCADA", "Ethernet", "DS1"]} />
-        <FilterSelect label="Visibility" value={visibilityFilter} onChange={onVisibilityChange} options={["all", "public", "team", "private"]} />
+        <FilterSelect label="Visibility" value={visibilityFilter} onChange={onVisibilityChange} options={["all", "public", "synthetic-demo", "team", "private"]} />
       </div>
       <div className="dashboard-results-heading">
         <strong>Results</strong>
@@ -596,7 +698,7 @@ function FiltersResultsDrawer({
             <strong>{result.label}</strong>
             <span>{formatSelectionKind(result.kind)} / {selectionStatus(result)}</span>
           </button>
-        )) : <p>{publicOnly ? "Sign in to view private planning records." : "No matching map records."}</p>}
+        )) : <p>No matching map records.</p>}
       </div>
     </section>
   );
@@ -614,7 +716,7 @@ function SummaryDrawer({ cards, publicOnly, mapStatusMessage }: { cards: ReturnT
         <Gauge size={16} />
         <div>
           <strong>Dashboard summary</strong>
-          <span>{publicOnly ? "Public ISO-NE reference mode" : "Authenticated planning workspace"}</span>
+          <span>{publicOnly ? "Public ISO-NE reference mode" : "No-account synthetic planning workspace"}</span>
         </div>
       </div>
       <div className="dashboard-summary-compact-grid">
@@ -639,7 +741,7 @@ function AddAssetChooser({ publicOnly, selectedKind, onSelect, onCreateMap }: { 
         <Plus size={16} />
         <div>
           <strong>Add Asset</strong>
-          <span>{publicOnly ? "Sign in required for private overlays" : "Choose a type, then click the map"}</span>
+          <span>{publicOnly ? "Public reference mode" : "Choose a synthetic type, then click the map"}</span>
         </div>
       </div>
       <div className="dashboard-add-asset-grid">
@@ -651,6 +753,336 @@ function AddAssetChooser({ publicOnly, selectedKind, onSelect, onCreateMap }: { 
         ))}
       </div>
       <button className="telecom-map-button full-width" type="button" onClick={onCreateMap}>Create transmission map</button>
+    </section>
+  );
+}
+
+function FiberStrandTable({
+  strands,
+  assignments,
+  opgwCables,
+  onUpdateStrands,
+}: {
+  strands: FiberStrand[];
+  assignments: FiberAssignment[];
+  opgwCables: OpgwCableFeature[];
+  onUpdateStrands: (cableId: string, strandNumbers: number[], status: FiberStrand["status"], assignmentId?: string) => void;
+}) {
+  const [cableId, setCableId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<number[]>([]);
+  const effectiveCableId = cableId || opgwCables[0]?.properties.id || "";
+  const cable = opgwCables.find((item) => item.properties.id === effectiveCableId);
+  const assignmentById = useMemo(() => new Map(assignments.map((assignment) => [assignment.id, assignment])), [assignments]);
+  const rows = useMemo(() => strands
+    .filter((strand) => strand.cableId === effectiveCableId)
+    .filter((strand) => statusFilter === "all" || strand.status === statusFilter)
+    .filter((strand) => {
+      const lowered = query.trim().toLowerCase();
+      if (!lowered) return true;
+      return `${strand.strandNumber} ${strand.colorCode || ""} ${strand.status} ${strand.assignmentId || ""} ${strand.circuitId || ""}`.toLowerCase().includes(lowered);
+    })
+    .slice(0, 144), [effectiveCableId, query, statusFilter, strands]);
+  const selectedRows = rows.filter((strand) => selected.includes(strand.strandNumber));
+
+  function toggleStrand(strandNumber: number) {
+    setSelected((current) => current.includes(strandNumber) ? current.filter((item) => item !== strandNumber) : [...current, strandNumber]);
+  }
+
+  function updateSelected(status: FiberStrand["status"]) {
+    if (!effectiveCableId || selectedRows.length === 0) return;
+    onUpdateStrands(effectiveCableId, selectedRows.map((strand) => strand.strandNumber), status);
+    setSelected([]);
+  }
+
+  function exportCsv() {
+    const header = ["strandNumber", "tubeNumber", "colorCode", "status", "assignmentId", "circuitId", "notes"];
+    const csv = [header.join(","), ...rows.map((row) => header.map((key) => JSON.stringify(row[key as keyof FiberStrand] ?? "")).join(","))].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${effectiveCableId || "fiber-strands"}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <section className="fiber-planning-panel" aria-label="Fiber strand table">
+      <div className="dashboard-panel-heading">
+        <TableProperties size={16} />
+        <div>
+          <strong>Fiber strand table</strong>
+          <span>Synthetic strand inventory and local planning reservations</span>
+        </div>
+      </div>
+      <div className="fiber-control-grid">
+        <label>
+          <span>OPGW cable</span>
+          <select value={effectiveCableId} onChange={(event) => { setCableId(event.target.value); setSelected([]); }}>
+            {opgwCables.slice(0, 250).map((item) => <option key={item.properties.id} value={item.properties.id}>{item.properties.cableName}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            {["all", "available", "assigned", "reserved", "dark", "spare", "faulted", "retired"].map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="dashboard-panel-search compact">
+        <Search size={14} />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search strand, assignment, circuit" />
+      </label>
+      <div className="fiber-stat-row">
+        <span>{cable?.properties.fiberCount || 0}F</span>
+        <span>{rows.length} shown</span>
+        <span>{selectedRows.length} selected</span>
+      </div>
+      <div className="fiber-action-row">
+        <button type="button" onClick={() => updateSelected("reserved")}>Reserve</button>
+        <button type="button" onClick={() => updateSelected("assigned")}>Assign</button>
+        <button type="button" onClick={() => updateSelected("available")}>Release</button>
+        <button type="button" onClick={exportCsv}>Export CSV</button>
+      </div>
+      <div className="fiber-table-wrap">
+        <table className="fiber-mini-table">
+          <thead>
+            <tr>
+              <th>Strand</th>
+              <th>Tube</th>
+              <th>Color</th>
+              <th>Status</th>
+              <th>Assignment</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((strand) => {
+              const assignment = strand.assignmentId ? assignmentById.get(strand.assignmentId) : undefined;
+              return (
+                <tr className={selected.includes(strand.strandNumber) ? "selected" : ""} key={strand.id} onClick={() => toggleStrand(strand.strandNumber)}>
+                  <td>{strand.strandNumber}</td>
+                  <td>{strand.tubeNumber || "-"}</td>
+                  <td>{strand.colorCode || "-"}</td>
+                  <td><span className={`fiber-status ${strand.status}`}>{strand.status}</span></td>
+                  <td>{assignment?.assignmentName || strand.assignmentId || "-"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function SpliceMatrix({
+  closures,
+  splices,
+  selectedAsset,
+  onAddSplice,
+  onDeleteSplice,
+}: {
+  closures: SpliceClosureFeature[];
+  splices: FiberSplice[];
+  selectedAsset: StreetMapSelection | null;
+  onAddSplice: (splice: FiberSplice) => void;
+  onDeleteSplice: (spliceId: string) => void;
+}) {
+  const initialClosureId = selectedAsset?.kind === "splice_closure" ? selectedAsset.id : "";
+  const [closureId, setClosureId] = useState(initialClosureId);
+  const effectiveClosureId = closureId || closures[0]?.properties.id || "";
+  const closure = closures.find((item) => item.properties.id === effectiveClosureId);
+  const rows = splices.filter((splice) => splice.spliceClosureId === effectiveClosureId).slice(0, 180);
+  const totalLoss = rows.reduce((total, splice) => total + (splice.lossDb || 0), 0);
+  const cableA = closure?.properties.cableIds[0] || "";
+  const cableB = closure?.properties.cableIds[1] || cableA;
+
+  useEffect(() => {
+    if (initialClosureId) setClosureId(initialClosureId);
+  }, [initialClosureId]);
+
+  function addPlannedSplice() {
+    if (!effectiveClosureId || !cableA) return;
+    const nextIndex = rows.length + 1;
+    onAddSplice({
+      id: `SPLICE-PLAN-${Date.now().toString(36).toUpperCase()}`,
+      spliceClosureId: effectiveClosureId,
+      fromCableId: cableA,
+      fromStrandNumber: nextIndex,
+      toCableId: cableB,
+      toStrandNumber: nextIndex,
+      spliceType: cableA === cableB ? "express" : "straight_through",
+      lossDb: 0.06,
+      status: "planned",
+      notes: "Synthetic planned splice created in no-auth demo mode.",
+    });
+  }
+
+  return (
+    <section className="fiber-planning-panel" aria-label="Splice matrix">
+      <div className="dashboard-panel-heading">
+        <Cable size={16} />
+        <div>
+          <strong>Splice matrix</strong>
+          <span>Synthetic generated splices are read-only; planned/proposed rows can be changed</span>
+        </div>
+      </div>
+      <label className="fiber-stacked-field">
+        <span>Splice closure</span>
+        <select value={effectiveClosureId} onChange={(event) => setClosureId(event.target.value)}>
+          {closures.slice(0, 400).map((item) => <option key={item.properties.id} value={item.properties.id}>{item.properties.name}</option>)}
+        </select>
+      </label>
+      <div className="fiber-stat-row">
+        <span>{closure?.properties.structureNumber || "-"}</span>
+        <span>{rows.length} splices</span>
+        <span>{totalLoss.toFixed(2)} dB est.</span>
+      </div>
+      <div className="fiber-action-row">
+        <button type="button" onClick={addPlannedSplice}>Add planned splice</button>
+        <button type="button">Create branch</button>
+        <button type="button">Export splice sheet</button>
+      </div>
+      <div className="fiber-table-wrap">
+        <table className="fiber-mini-table">
+          <thead>
+            <tr>
+              <th>From</th>
+              <th>To</th>
+              <th>Type</th>
+              <th>Loss</th>
+              <th>Status</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((splice) => (
+              <tr key={splice.id}>
+                <td>{splice.fromCableId} / {splice.fromStrandNumber}</td>
+                <td>{splice.toCableId} / {splice.toStrandNumber}</td>
+                <td>{splice.spliceType}</td>
+                <td>{(splice.lossDb || 0).toFixed(2)} dB</td>
+                <td><span className={`fiber-status ${splice.status}`}>{splice.status}</span></td>
+                <td>{splice.status === "existing" ? <span className="fiber-readonly">read-only</span> : <button type="button" onClick={() => onDeleteSplice(splice.id)}>Delete</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function FiberAssignmentPlanner({
+  assignments,
+  opgwCables,
+  structures,
+  strands,
+  onCreateAssignment,
+}: {
+  assignments: FiberAssignment[];
+  opgwCables: OpgwCableFeature[];
+  structures: TransmissionStructureFeature[];
+  strands: FiberStrand[];
+  onCreateAssignment: (assignment: FiberAssignment) => void;
+}) {
+  const [serviceType, setServiceType] = useState<FiberAssignment["serviceType"]>("SEL_ICON");
+  const [status, setStatus] = useState<FiberAssignment["status"]>("proposed");
+  const [cableId, setCableId] = useState("");
+  const [strandCount, setStrandCount] = useState(2);
+  const effectiveCableId = cableId || opgwCables[0]?.properties.id || "";
+  const cable = opgwCables.find((item) => item.properties.id === effectiveCableId);
+  const structureById = useMemo(() => new Map(structures.map((structure) => [structure.properties.id, structure])), [structures]);
+  const availableStrands = useMemo(() => strands
+    .filter((strand) => strand.cableId === effectiveCableId && ["available", "spare", "dark"].includes(strand.status))
+    .slice(0, strandCount), [effectiveCableId, strandCount, strands]);
+  const startStructure = cable ? structureById.get(cable.properties.startStructureId) : undefined;
+  const endStructure = cable ? structureById.get(cable.properties.endStructureId) : undefined;
+  const estimatedDistance = cable?.properties.routeMiles || 0;
+  const estimatedLoss = Number((estimatedDistance * 0.25 + 1).toFixed(2));
+  const canCreate = Boolean(cable && startStructure && endStructure && availableStrands.length === strandCount);
+
+  function createAssignment() {
+    if (!cable || !startStructure || !endStructure || !canCreate) return;
+    const strandNumbers = availableStrands.map((strand) => strand.strandNumber);
+    const assignment: FiberAssignment = {
+      id: `FASN-PLAN-${Date.now().toString(36).toUpperCase()}`,
+      assignmentName: `${serviceType}-${startStructure.properties.structureNumber}-${endStructure.properties.structureNumber}`,
+      synthetic: true,
+      serviceType,
+      status,
+      aEndStructureId: startStructure.properties.id,
+      zEndStructureId: endStructure.properties.id,
+      cableIds: [cable.properties.id],
+      strandSegments: [{
+        cableId: cable.properties.id,
+        strandNumbers,
+        fromStructureId: startStructure.properties.id,
+        toStructureId: endStructure.properties.id,
+      }],
+      spliceIds: [],
+      estimatedDistanceMiles: estimatedDistance,
+      estimatedLossDb: estimatedLoss,
+      notes: "Synthetic/demo fiber assignment. Not an operational telecom route.",
+    };
+    onCreateAssignment(assignment);
+  }
+
+  return (
+    <section className="fiber-planning-panel" aria-label="Fiber assignment planner">
+      <div className="dashboard-panel-heading">
+        <Workflow size={16} />
+        <div>
+          <strong>Fiber assignment planner</strong>
+          <span>Reserve synthetic OPGW strands for planned/demo services</span>
+        </div>
+      </div>
+      <div className="fiber-control-grid">
+        <label>
+          <span>Service type</span>
+          <select value={serviceType} onChange={(event) => setServiceType(event.target.value as FiberAssignment["serviceType"])}>
+            {["SEL_ICON", "C37_94", "Ethernet", "MPLS_TP", "OTN", "SCADA", "Protection", "DTT", "Leased", "Spare", "Other"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select value={status} onChange={(event) => setStatus(event.target.value as FiberAssignment["status"])}>
+            {["proposed", "planned", "reserved", "active", "retired"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="fiber-stacked-field">
+        <span>Candidate OPGW route</span>
+        <select value={effectiveCableId} onChange={(event) => setCableId(event.target.value)}>
+          {opgwCables.slice(0, 400).map((item) => <option key={item.properties.id} value={item.properties.id}>{item.properties.cableName}</option>)}
+        </select>
+      </label>
+      <div className="fiber-control-grid">
+        <label>
+          <span>Strands</span>
+          <input type="number" min={1} max={12} value={strandCount} onChange={(event) => setStrandCount(Number(event.target.value))} />
+        </label>
+        <label>
+          <span>Available set</span>
+          <input readOnly value={availableStrands.map((strand) => strand.strandNumber).join(", ") || "No continuous set"} />
+        </label>
+      </div>
+      <div className="fiber-route-card">
+        <strong>{startStructure?.properties.structureNumber || "A-end"} to {endStructure?.properties.structureNumber || "Z-end"}</strong>
+        <span>{estimatedDistance.toFixed(2)} miles / {estimatedLoss.toFixed(2)} dB estimated loss</span>
+        <small>Loss uses 0.25 dB per mile plus 0.5 dB connector loss per end. Splice losses are estimated separately in the splice matrix.</small>
+      </div>
+      {!canCreate ? <p className="fiber-warning">No continuous available strand set is available for the selected route and strand count.</p> : null}
+      <button className="telecom-map-button full-width" type="button" disabled={!canCreate} onClick={createAssignment}>Confirm planned assignment</button>
+      <div className="fiber-mini-list">
+        {assignments.slice(0, 8).map((assignment) => (
+          <div key={assignment.id}>
+            <strong>{assignment.assignmentName}</strong>
+            <span>{assignment.serviceType} / {assignment.status} / {(assignment.estimatedLossDb || 0).toFixed(2)} dB</span>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -668,18 +1100,28 @@ function buildSummaryCards(
   lines: TransmissionLine[],
   publicLines: PublicTransmissionLineFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
+  structures: TransmissionStructureFeature[],
+  opgw: OpgwCableFeature[],
+  closures: SpliceClosureFeature[],
+  assignments: FiberAssignment[],
+  panels: PatchPanel[],
   mapStatus: MapStatus,
 ) {
   return [
-    { label: "Transmission Maps", value: maps.length, note: "public + private", Icon: Network },
+    { label: "Transmission Maps", value: maps.length, note: "public + synthetic", Icon: Network },
     { label: "Public Lines", value: publicLines.length, note: "read-only HIFLD reference", Icon: Route },
-    { label: "Synthetic Substations", value: syntheticSubstations.length, note: "demo/private planning", Icon: MapPin },
+    { label: "Structures", value: structures.length, note: "synthetic numbered points", Icon: MapPin },
+    { label: "OPGW Cables", value: opgw.length, note: "synthetic dashed routes", Icon: Cable },
+    { label: "Splice Closures", value: closures.length, note: "synthetic OPGW closures", Icon: Cable },
+    { label: "Fiber Assignments", value: assignments.length, note: "synthetic planned services", Icon: Workflow },
+    { label: "Patch Panels", value: panels.length, note: "synthetic terminations", Icon: TableProperties },
+    { label: "Synthetic Substations", value: syntheticSubstations.length, note: "demo planning", Icon: MapPin },
     { label: "Substations", value: substations.length, note: `${substations.filter((item) => item.latitude === undefined).length} missing location`, Icon: MapPin },
     { label: "Transmission Lines", value: lines.length, note: "ISO-NE scoped", Icon: Route },
     { label: "SEL ICON Nodes", value: nodes.filter((node) => node.nodeType === "sel_icon_node").length, note: "parameterized", Icon: Cpu },
     { label: "Circuit Endpoints", value: nodes.filter((node) => node.nodeType === "circuit_endpoint").length, note: "C37.94/telecom", Icon: Workflow },
     { label: "Fiber Nodes", value: nodes.filter((node) => node.nodeType === "fiber_node").length, note: "splice/patch context", Icon: Cable },
-    { label: "Private Layers", value: nodes.filter((node) => node.visibility === "private").length + substations.filter((item) => item.visibility === "private").length, note: "hidden publicly", Icon: ShieldCheck },
+    { label: "Demo Overlays", value: nodes.filter((node) => node.visibility === "private").length + substations.filter((item) => item.visibility === "private").length, note: "synthetic editable records", Icon: ShieldCheck },
     { label: "MapLibre", value: mapStatus === "active" ? "Active" : mapStatus === "error" ? "Error" : "Loading", note: mapStatus === "active" ? "MapLibre active" : mapStatus === "error" ? "clear failure state" : "waiting for load", Icon: RadioTower },
   ];
 }
@@ -690,11 +1132,21 @@ function buildSearchResults(
   lines: TransmissionLine[],
   publicLines: PublicTransmissionLineFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
+  structures: TransmissionStructureFeature[],
+  opgw: OpgwCableFeature[],
+  closures: SpliceClosureFeature[],
+  assignments: FiberAssignment[],
+  panels: PatchPanel[],
   query: string,
 ): StreetMapSelection[] {
   const all: StreetMapSelection[] = [
     ...publicLines.map((record) => ({ kind: "public_transmission_line" as const, id: record.properties.id, label: publicLineLabel(record), record })),
     ...syntheticSubstations.map((record) => ({ kind: "synthetic_substation" as const, id: record.properties.id, label: record.properties.name, record })),
+    ...structures.map((record) => ({ kind: "transmission_structure" as const, id: record.properties.id, label: record.properties.structureNumber, record })),
+    ...opgw.map((record) => ({ kind: "opgw_cable" as const, id: record.properties.id, label: record.properties.cableName, record })),
+    ...closures.map((record) => ({ kind: "splice_closure" as const, id: record.properties.id, label: record.properties.name, record })),
+    ...assignments.map((record) => ({ kind: "fiber_assignment" as const, id: record.id, label: record.assignmentName, record })),
+    ...panels.map((record) => ({ kind: "patch_panel" as const, id: record.id, label: record.name, record })),
     ...substations.map((record) => ({ kind: "substation" as const, id: record.id, label: record.name, record })),
     ...nodes.map((record) => ({ kind: "node" as const, id: record.id, label: record.name, record })),
     ...lines.map((record) => ({ kind: "transmission_line" as const, id: record.id, label: record.name, record })),
@@ -719,6 +1171,11 @@ function matchesDashboardFilters(selection: StreetMapSelection, assetType: strin
 function selectionStatus(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return selection.record.properties.status || "unknown";
   if (selection.kind === "synthetic_substation") return selection.record.properties.status;
+  if (selection.kind === "transmission_structure") return selection.record.properties.hasSplice ? "assigned" : selection.record.properties.hasOpgw ? "existing" : "planned";
+  if (selection.kind === "opgw_cable") return selection.record.properties.status;
+  if (selection.kind === "splice_closure") return selection.record.properties.status;
+  if (selection.kind === "fiber_assignment") return selection.record.status;
+  if (selection.kind === "patch_panel") return selection.record.ports.some((port) => port.status === "assigned") ? "assigned" : "planned";
   const record = selection.record as { status?: string };
   return record.status || "open";
 }
@@ -726,6 +1183,7 @@ function selectionStatus(selection: StreetMapSelection) {
 function selectionRegion(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return selection.record.properties.states[0] || "MA";
   if (selection.kind === "synthetic_substation") return selection.record.properties.state;
+  if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "MA";
   const record = selection.record as { state?: string };
   return record.state || "MA";
 }
@@ -733,6 +1191,7 @@ function selectionRegion(selection: StreetMapSelection) {
 function selectionVisibility(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return "public";
   if (selection.kind === "synthetic_substation") return selection.record.properties.visibility;
+  if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "synthetic-demo";
   const record = selection.record as { visibility?: string };
   return record.visibility || "private";
 }

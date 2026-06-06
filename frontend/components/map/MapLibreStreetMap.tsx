@@ -2,7 +2,7 @@
 
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, MapDrawingTool, MapNode, PlanningRegion, PublicTransmissionLineFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
+import type { Coordinate, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
 
 type MapLibreStreetMapProps = {
@@ -12,6 +12,11 @@ type MapLibreStreetMapProps = {
   transmissionLines: TransmissionLine[];
   publicTransmissionLines: PublicTransmissionLineFeature[];
   syntheticSubstations: SyntheticSubstationFeature[];
+  transmissionStructures: TransmissionStructureFeature[];
+  opgwCables: OpgwCableFeature[];
+  spliceClosures: SpliceClosureFeature[];
+  fiberAssignments: FiberAssignment[];
+  patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
   activeTool: MapDrawingTool;
@@ -42,6 +47,11 @@ const sourceIds = {
   reference: "regional-iso-ne-reference",
   lines: "regional-transmission-lines",
   publicLines: "public-transmission-lines",
+  structures: "synthetic-transmission-structures",
+  opgwCables: "synthetic-opgw-cables",
+  spliceClosures: "synthetic-splice-closures",
+  fiberAssignments: "synthetic-fiber-assignments",
+  patchPanels: "synthetic-patch-panels",
   substations: "regional-substations",
   syntheticSubstations: "synthetic-substations",
   nodes: "regional-map-nodes",
@@ -52,6 +62,11 @@ const clickableLayerIds = [
   "regional-planning-regions-fill",
   "regional-reference-line",
   "public-transmission-lines",
+  "synthetic-opgw-cables",
+  "synthetic-fiber-assignments",
+  "synthetic-transmission-structures",
+  "synthetic-splice-closures",
+  "synthetic-patch-panels",
   "regional-transmission-lines",
   "regional-transmission-lines-dashed",
   "regional-substations",
@@ -86,6 +101,11 @@ export function MapLibreStreetMap({
   transmissionLines,
   publicTransmissionLines,
   syntheticSubstations,
+  transmissionStructures,
+  opgwCables,
+  spliceClosures,
+  fiberAssignments,
+  patchPanels,
   planningRegions,
   layers,
   activeTool,
@@ -108,12 +128,12 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, planningRegions, layers),
-    [substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, planningRegions, layers],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions, layers),
+    [substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions, layers],
   );
   const lookup = useMemo(
-    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, planningRegions),
-    [substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, planningRegions],
+    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions),
+    [substations, nodes, transmissionLines, publicTransmissionLines, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions],
   );
 
   useEffect(() => {
@@ -149,20 +169,34 @@ export function MapLibreStreetMap({
       resizeObserver = new ResizeObserver(() => map.resize());
       resizeObserver.observe(containerRef.current);
 
-      map.on("load", () => {
-        addPlanningSourcesAndLayers(map);
+      const initializeMap = () => {
+        if (loadedRef.current) return;
+        if (!mapRef.current) return;
+        try {
+          addPlanningSourcesAndLayers(map);
+        } catch {
+          window.setTimeout(initializeMap, 500);
+          return;
+        }
         clickableLayerIds.forEach((layerId) => {
           map.on("click", layerId, handleFeatureClick);
           map.on("mouseenter", layerId, () => setCursor(map, "pointer"));
           map.on("mouseleave", layerId, () => setCursor(map, activeToolRef.current === "select" ? "" : "crosshair"));
         });
+        map.on("mousemove", "synthetic-transmission-structures", handleStructureHover);
+        map.on("mouseleave", "synthetic-transmission-structures", () => popupRef.current?.remove());
         loadedRef.current = true;
         setStyleReady(true);
         setErrorMessage("");
         onStatusChange("active");
         map.fitBounds(isoNeBounds, { padding: 28, duration: 0 });
         window.setTimeout(() => map.resize(), 80);
-      });
+      };
+
+      map.on("style.load", initializeMap);
+      map.on("styledata", initializeMap);
+      map.on("load", initializeMap);
+      window.setTimeout(initializeMap, 1400);
 
       map.on("error", (event) => {
         if (loadedRef.current) return;
@@ -199,6 +233,11 @@ export function MapLibreStreetMap({
     updateSource(mapRef.current, sourceIds.reference, datasets.reference);
     updateSource(mapRef.current, sourceIds.lines, datasets.lines);
     updateSource(mapRef.current, sourceIds.publicLines, datasets.publicLines);
+    updateSource(mapRef.current, sourceIds.structures, datasets.structures);
+    updateSource(mapRef.current, sourceIds.opgwCables, datasets.opgwCables);
+    updateSource(mapRef.current, sourceIds.spliceClosures, datasets.spliceClosures);
+    updateSource(mapRef.current, sourceIds.fiberAssignments, datasets.fiberAssignments);
+    updateSource(mapRef.current, sourceIds.patchPanels, datasets.patchPanels);
     updateSource(mapRef.current, sourceIds.substations, datasets.substations);
     updateSource(mapRef.current, sourceIds.syntheticSubstations, datasets.syntheticSubstations);
     updateSource(mapRef.current, sourceIds.nodes, datasets.nodes);
@@ -249,11 +288,22 @@ export function MapLibreStreetMap({
       .addTo(event.target);
   }
 
+  function handleStructureHover(event: MapLayerMouseEvent) {
+    const feature = event.features?.[0];
+    if (!feature?.properties || "point_count" in feature.properties) return;
+    popupRef.current
+      ?.setLngLat(event.lngLat)
+      .setHTML(renderPopupHtml(feature.properties.structureNumber || feature.properties.label, "synthetic structure", feature.properties.structureType || "structure"))
+      .addTo(event.target);
+  }
+
   return (
     <div className="maplibre-street-map" data-testid="street-level-map">
       <div className="maplibre-map-root" ref={containerRef} aria-label={`${activeMap.name} MapLibre street-level planning map`} />
       <div className="maplibre-legend" aria-hidden="true">
         <span><i className="legend-line" />Public transmission lines</span>
+        <span><i className="legend-opgw" />Synthetic OPGW</span>
+        <span><i className="legend-structure" />Synthetic structures/splices</span>
         <span><i className="legend-substation" />Synthetic substations</span>
         <span><i className="legend-substation" />Substations</span>
         <span><i className="legend-node" />SEL ICON / telecom</span>
@@ -274,7 +324,9 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
   map.addSource(sourceIds.reference, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.lines, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.publicLines, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
-  [sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
+  map.addSource(sourceIds.opgwCables, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  map.addSource(sourceIds.fiberAssignments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  [sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.structures, sourceIds.spliceClosures, sourceIds.patchPanels, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
     map.addSource(sourceId, {
       type: "geojson",
       data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0],
@@ -334,6 +386,33 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     paint: { "text-color": "#d7f4ff", "text-halo-color": "#061012", "text-halo-width": 1.4 },
   });
   map.addLayer({
+    id: "synthetic-opgw-cables-casing",
+    type: "line",
+    source: sourceIds.opgwCables,
+    paint: { "line-color": "#031012", "line-width": 7.2, "line-opacity": 0.72 },
+  });
+  map.addLayer({
+    id: "synthetic-opgw-cables",
+    type: "line",
+    source: sourceIds.opgwCables,
+    paint: {
+      "line-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#28e6c0"],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 2.2, 10, 4.8],
+      "line-opacity": 0.9,
+      "line-dasharray": ["literal", [1.6, 1.2]],
+    },
+  });
+  map.addLayer({
+    id: "synthetic-fiber-assignments",
+    type: "line",
+    source: sourceIds.fiberAssignments,
+    paint: {
+      "line-color": ["match", ["get", "status"], "active", "#6effff", "reserved", "#efc95f", "planned", "#ffd85f", "proposed", "#ff4fd8", "#9bd6ff"],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 4, 10, 8],
+      "line-opacity": ["match", ["get", "status"], "reserved", 0.82, 0.72],
+    },
+  });
+  map.addLayer({
     id: "regional-transmission-lines",
     type: "line",
     source: sourceIds.lines,
@@ -353,6 +432,9 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
 
   addClusterLayers(map, sourceIds.substations, "regional-substations", "#69d7e4", "substation");
   addClusterLayers(map, sourceIds.syntheticSubstations, "synthetic-substations", "#ffb84d", "synthetic");
+  addClusterLayers(map, sourceIds.structures, "synthetic-transmission-structures", "#c9d4d8", "structure");
+  addClusterLayers(map, sourceIds.spliceClosures, "synthetic-splice-closures", "#ffb84d", "splice");
+  addClusterLayers(map, sourceIds.patchPanels, "synthetic-patch-panels", "#d5f3ff", "panel");
   addClusterLayers(map, sourceIds.nodes, "regional-map-nodes", "#28c7a9", "node");
   addClusterLayers(map, sourceIds.workOrders, "regional-work-orders", "#efc95f", "work_order");
 
@@ -410,6 +492,53 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     minzoom: 8.8,
     layout: { "text-field": ["concat", "Synthetic ", ["get", "state"], " / ", ["get", "planningRole"]], "text-size": 10, "text-offset": [0, 1.15], "text-anchor": "top" },
     paint: { "text-color": "#fff7d8", "text-halo-color": "#071012", "text-halo-width": 1.5 },
+  });
+  map.addLayer({
+    id: "synthetic-transmission-structures",
+    type: "circle",
+    source: sourceIds.structures,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": ["case", ["get", "hasSplice"], 5.8, ["get", "hasOpgw"], 4.4, 2.8],
+      "circle-color": ["case", ["get", "hasSplice"], "#ffb84d", ["get", "hasOpgw"], "#39e7d2", "#d5dde2"],
+      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.46, 9, 0.86],
+      "circle-stroke-color": "#061012",
+      "circle-stroke-width": 1,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-transmission-structure-labels",
+    type: "symbol",
+    source: sourceIds.structures,
+    filter: ["!", ["has", "point_count"]],
+    minzoom: 11.2,
+    layout: { "text-field": ["get", "structureNumber"], "text-size": 9, "text-offset": [0, 1], "text-anchor": "top" },
+    paint: { "text-color": "#efffff", "text-halo-color": "#061012", "text-halo-width": 1.2 },
+  });
+  map.addLayer({
+    id: "synthetic-splice-closures",
+    type: "circle",
+    source: sourceIds.spliceClosures,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 5.5, 10, 8.5],
+      "circle-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#ffb84d"],
+      "circle-stroke-color": "#fff6d4",
+      "circle-stroke-width": 1.4,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-patch-panels",
+    type: "circle",
+    source: sourceIds.patchPanels,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": 4.8,
+      "circle-color": "#d5f3ff",
+      "circle-stroke-color": "#12343a",
+      "circle-stroke-width": 1.2,
+      "circle-opacity": 0.9,
+    },
   });
   map.addLayer({
     id: "regional-map-nodes",
@@ -513,9 +642,16 @@ function buildDatasets(
   transmissionLines: TransmissionLine[],
   publicTransmissionLines: PublicTransmissionLineFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
+  transmissionStructures: TransmissionStructureFeature[],
+  opgwCables: OpgwCableFeature[],
+  spliceClosures: SpliceClosureFeature[],
+  fiberAssignments: FiberAssignment[],
+  patchPanels: PatchPanel[],
   planningRegions: PlanningRegion[],
   layers: Record<StreetMapLayerKey, boolean>,
 ) {
+  const structureById = new Map(transmissionStructures.map((feature) => [feature.properties.id, feature]));
+  const cableById = new Map(opgwCables.map((feature) => [feature.properties.id, feature]));
   return {
     regions: layers.planningRegions ? collection(planningRegions.map((region) => ({
       type: "Feature",
@@ -556,6 +692,89 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
+    structures: layers.transmissionStructures ? collection(transmissionStructures.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "transmission_structure",
+        id: feature.properties.id,
+        label: feature.properties.structureNumber,
+        structureNumber: feature.properties.structureNumber,
+        status: feature.properties.hasSplice ? "splice" : feature.properties.hasOpgw ? "opgw" : "synthetic",
+        structureType: feature.properties.structureType,
+        hasOpgw: feature.properties.hasOpgw,
+        hasSplice: feature.properties.hasSplice,
+        lineId: feature.properties.lineId,
+        synthetic: true,
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
+    opgwCables: layers.syntheticOpgwCables ? collection(opgwCables.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "opgw_cable",
+        id: feature.properties.id,
+        label: feature.properties.cableName,
+        status: feature.properties.status,
+        fiberCount: feature.properties.fiberCount,
+        routeMiles: feature.properties.routeMiles,
+        synthetic: true,
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
+    spliceClosures: layers.spliceClosures ? collection(spliceClosures.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "splice_closure",
+        id: feature.properties.id,
+        label: feature.properties.name,
+        status: feature.properties.status,
+        closureType: feature.properties.closureType,
+        structureNumber: feature.properties.structureNumber,
+        spliceCount: feature.properties.spliceCount,
+        synthetic: true,
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
+    fiberAssignments: layers.fiberAssignments ? collection(fiberAssignments.flatMap((assignment) => {
+      const coordinates = assignment.cableIds
+        .map((cableId) => cableById.get(cableId))
+        .filter(Boolean)
+        .map((feature) => feature!.geometry.type === "LineString" ? feature!.geometry.coordinates : feature!.geometry.coordinates.flat());
+      if (!coordinates.length) return [];
+      return [{
+        type: "Feature" as const,
+        properties: {
+          kind: "fiber_assignment",
+          id: assignment.id,
+          label: assignment.assignmentName,
+          status: assignment.status,
+          serviceType: assignment.serviceType,
+          estimatedLossDb: assignment.estimatedLossDb || 0,
+          synthetic: true,
+        },
+        geometry: coordinates.length === 1
+          ? { type: "LineString" as const, coordinates: coordinates[0] }
+          : { type: "MultiLineString" as const, coordinates },
+      }];
+    })) : emptyCollection,
+    patchPanels: layers.patchPanels ? collection(patchPanels.flatMap((panel) => {
+      if (panel.locationType !== "structure") return [];
+      const structure = structureById.get(panel.locationId);
+      if (!structure) return [];
+      return [{
+        type: "Feature" as const,
+        properties: {
+          kind: "patch_panel",
+          id: panel.id,
+          label: panel.name,
+          status: panel.ports.some((port) => port.status === "assigned") ? "assigned" : "available",
+          portCount: panel.portCount,
+          connectorType: panel.connectorType,
+          synthetic: true,
+        },
+        geometry: { type: "Point" as const, coordinates: structure.geometry.coordinates },
+      }];
+    })) : emptyCollection,
     substations: collection(substations.filter((substation) => layers.substations && hasCoordinates(substation)).map((substation) => ({
       type: "Feature",
       properties: { kind: "substation", id: substation.id, label: substation.abbreviation || substation.name, status: substation.status, visibility: substation.visibility, voltageKv: substation.voltageKv?.[0] || 0 },
@@ -622,6 +841,11 @@ function buildSelectionLookup(
   transmissionLines: TransmissionLine[],
   publicTransmissionLines: PublicTransmissionLineFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
+  transmissionStructures: TransmissionStructureFeature[],
+  opgwCables: OpgwCableFeature[],
+  spliceClosures: SpliceClosureFeature[],
+  fiberAssignments: FiberAssignment[],
+  patchPanels: PatchPanel[],
   planningRegions: PlanningRegion[],
 ) {
   const lookup: Record<string, StreetMapSelection> = {};
@@ -650,6 +874,46 @@ function buildSelectionLookup(
       kind: "synthetic_substation",
       id: record.properties.id,
       label: record.properties.name,
+      record,
+    };
+  });
+  transmissionStructures.forEach((record) => {
+    lookup[`transmission_structure:${record.properties.id}`] = {
+      kind: "transmission_structure",
+      id: record.properties.id,
+      label: record.properties.structureNumber,
+      record,
+    };
+  });
+  opgwCables.forEach((record) => {
+    lookup[`opgw_cable:${record.properties.id}`] = {
+      kind: "opgw_cable",
+      id: record.properties.id,
+      label: record.properties.cableName,
+      record,
+    };
+  });
+  spliceClosures.forEach((record) => {
+    lookup[`splice_closure:${record.properties.id}`] = {
+      kind: "splice_closure",
+      id: record.properties.id,
+      label: record.properties.name,
+      record,
+    };
+  });
+  fiberAssignments.forEach((record) => {
+    lookup[`fiber_assignment:${record.id}`] = {
+      kind: "fiber_assignment",
+      id: record.id,
+      label: record.assignmentName,
+      record,
+    };
+  });
+  patchPanels.forEach((record) => {
+    lookup[`patch_panel:${record.id}`] = {
+      kind: "patch_panel",
+      id: record.id,
+      label: record.name,
       record,
     };
   });
@@ -688,6 +952,9 @@ function selectionCoordinates(selection: StreetMapSelection): Coordinate[] {
     return selection.record.geometry.type === "LineString" ? selection.record.geometry.coordinates : selection.record.geometry.coordinates.flat();
   }
   if (selection.kind === "synthetic_substation") return [selection.record.geometry.coordinates];
+  if (selection.kind === "transmission_structure") return [selection.record.geometry.coordinates];
+  if (selection.kind === "opgw_cable") return selection.record.geometry.type === "LineString" ? selection.record.geometry.coordinates : selection.record.geometry.coordinates.flat();
+  if (selection.kind === "splice_closure") return [selection.record.geometry.coordinates];
   if (selection.kind === "planning_region") return selection.record.geometry.coordinates[0];
   if ("latitude" in selection.record && selection.record.latitude !== undefined && selection.record.longitude !== undefined) {
     return [[selection.record.longitude, selection.record.latitude]];

@@ -1,2 +1,5 @@
-import { AdminSettingsPage } from "@/components/UtilityPages";
-export default function Page() { return <AdminSettingsPage />; }
+import { redirect } from "next/navigation";
+
+export default function Page() {
+  redirect("/dashboard");
+}

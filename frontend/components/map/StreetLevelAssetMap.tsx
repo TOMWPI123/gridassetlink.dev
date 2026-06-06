@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, MapDrawingTool, MapNode, PlanningRegion, PublicTransmissionLineFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap } from "@/lib/types/assets";
+import type { Coordinate, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
@@ -10,6 +10,11 @@ export type StreetMapSelection =
   | { kind: "transmission_line"; id: string; label: string; record: TransmissionLine }
   | { kind: "public_transmission_line"; id: string; label: string; record: PublicTransmissionLineFeature }
   | { kind: "synthetic_substation"; id: string; label: string; record: SyntheticSubstationFeature }
+  | { kind: "transmission_structure"; id: string; label: string; record: TransmissionStructureFeature }
+  | { kind: "opgw_cable"; id: string; label: string; record: OpgwCableFeature }
+  | { kind: "splice_closure"; id: string; label: string; record: SpliceClosureFeature }
+  | { kind: "fiber_assignment"; id: string; label: string; record: FiberAssignment }
+  | { kind: "patch_panel"; id: string; label: string; record: PatchPanel }
   | { kind: "planning_region"; id: string; label: string; record: PlanningRegion }
   | { kind: "work_order"; id: string; label: string; record: MapNode };
 
@@ -26,6 +31,11 @@ type StreetLevelAssetMapProps = {
   transmissionLines: TransmissionLine[];
   publicTransmissionLines: PublicTransmissionLineFeature[];
   syntheticSubstations: SyntheticSubstationFeature[];
+  transmissionStructures: TransmissionStructureFeature[];
+  opgwCables: OpgwCableFeature[];
+  spliceClosures: SpliceClosureFeature[];
+  fiberAssignments: FiberAssignment[];
+  patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
   activeTool: MapDrawingTool;
@@ -49,6 +59,11 @@ export function StreetLevelAssetMap({
   transmissionLines,
   publicTransmissionLines,
   syntheticSubstations,
+  transmissionStructures,
+  opgwCables,
+  spliceClosures,
+  fiberAssignments,
+  patchPanels,
   planningRegions,
   layers,
   activeTool,
@@ -69,6 +84,11 @@ export function StreetLevelAssetMap({
           transmissionLines={transmissionLines}
           publicTransmissionLines={publicTransmissionLines}
           syntheticSubstations={syntheticSubstations}
+          transmissionStructures={transmissionStructures}
+          opgwCables={opgwCables}
+          spliceClosures={spliceClosures}
+          fiberAssignments={fiberAssignments}
+          patchPanels={patchPanels}
           planningRegions={planningRegions}
           layers={layers}
           activeTool={activeTool}

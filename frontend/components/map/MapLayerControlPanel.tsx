@@ -8,13 +8,23 @@ type MapLayerControlPanelProps = {
   activeTool: MapDrawingTool;
   publicLineCount?: number;
   syntheticSubstationCount?: number;
-  dataWarnings?: { publicLines?: string; syntheticSubstations?: string };
+  structureCount?: number;
+  opgwCableCount?: number;
+  spliceClosureCount?: number;
+  fiberAssignmentCount?: number;
+  patchPanelCount?: number;
+  dataWarnings?: Record<string, string>;
   onToggleLayer: (layer: StreetMapLayerKey) => void;
   onToolChange: (tool: MapDrawingTool) => void;
 };
 
 const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges?: string[] }> = [
   { key: "publicTransmissionLines", label: "Public transmission lines", note: "HIFLD public reference", badges: ["Public", "Read-only"] },
+  { key: "transmissionStructures", label: "Transmission structures", note: "Synthetic numbered structures", badges: ["Synthetic", "Demo"] },
+  { key: "syntheticOpgwCables", label: "OPGW cables", note: "Synthetic OPGW planning routes", badges: ["Synthetic", "Demo"] },
+  { key: "spliceClosures", label: "Splice closures", note: "Synthetic closure points", badges: ["Synthetic", "Demo"] },
+  { key: "fiberAssignments", label: "Fiber assignments", note: "Synthetic planned/active routes", badges: ["Synthetic", "Demo"] },
+  { key: "patchPanels", label: "Patch panels", note: "Synthetic terminal panels", badges: ["Synthetic", "Demo"] },
   { key: "syntheticSubstations", label: "Synthetic substations", note: "100 demo planning points", badges: ["Synthetic", "Private"] },
   { key: "telecomNodes", label: "Synthetic telecom nodes", note: "Routers, RTUs, OTN", badges: ["Synthetic", "Private"] },
   { key: "fiberRoutes", label: "Synthetic fiber routes", note: "Fiber/circuit paths", badges: ["Synthetic", "Private"] },
@@ -44,10 +54,15 @@ const drawingTools: Array<{ key: MapDrawingTool; label: string; Icon: typeof Map
   { key: "delete_geometry", label: "Delete geometry", Icon: Trash2, implemented: false },
 ];
 
-export function MapLayerControlPanel({ layers, activeTool, publicLineCount = 0, syntheticSubstationCount = 0, dataWarnings, onToggleLayer, onToolChange }: MapLayerControlPanelProps) {
+export function MapLayerControlPanel({ layers, activeTool, publicLineCount = 0, syntheticSubstationCount = 0, structureCount = 0, opgwCableCount = 0, spliceClosureCount = 0, fiberAssignmentCount = 0, patchPanelCount = 0, dataWarnings, onToggleLayer, onToolChange }: MapLayerControlPanelProps) {
   const counts: Partial<Record<StreetMapLayerKey, number>> = {
     publicTransmissionLines: publicLineCount,
     syntheticSubstations: syntheticSubstationCount,
+    transmissionStructures: structureCount,
+    syntheticOpgwCables: opgwCableCount,
+    spliceClosures: spliceClosureCount,
+    fiberAssignments: fiberAssignmentCount,
+    patchPanels: patchPanelCount,
   };
   return (
     <aside className="street-layer-control-panel" aria-label="Street-level layer and drawing controls">
@@ -88,8 +103,13 @@ export function MapLayerControlPanel({ layers, activeTool, publicLineCount = 0, 
   );
 }
 
-function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: { publicLines?: string; syntheticSubstations?: string }) {
+function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string, string>) {
   if (layer === "publicTransmissionLines") return warnings?.publicLines;
   if (layer === "syntheticSubstations") return warnings?.syntheticSubstations;
+  if (layer === "transmissionStructures") return warnings?.structures;
+  if (layer === "syntheticOpgwCables") return warnings?.opgw;
+  if (layer === "spliceClosures") return warnings?.spliceClosures;
+  if (layer === "fiberAssignments") return warnings?.assignments;
+  if (layer === "patchPanels") return warnings?.patchPanels;
   return "";
 }
