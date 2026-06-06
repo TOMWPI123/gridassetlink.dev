@@ -2591,6 +2591,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 
 .dashboard-compact-brand,
 .dashboard-map-global-search,
+.dashboard-map-layer-select,
 .dashboard-map-status-pill,
 .dashboard-top-right-toolbar button,
 .dashboard-left-filter-panel,
@@ -2632,10 +2633,17 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   min-width: 0;
 }
 
+.dashboard-map-global-search-shell {
+  display: grid;
+  grid-template-columns: minmax(176px, .36fr) minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
 .dashboard-map-global-search,
+.dashboard-map-layer-select,
 .dashboard-panel-search {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   min-height: 46px;
@@ -2644,7 +2652,26 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   color: var(--dash-muted);
 }
 
+.dashboard-map-global-search {
+  grid-template-columns: 18px minmax(0, 1fr);
+}
+
+.dashboard-map-layer-select {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 3px;
+}
+
+.dashboard-map-layer-select span {
+  color: rgba(238,252,251,.62);
+  font-size: 9px;
+  font-weight: 860;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .dashboard-map-global-search input,
+.dashboard-map-layer-select select,
 .dashboard-panel-search input {
   min-width: 0;
   border: 0;
@@ -2652,6 +2679,16 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   background: transparent;
   color: var(--dash-text);
   font-size: 13px;
+}
+
+.dashboard-map-layer-select select {
+  width: 100%;
+  padding: 0;
+  font-weight: 760;
+}
+
+.dashboard-map-layer-select option {
+  background: #10191d;
 }
 
 .dashboard-map-global-search input::placeholder,

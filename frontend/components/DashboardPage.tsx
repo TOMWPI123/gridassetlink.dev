@@ -77,6 +77,35 @@ const addAssetOptions: Array<{ kind: AddAssetKind; label: string; note: string }
   { kind: "proposed_change", label: "Proposed change", note: "Private staged planning marker" },
 ];
 
+type DashboardSearchLayer =
+  | "all"
+  | "publicTransmissionLines"
+  | "publicSubstations"
+  | "fccUtilityTowers"
+  | "fccMicrowaveLinks"
+  | "transmissionStructures"
+  | "spliceClosures"
+  | "syntheticOpgwCables"
+  | "fiberAssignments"
+  | "patchPanels"
+  | "syntheticSubstations"
+  | "editablePlanning";
+
+const searchLayerOptions: Array<{ value: DashboardSearchLayer; label: string; kinds: StreetMapSelection["kind"][] }> = [
+  { value: "all", label: "All searchable layers", kinds: [] },
+  { value: "publicTransmissionLines", label: "HIFLD transmission lines", kinds: ["public_transmission_line"] },
+  { value: "publicSubstations", label: "Verified-owner substations", kinds: ["public_substation"] },
+  { value: "fccUtilityTowers", label: "FCC tower nodes", kinds: ["fcc_utility_tower"] },
+  { value: "fccMicrowaveLinks", label: "FCC microwave links", kinds: ["fcc_microwave_link"] },
+  { value: "transmissionStructures", label: "Transmission structures", kinds: ["transmission_structure"] },
+  { value: "spliceClosures", label: "Splice closures", kinds: ["splice_closure"] },
+  { value: "syntheticOpgwCables", label: "Synthetic OPGW cables", kinds: ["opgw_cable"] },
+  { value: "fiberAssignments", label: "Fiber assignments", kinds: ["fiber_assignment"] },
+  { value: "patchPanels", label: "Patch panels", kinds: ["patch_panel"] },
+  { value: "syntheticSubstations", label: "Synthetic substations", kinds: ["synthetic_substation"] },
+  { value: "editablePlanning", label: "Editable planning assets", kinds: ["substation", "node", "transmission_line", "work_order"] },
+];
+
 export function DashboardPage() {
   const pathname = usePathname();
   const [mode, setMode] = useState<DashboardMapMode>("street-level");
@@ -95,6 +124,7 @@ export function DashboardPage() {
   const [addAssetKind, setAddAssetKind] = useState<AddAssetKind | null>(null);
   const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
+  const [searchLayerFilter, setSearchLayerFilter] = useState<DashboardSearchLayer>("all");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [assetTypeFilter, setAssetTypeFilter] = useState("all");
@@ -375,20 +405,24 @@ export function DashboardPage() {
     () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, layerFilteredPublicTransmissionLines, layerFilteredPublicSubstations, layerFilteredFccUtilityTowers, layerFilteredFccMicrowaveLinks, visibleSyntheticSubstations, layerFilteredTransmissionStructures, visibleOpgwCables, layerFilteredSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search),
     [layerFilteredFccMicrowaveLinks, layerFilteredFccUtilityTowers, layerFilteredPublicSubstations, layerFilteredPublicTransmissionLines, layerFilteredSpliceClosures, layerFilteredTransmissionStructures, search, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
   );
+  const layerScopedSearchResults = useMemo(
+    () => rawSearchResults.filter((selection) => matchesSearchLayer(selection, searchLayerFilter)),
+    [rawSearchResults, searchLayerFilter],
+  );
   const mapSearchResults = useMemo(
-    () => search.trim() ? rawSearchResults.filter(isDashboardMapSearchResult).slice(0, 8) : [],
-    [rawSearchResults, search],
+    () => search.trim() ? layerScopedSearchResults.filter(isDashboardMapSearchResult).slice(0, 8) : [],
+    [layerScopedSearchResults, search],
   );
   const searchResults = useMemo(
-    () => rawSearchResults
+    () => layerScopedSearchResults
       .filter((selection) => matchesDashboardFilters(selection, assetTypeFilter, statusFilter, regionFilter, visibilityFilter, ownerFilter))
       .slice(0, 12),
-    [assetTypeFilter, ownerFilter, rawSearchResults, regionFilter, statusFilter, visibilityFilter],
+    [assetTypeFilter, layerScopedSearchResults, ownerFilter, regionFilter, statusFilter, visibilityFilter],
   );
 
   useEffect(() => {
     setActiveSearchIndex(0);
-  }, [search]);
+  }, [search, searchLayerFilter]);
 
   const handleMapStatusChange = useCallback((status: MapStatus, message?: string) => {
     setMapStatus(status);
@@ -697,18 +731,26 @@ export function DashboardPage() {
         <span>HIFLD, FCC towers/links, substations, structures, and splices</span>
         </div>
         <div className="dashboard-map-global-search-wrap">
-          <label className="dashboard-map-global-search">
-            <Search size={16} />
-            <input
-              value={search}
-              onChange={(event) => handleGlobalSearchChange(event.target.value)}
-              onFocus={() => setSearchOpen(Boolean(search.trim()))}
-              onKeyDown={handleGlobalSearchKeyDown}
-              placeholder="Search HIFLD, FCC call signs, owners, substations, structures, or splices"
-              aria-autocomplete="list"
-              aria-expanded={searchOpen && mapSearchResults.length > 0}
-            />
-          </label>
+          <div className="dashboard-map-global-search-shell">
+            <label className="dashboard-map-layer-select">
+              <span>Layer</span>
+              <select value={searchLayerFilter} onChange={(event) => setSearchLayerFilter(event.currentTarget.value as DashboardSearchLayer)}>
+                {searchLayerOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="dashboard-map-global-search">
+              <Search size={16} />
+              <input
+                value={search}
+                onChange={(event) => handleGlobalSearchChange(event.target.value)}
+                onFocus={() => setSearchOpen(Boolean(search.trim()))}
+                onKeyDown={handleGlobalSearchKeyDown}
+                placeholder="Search selected layer by name, call sign, owner, ID, structure, or splice"
+                aria-autocomplete="list"
+                aria-expanded={searchOpen && mapSearchResults.length > 0}
+              />
+            </label>
+          </div>
           {searchOpen && search.trim() ? (
             <div className="dashboard-map-search-popover" role="listbox" aria-label="Map search results">
               {mapSearchResults.length ? mapSearchResults.map((result, index) => (
@@ -722,9 +764,9 @@ export function DashboardPage() {
                   aria-selected={index === activeSearchIndex}
                 >
                   <strong>{result.label}</strong>
-                  <span>{formatSelectionKind(result.kind)} / {selectionStatus(result)}</span>
+                  <span>{selectionLayerLabel(result)} / {formatSelectionKind(result.kind)} / {selectionStatus(result)}</span>
                 </button>
-              )) : <p>No matching map assets.</p>}
+              )) : <p>No matching map assets in {searchLayerLabel(searchLayerFilter)}.</p>}
             </div>
           ) : null}
         </div>
@@ -761,6 +803,7 @@ export function DashboardPage() {
                 <FiltersResultsDrawer
                   publicOnly={publicOnly}
                   search={search}
+                  searchLayerFilter={searchLayerFilter}
                   assetTypeFilter={assetTypeFilter}
                   statusFilter={statusFilter}
                   regionFilter={regionFilter}
@@ -769,6 +812,7 @@ export function DashboardPage() {
                   ownerOptions={ownerOptions}
                   searchResults={searchResults}
                   onSearchChange={setSearch}
+                  onSearchLayerChange={(value) => setSearchLayerFilter(value as DashboardSearchLayer)}
                   onAssetTypeChange={setAssetTypeFilter}
                   onStatusChange={setStatusFilter}
                   onRegionChange={setRegionFilter}
@@ -872,15 +916,19 @@ export function DashboardPage() {
   );
 }
 
-function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+function FilterSelect({ label, value, options, onChange, displayLabel = formatFilterOption }: { label: string; value: string; options: string[]; onChange: (value: string) => void; displayLabel?: (value: string) => string }) {
   return (
     <label>
       <span>{label}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => <option value={option} key={option}>{option === "all" ? "All" : option}</option>)}
+        {options.map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}
       </select>
     </label>
   );
+}
+
+function formatFilterOption(value: string) {
+  return value === "all" ? "All" : value;
 }
 
 function DashboardDataSourcesPanel() {
@@ -951,6 +999,7 @@ function ModulesDrawer({ pathname }: { pathname: string }) {
 function FiltersResultsDrawer({
   publicOnly,
   search,
+  searchLayerFilter,
   assetTypeFilter,
   statusFilter,
   regionFilter,
@@ -959,6 +1008,7 @@ function FiltersResultsDrawer({
   ownerOptions,
   searchResults,
   onSearchChange,
+  onSearchLayerChange,
   onAssetTypeChange,
   onStatusChange,
   onRegionChange,
@@ -968,6 +1018,7 @@ function FiltersResultsDrawer({
 }: {
   publicOnly: boolean;
   search: string;
+  searchLayerFilter: string;
   assetTypeFilter: string;
   statusFilter: string;
   regionFilter: string;
@@ -976,6 +1027,7 @@ function FiltersResultsDrawer({
   ownerOptions: string[];
   searchResults: StreetMapSelection[];
   onSearchChange: (value: string) => void;
+  onSearchLayerChange: (value: string) => void;
   onAssetTypeChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onRegionChange: (value: string) => void;
@@ -997,6 +1049,7 @@ function FiltersResultsDrawer({
         <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search map records" />
       </label>
       <div className="dashboard-filter-grid">
+        <FilterSelect label="Search Layer" value={searchLayerFilter} onChange={onSearchLayerChange} options={searchLayerOptions.map((option) => option.value)} displayLabel={searchLayerLabel} />
         <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={onAssetTypeChange} options={["all", "public_transmission_line", "public_substation", "transmission_structure", "opgw_cable", "splice_closure", "fiber_assignment", "patch_panel", "synthetic_substation", "substation", "node", "transmission_line", "work_order"]} />
         <FilterSelect label="Status" value={statusFilter} onChange={onStatusChange} options={["all", "existing", "planned", "proposed", "reserved", "assigned", "open"]} />
         <FilterSelect label="Region" value={regionFilter} onChange={onRegionChange} options={["all", "MA", "RI", "CT", "NH", "VT", "ME"]} />
@@ -1016,7 +1069,7 @@ function FiltersResultsDrawer({
         {searchResults.length ? searchResults.map((result) => (
           <button type="button" key={`${result.kind}-${result.id}`} onClick={() => onSelectResult(result)}>
             <strong>{result.label}</strong>
-            <span>{formatSelectionKind(result.kind)} / {selectionStatus(result)}</span>
+            <span>{selectionLayerLabel(result)} / {formatSelectionKind(result.kind)} / {selectionStatus(result)}</span>
           </button>
         )) : <p>No matching map records.</p>}
       </div>
@@ -1521,6 +1574,20 @@ function matchesDashboardFilters(selection: StreetMapSelection, assetType: strin
   return true;
 }
 
+function matchesSearchLayer(selection: StreetMapSelection, layer: string) {
+  if (layer === "all") return true;
+  const option = searchLayerOptions.find((item) => item.value === layer);
+  return option ? option.kinds.includes(selection.kind) : true;
+}
+
+function searchLayerLabel(layer: string) {
+  return searchLayerOptions.find((option) => option.value === layer)?.label || "All searchable layers";
+}
+
+function selectionLayerLabel(selection: StreetMapSelection) {
+  return searchLayerOptions.find((option) => option.kinds.includes(selection.kind))?.label || "Other map layer";
+}
+
 function selectionStatus(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return selection.record.properties.status || "unknown";
   if (selection.kind === "public_substation") return selection.record.properties.status || "unknown";
@@ -1669,31 +1736,32 @@ function formatSelectionKind(kind: StreetMapSelection["kind"]) {
 }
 
 function selectionSearchText(selection: StreetMapSelection) {
+  const layerLabel = selectionLayerLabel(selection);
   if (selection.kind === "public_transmission_line") {
     const properties = selection.record.properties;
-    return [selection.label, properties.id, properties.name, publicTransmissionLineOwner(properties), properties.rawOwner, properties.ownerSource, properties.osmLineElementId, properties.osmLineName, properties.osmOperator, properties.osmOwner, properties.voltageClass, properties.states.join(" ")].join(" ");
+    return [layerLabel, selection.label, properties.id, properties.name, publicTransmissionLineOwner(properties), properties.rawOwner, properties.ownerSource, properties.osmLineElementId, properties.osmLineName, properties.osmOperator, properties.osmOwner, properties.voltageClass, properties.states.join(" ")].join(" ");
   }
   if (selection.kind === "public_substation") {
     const properties = selection.record.properties;
-    return [selection.label, properties.id, properties.name, properties.utilityOwner, properties.city, properties.county, properties.state, properties.nearestPublicLineId].join(" ");
+    return [layerLabel, selection.label, properties.id, properties.name, properties.utilityOwner, properties.city, properties.county, properties.state, properties.nearestPublicLineId].join(" ");
   }
   if (selection.kind === "fcc_utility_tower") {
     const properties = selection.record.properties;
-    return [selection.label, properties.id, properties.nodeName, properties.callSign, properties.utilityOwner, properties.rawLicenseeName, properties.frn, properties.locationName, properties.address, properties.city, properties.county, properties.state, properties.towerRegistrationNumber, properties.frequencyBandsMhz.join(" ")].join(" ");
+    return [layerLabel, selection.label, properties.id, properties.nodeName, properties.callSign, properties.utilityOwner, properties.rawLicenseeName, properties.frn, properties.locationName, properties.address, properties.city, properties.county, properties.state, properties.towerRegistrationNumber, properties.frequencyBandsMhz.join(" ")].join(" ");
   }
   if (selection.kind === "fcc_microwave_link") {
     const properties = selection.record.properties;
-    return [selection.label, properties.id, properties.linkName, properties.callSign, properties.utilityOwner, properties.rawLicenseeName, properties.pathNumber, properties.pathTypeDesc, properties.frequencyAssignedMhz, properties.frequencyUpperBandMhz, properties.txNodeId, properties.rxNodeId, properties.states.join(" ")].join(" ");
+    return [layerLabel, selection.label, properties.id, properties.linkName, properties.callSign, properties.utilityOwner, properties.rawLicenseeName, properties.pathNumber, properties.pathTypeDesc, fccFrequencyBandLabel(properties.frequencyAssignedMhz), properties.frequencyAssignedMhz, properties.frequencyUpperBandMhz, properties.txNodeId, properties.rxNodeId, properties.states.join(" ")].join(" ");
   }
   if (selection.kind === "transmission_structure") {
     const properties = selection.record.properties;
-    return [selection.label, properties.id, properties.structureNumber, properties.lineId, properties.lineName, properties.structureType].join(" ");
+    return [layerLabel, selection.label, properties.id, properties.structureNumber, properties.lineId, properties.lineName, properties.structureType].join(" ");
   }
   if (selection.kind === "splice_closure") {
     const properties = selection.record.properties;
-    return [selection.label, properties.id, properties.name, properties.structureNumber, properties.closureType, properties.status].join(" ");
+    return [layerLabel, selection.label, properties.id, properties.name, properties.structureNumber, properties.closureType, properties.status].join(" ");
   }
-  return JSON.stringify(selection.record);
+  return [layerLabel, JSON.stringify(selection.record)].join(" ");
 }
 
 function filterSubstationsForScope(substations: Substation[], publicOnly: boolean) {
