@@ -2,7 +2,7 @@
 
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 
@@ -13,6 +13,8 @@ type MapLibreStreetMapProps = {
   transmissionLines: TransmissionLine[];
   publicTransmissionLines: PublicTransmissionLineFeature[];
   publicSubstations: PublicSubstationFeature[];
+  fccUtilityTowers: FccUtilityTowerFeature[];
+  fccMicrowaveLinks: FccMicrowaveLinkFeature[];
   syntheticSubstations: SyntheticSubstationFeature[];
   transmissionStructures: TransmissionStructureFeature[];
   opgwCables: OpgwCableFeature[];
@@ -50,6 +52,8 @@ const sourceIds = {
   lines: "regional-transmission-lines",
   publicLines: "public-transmission-lines",
   publicSubstations: "public-substations",
+  fccUtilityTowers: "fcc-utility-towers",
+  fccMicrowaveLinks: "fcc-utility-microwave-links",
   structures: "synthetic-transmission-structures",
   opgwCables: "synthetic-opgw-cables",
   spliceClosures: "synthetic-splice-closures",
@@ -66,6 +70,8 @@ const clickableLayerIds = [
   "regional-reference-line",
   "public-transmission-lines",
   "public-substations",
+  "fcc-utility-microwave-links",
+  "fcc-utility-towers",
   "synthetic-opgw-cables",
   "synthetic-fiber-assignments",
   "synthetic-transmission-structures",
@@ -105,6 +111,8 @@ export function MapLibreStreetMap({
   transmissionLines,
   publicTransmissionLines,
   publicSubstations,
+  fccUtilityTowers,
+  fccMicrowaveLinks,
   syntheticSubstations,
   transmissionStructures,
   opgwCables,
@@ -133,12 +141,12 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions, layers),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions, layers],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions, layers),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions, layers],
   );
   const lookup = useMemo(
-    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions],
+    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions],
   );
 
   useEffect(() => {
@@ -239,6 +247,8 @@ export function MapLibreStreetMap({
     updateSource(mapRef.current, sourceIds.lines, datasets.lines);
     updateSource(mapRef.current, sourceIds.publicLines, datasets.publicLines);
     updateSource(mapRef.current, sourceIds.publicSubstations, datasets.publicSubstations);
+    updateSource(mapRef.current, sourceIds.fccMicrowaveLinks, datasets.fccMicrowaveLinks);
+    updateSource(mapRef.current, sourceIds.fccUtilityTowers, datasets.fccUtilityTowers);
     updateSource(mapRef.current, sourceIds.structures, datasets.structures);
     updateSource(mapRef.current, sourceIds.opgwCables, datasets.opgwCables);
     updateSource(mapRef.current, sourceIds.spliceClosures, datasets.spliceClosures);
@@ -309,6 +319,7 @@ export function MapLibreStreetMap({
       <div className="maplibre-legend" aria-hidden="true">
         {layers.publicTransmissionLines ? <span><i className="legend-line" />HIFLD transmission lines</span> : null}
         {layers.publicSubstations ? <span><i className="legend-substation" />Public substations by owner</span> : null}
+        {layers.fccUtilityMicrowave ? <span><i className="legend-node" />FCC utility microwave</span> : null}
         {layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW</span> : null}
         {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
         {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
@@ -331,9 +342,10 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
   map.addSource(sourceIds.reference, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.lines, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.publicLines, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  map.addSource(sourceIds.fccMicrowaveLinks, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.opgwCables, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.fiberAssignments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
-  [sourceIds.publicSubstations, sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.structures, sourceIds.spliceClosures, sourceIds.patchPanels, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
+  [sourceIds.publicSubstations, sourceIds.fccUtilityTowers, sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.structures, sourceIds.spliceClosures, sourceIds.patchPanels, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
     map.addSource(sourceId, {
       type: "geojson",
       data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0],
@@ -414,6 +426,54 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     minzoom: 9.8,
     layout: { "text-field": ["coalesce", ["get", "label"], ["get", "id"]], "text-size": 10, "text-offset": [0, 1.1], "text-anchor": "top" },
     paint: { "text-color": "#e8fbff", "text-halo-color": "#061012", "text-halo-width": 1.45 },
+  });
+  map.addLayer({
+    id: "fcc-utility-microwave-links-casing",
+    type: "line",
+    source: sourceIds.fccMicrowaveLinks,
+    paint: { "line-color": "#03080a", "line-width": ["interpolate", ["linear"], ["zoom"], 5, 4.2, 10, 7], "line-opacity": 0.76 },
+  });
+  map.addLayer({
+    id: "fcc-utility-microwave-links",
+    type: "line",
+    source: sourceIds.fccMicrowaveLinks,
+    paint: {
+      "line-color": fccOwnerColorExpression() as never,
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 1.8, 10, 4.2],
+      "line-opacity": 0.82,
+      "line-dasharray": ["literal", [1.2, 0.7]],
+    },
+  });
+  map.addLayer({
+    id: "fcc-utility-microwave-link-labels",
+    type: "symbol",
+    source: sourceIds.fccMicrowaveLinks,
+    minzoom: 9.4,
+    layout: { "text-field": ["concat", ["get", "callSign"], " P", ["to-string", ["get", "pathNumber"]]], "text-size": 9, "symbol-placement": "line", "text-rotation-alignment": "map" },
+    paint: { "text-color": "#ffe8bd", "text-halo-color": "#061012", "text-halo-width": 1.3 },
+  });
+  addClusterLayers(map, sourceIds.fccUtilityTowers, "fcc-utility-towers", "#f5a524", "FCC");
+  map.addLayer({
+    id: "fcc-utility-towers",
+    type: "circle",
+    source: sourceIds.fccUtilityTowers,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 4.2, 10, 7.8, 13, 10],
+      "circle-color": fccOwnerColorExpression() as never,
+      "circle-opacity": 0.92,
+      "circle-stroke-color": "#fff4d6",
+      "circle-stroke-width": 1.3,
+    },
+  });
+  map.addLayer({
+    id: "fcc-utility-tower-labels",
+    type: "symbol",
+    source: sourceIds.fccUtilityTowers,
+    filter: ["!", ["has", "point_count"]],
+    minzoom: 10,
+    layout: { "text-field": ["get", "callSign"], "text-size": 10, "text-offset": [0, 1.1], "text-anchor": "top" },
+    paint: { "text-color": "#fff4d6", "text-halo-color": "#061012", "text-halo-width": 1.45 },
   });
   map.addLayer({
     id: "synthetic-opgw-cables-casing",
@@ -691,12 +751,33 @@ function publicSubstationOwnerColorExpression() {
   ];
 }
 
+function fccOwnerColorExpression() {
+  return [
+    "match",
+    ["get", "utilityOwner"],
+    "Eversource Energy", "#ff8ecf",
+    "National Grid", "#4f93ff",
+    "Central Maine Power", "#41d6c6",
+    "Versant Power", "#36d0a8",
+    "Vermont Electric Power Company", "#b390ff",
+    "Green Mountain Power", "#8ee68e",
+    "New York Power Authority", "#7dd3fc",
+    "New York State Electric & Gas", "#efc95f",
+    "Consolidated Edison", "#f5a524",
+    "Unitil", "#f6d365",
+    "Municipal utility", "#d5dde2",
+    "#f5a524",
+  ];
+}
+
 function buildDatasets(
   substations: Substation[],
   nodes: MapNode[],
   transmissionLines: TransmissionLine[],
   publicTransmissionLines: PublicTransmissionLineFeature[],
   publicSubstations: PublicSubstationFeature[],
+  fccUtilityTowers: FccUtilityTowerFeature[],
+  fccMicrowaveLinks: FccMicrowaveLinkFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
   transmissionStructures: TransmissionStructureFeature[],
   opgwCables: OpgwCableFeature[],
@@ -777,6 +858,50 @@ function buildDatasets(
         nearestPublicLineDistanceMiles: feature.properties.nearestPublicLineDistanceMiles ?? null,
         maxVoltageKv: feature.properties.maxVoltageKv ?? null,
         minVoltageKv: feature.properties.minVoltageKv ?? null,
+        sourceType: feature.properties.sourceType,
+        readOnly: true,
+        synthetic: false,
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
+    fccMicrowaveLinks: layers.fccUtilityMicrowave ? collection(fccMicrowaveLinks.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "fcc_microwave_link",
+        id: feature.properties.id,
+        label: feature.properties.linkName,
+        status: feature.properties.pathStatus || "active",
+        callSign: feature.properties.callSign,
+        utilityOwner: feature.properties.utilityOwner,
+        rawLicenseeName: feature.properties.rawLicenseeName,
+        pathNumber: feature.properties.pathNumber,
+        pathTypeDesc: feature.properties.pathTypeDesc || null,
+        frequencyAssignedMhz: feature.properties.frequencyAssignedMhz ?? null,
+        frequencyUpperBandMhz: feature.properties.frequencyUpperBandMhz ?? null,
+        eirp: feature.properties.eirp ?? null,
+        pathDistanceMiles: feature.properties.pathDistanceMiles ?? null,
+        sourceType: feature.properties.sourceType,
+        readOnly: true,
+        synthetic: false,
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
+    fccUtilityTowers: layers.fccUtilityMicrowave ? collection(fccUtilityTowers.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "fcc_utility_tower",
+        id: feature.properties.id,
+        label: feature.properties.nodeName,
+        status: feature.properties.licenseStatus || "active",
+        callSign: feature.properties.callSign,
+        utilityOwner: feature.properties.utilityOwner,
+        rawLicenseeName: feature.properties.rawLicenseeName,
+        state: feature.properties.state,
+        locationNumber: feature.properties.locationNumber,
+        locationName: feature.properties.locationName || null,
+        towerRegistrationNumber: feature.properties.towerRegistrationNumber || null,
+        linkedPathCount: feature.properties.linkedPathIds.length,
+        frequencyBandsMhz: feature.properties.frequencyBandsMhz.join(", "),
         sourceType: feature.properties.sourceType,
         readOnly: true,
         synthetic: false,
@@ -932,6 +1057,8 @@ function buildSelectionLookup(
   transmissionLines: TransmissionLine[],
   publicTransmissionLines: PublicTransmissionLineFeature[],
   publicSubstations: PublicSubstationFeature[],
+  fccUtilityTowers: FccUtilityTowerFeature[],
+  fccMicrowaveLinks: FccMicrowaveLinkFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
   transmissionStructures: TransmissionStructureFeature[],
   opgwCables: OpgwCableFeature[],
@@ -966,6 +1093,22 @@ function buildSelectionLookup(
       kind: "public_substation",
       id: record.properties.id,
       label: `${record.properties.name} / ${record.properties.utilityOwner}`,
+      record,
+    };
+  });
+  fccUtilityTowers.forEach((record) => {
+    lookup[`fcc_utility_tower:${record.properties.id}`] = {
+      kind: "fcc_utility_tower",
+      id: record.properties.id,
+      label: `${record.properties.callSign} loc ${record.properties.locationNumber} / ${record.properties.utilityOwner}`,
+      record,
+    };
+  });
+  fccMicrowaveLinks.forEach((record) => {
+    lookup[`fcc_microwave_link:${record.properties.id}`] = {
+      kind: "fcc_microwave_link",
+      id: record.properties.id,
+      label: `${record.properties.callSign} path ${record.properties.pathNumber} / ${record.properties.utilityOwner}`,
       record,
     };
   });
@@ -1052,6 +1195,8 @@ function selectionCoordinates(selection: StreetMapSelection): Coordinate[] {
     return selection.record.geometry.type === "LineString" ? selection.record.geometry.coordinates : selection.record.geometry.coordinates.flat();
   }
   if (selection.kind === "public_substation") return [selection.record.geometry.coordinates];
+  if (selection.kind === "fcc_utility_tower") return [selection.record.geometry.coordinates];
+  if (selection.kind === "fcc_microwave_link") return selection.record.geometry.coordinates;
   if (selection.kind === "synthetic_substation") return [selection.record.geometry.coordinates];
   if (selection.kind === "transmission_structure") return [selection.record.geometry.coordinates];
   if (selection.kind === "opgw_cable") return selection.record.geometry.type === "LineString" ? selection.record.geometry.coordinates : selection.record.geometry.coordinates.flat();

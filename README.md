@@ -105,6 +105,7 @@ The website includes a `/data-sources` page and a dashboard Sources drawer tab. 
 - HIFLD transmission-line owner sublayers use the public HIFLD `OWNER` field when present, then close OpenStreetMap `power=line` / `power=minor_line` owner/operator tag matches with compatible voltage, then explicit utility owner tokens in public line names; otherwise the line remains in `Unknown public owner`.
 - HIFLD Electric Substations are used as public reference points only when owner/operator can be verified from public source data or close OpenStreetMap `power=substation` owner/operator tag matches.
 - OpenStreetMap data is used for public owner/operator tag enrichment and is attributed to OpenStreetMap contributors under the Open Database License.
+- FCC ULS Microwave Public Access Files are used for a read-only utility microwave layer. The layer includes public FCC microwave site/tower nodes and point-to-point paths only when the active public licensee name matches a utility-owner pattern and coordinates fall inside the ISO New England map bounds.
 - CARTO basemap tiles are used only as visual map background context.
 - Transmission structures, OPGW, splices, fiber strands, patch panels, assignments, SEL ICON examples, circuits, and work orders are synthetic demo/planning records unless later replaced by user-verified engineering records.
 
@@ -126,6 +127,7 @@ Or run each step separately:
 ```bash
 npm run data:transmission
 npm run data:public-substations
+npm run data:fcc-utility-microwave
 npm run data:synthetic-substations
 npm run data:structures
 npm run data:opgw
@@ -142,6 +144,9 @@ Generated files are stored in:
 - `frontend/public/data/iso-ne-public-transmission-lines.meta.json`
 - `frontend/public/data/iso-ne-public-substations.geojson`
 - `frontend/public/data/iso-ne-public-substations.meta.json`
+- `frontend/public/data/fcc-uls-utility-towers.geojson`
+- `frontend/public/data/fcc-uls-utility-microwave-links.geojson`
+- `frontend/public/data/fcc-uls-utility-microwave.meta.json`
 - `frontend/public/data/iso-ne-synthetic-substations.geojson`
 - `frontend/public/data/iso-ne-synthetic-substations.meta.json`
 - `frontend/public/data/iso-ne-synthetic-transmission-structures.geojson`
@@ -164,6 +169,14 @@ The ingestion script queries public geometry only, requests WGS84 output, filter
 Public transmission-line ingestion can enrich unknown HIFLD line-owner records with OpenStreetMap `power=line`, `power=minor_line`, and `power=cable` owner/operator tags from Overpass when the public OSM way is a close spatial match and has compatible voltage. This public enrichment is recorded as `openstreetmap_spatial_match`; it is not operational ownership verification, and unmatched records remain `Unknown public owner`.
 
 Public substation ingestion uses a public HIFLD Electric Substations FeatureServer plus OpenStreetMap `power=substation` owner/operator tags from Overpass for owner verification. The generated public substation layer includes only records with directly supported public owner/operator evidence; unknown-owner and nearest-line-only inferred records are excluded.
+
+FCC utility microwave ingestion uses the public FCC ULS complete microwave public access ZIP. The script parses active license, entity, location, path, microwave, and frequency tables, filters to utility licensee names, filters coordinates to Connecticut, Massachusetts, Rhode Island, New Hampshire, Vermont, and Maine, and writes read-only FCC tower/site and microwave path GeoJSON. The raw FCC ZIP is cached outside the repository by default because it is large. Override it with:
+
+```bash
+FCC_ULS_MICROWAVE_ZIP=C:\path\to\l_micro.zip npm run data:fcc-utility-microwave
+```
+
+FCC path, frequency, ASR, and tower-height fields are public license parameters only. They are not private utility route verification, operational circuit inventory, SCADA/protection path data, or CEII analysis.
 
 Synthetic substation generation creates exactly 100 fake demo/planning substations with a fixed seed:
 

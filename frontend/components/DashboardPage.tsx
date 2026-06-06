@@ -18,11 +18,12 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
   publicSubstations: true,
+  fccUtilityMicrowave: false,
   syntheticSubstations: false,
   transmissionStructures: true,
   syntheticOpgwCables: false,
@@ -49,6 +50,7 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   ...initialStreetLayers,
   publicTransmissionLines: true,
   publicSubstations: true,
+  fccUtilityMicrowave: true,
   transmissionStructures: true,
   spliceClosures: true,
 };
@@ -107,8 +109,11 @@ export function DashboardPage() {
   const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => dashboardStreetLayers);
   const [visibleTransmissionLineOwners, setVisibleTransmissionLineOwners] = useState<Record<string, boolean>>({});
   const [visibleSubstationOwners, setVisibleSubstationOwners] = useState<Record<string, boolean>>({});
+  const [visibleFccOwners, setVisibleFccOwners] = useState<Record<string, boolean>>({});
   const [publicTransmissionLines, setPublicTransmissionLines] = useState<PublicTransmissionLineFeature[]>([]);
   const [publicSubstations, setPublicSubstations] = useState<PublicSubstationFeature[]>([]);
+  const [fccUtilityTowers, setFccUtilityTowers] = useState<FccUtilityTowerFeature[]>([]);
+  const [fccMicrowaveLinks, setFccMicrowaveLinks] = useState<FccMicrowaveLinkFeature[]>([]);
   const [syntheticSubstations, setSyntheticSubstations] = useState<SyntheticSubstationFeature[]>([]);
   const [transmissionStructures, setTransmissionStructures] = useState<TransmissionStructureFeature[]>([]);
   const [opgwCables, setOpgwCables] = useState<OpgwCableFeature[]>([]);
@@ -147,6 +152,18 @@ export function DashboardPage() {
           warnings.spliceClosures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
           return [] as SpliceClosureFeature[];
         });
+      const fccTowers = await fetchGeoJson<FccUtilityTowerCollection>("/data/fcc-uls-utility-towers.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.fccUtilityMicrowave = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as FccUtilityTowerFeature[];
+        });
+      const fccLinks = await fetchGeoJson<FccMicrowaveLinkCollection>("/data/fcc-uls-utility-microwave-links.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.fccUtilityMicrowave = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as FccMicrowaveLinkFeature[];
+        });
       const splices = await fetchGeoJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json").catch((error) => {
         warnings.splices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
         return [] as FiberSplice[];
@@ -156,6 +173,8 @@ export function DashboardPage() {
       setPublicSubstations(publicSubstationRecords);
       setTransmissionStructures(structures);
       setSpliceClosures(closures);
+      setFccUtilityTowers(fccTowers);
+      setFccMicrowaveLinks(fccLinks);
       setFiberSplices(splices);
       setMapDataWarnings(warnings);
     }
@@ -214,6 +233,21 @@ export function DashboardPage() {
   useEffect(() => {
     setVisibleSubstationOwners((current) => mergeVisibleOwnerState(current, substationOwnerCounts));
   }, [substationOwnerCounts]);
+  const visibleFccUtilityTowers = useMemo(
+    () => fccUtilityTowers.filter((feature) => feature.properties.isoNe),
+    [fccUtilityTowers],
+  );
+  const visibleFccMicrowaveLinks = useMemo(
+    () => fccMicrowaveLinks.filter((feature) => feature.properties.isoNe),
+    [fccMicrowaveLinks],
+  );
+  const fccOwnerCounts = useMemo(
+    () => fccOwnerCountsFor(visibleFccUtilityTowers, visibleFccMicrowaveLinks),
+    [visibleFccMicrowaveLinks, visibleFccUtilityTowers],
+  );
+  useEffect(() => {
+    setVisibleFccOwners((current) => mergeVisibleOwnerState(current, fccOwnerCounts));
+  }, [fccOwnerCounts]);
   const visibleSyntheticSubstations = useMemo(
     () => syntheticSubstations.filter((feature) => feature.properties.synthetic && feature.properties.public === false),
     [syntheticSubstations],
@@ -244,6 +278,7 @@ export function DashboardPage() {
   );
   const hasSubstationOwnerLayerState = Object.keys(visibleSubstationOwners).length > 0;
   const hasTransmissionLineOwnerLayerState = Object.keys(visibleTransmissionLineOwners).length > 0;
+  const hasFccOwnerLayerState = Object.keys(visibleFccOwners).length > 0;
   const visibleTransmissionLineOwnerSet = useMemo(
     () => new Set(Object.entries(visibleTransmissionLineOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
     [visibleTransmissionLineOwners],
@@ -251,6 +286,10 @@ export function DashboardPage() {
   const visibleSubstationOwnerSet = useMemo(
     () => new Set(Object.entries(visibleSubstationOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
     [visibleSubstationOwners],
+  );
+  const visibleFccOwnerSet = useMemo(
+    () => new Set(Object.entries(visibleFccOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
+    [visibleFccOwners],
   );
   const layerFilteredPublicTransmissionLines = useMemo(
     () => {
@@ -268,6 +307,22 @@ export function DashboardPage() {
     },
     [hasSubstationOwnerLayerState, streetLayers.publicSubstations, visiblePublicSubstations, visibleSubstationOwnerSet],
   );
+  const layerFilteredFccUtilityTowers = useMemo(
+    () => {
+      if (!streetLayers.fccUtilityMicrowave) return [];
+      if (!hasFccOwnerLayerState) return visibleFccUtilityTowers;
+      return visibleFccUtilityTowers.filter((feature) => visibleFccOwnerSet.has(feature.properties.utilityOwner));
+    },
+    [hasFccOwnerLayerState, streetLayers.fccUtilityMicrowave, visibleFccOwnerSet, visibleFccUtilityTowers],
+  );
+  const layerFilteredFccMicrowaveLinks = useMemo(
+    () => {
+      if (!streetLayers.fccUtilityMicrowave) return [];
+      if (!hasFccOwnerLayerState) return visibleFccMicrowaveLinks;
+      return visibleFccMicrowaveLinks.filter((feature) => visibleFccOwnerSet.has(feature.properties.utilityOwner));
+    },
+    [hasFccOwnerLayerState, streetLayers.fccUtilityMicrowave, visibleFccMicrowaveLinks, visibleFccOwnerSet],
+  );
   const layerFilteredTransmissionStructures = useMemo(
     () => streetLayers.transmissionStructures ? visibleTransmissionStructures : [],
     [streetLayers.transmissionStructures, visibleTransmissionStructures],
@@ -278,16 +333,16 @@ export function DashboardPage() {
   );
 
   const summaryCards = useMemo(
-    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, mapStatus),
-    [mapStatus, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
+    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleFccUtilityTowers, visibleFccMicrowaveLinks, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, mapStatus),
+    [mapStatus, visibleFccMicrowaveLinks, visibleFccUtilityTowers, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
   );
   const ownerOptions = useMemo(
-    () => buildOwnerOptions(visiblePublicSubstations, visiblePublicTransmissionLines),
-    [visiblePublicSubstations, visiblePublicTransmissionLines],
+    () => buildOwnerOptions(visiblePublicSubstations, visiblePublicTransmissionLines, visibleFccUtilityTowers, visibleFccMicrowaveLinks),
+    [visibleFccMicrowaveLinks, visibleFccUtilityTowers, visiblePublicSubstations, visiblePublicTransmissionLines],
   );
   const rawSearchResults = useMemo(
-    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, layerFilteredPublicTransmissionLines, layerFilteredPublicSubstations, visibleSyntheticSubstations, layerFilteredTransmissionStructures, visibleOpgwCables, layerFilteredSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search),
-    [layerFilteredPublicSubstations, layerFilteredPublicTransmissionLines, layerFilteredSpliceClosures, layerFilteredTransmissionStructures, search, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
+    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, layerFilteredPublicTransmissionLines, layerFilteredPublicSubstations, layerFilteredFccUtilityTowers, layerFilteredFccMicrowaveLinks, visibleSyntheticSubstations, layerFilteredTransmissionStructures, visibleOpgwCables, layerFilteredSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search),
+    [layerFilteredFccMicrowaveLinks, layerFilteredFccUtilityTowers, layerFilteredPublicSubstations, layerFilteredPublicTransmissionLines, layerFilteredSpliceClosures, layerFilteredTransmissionStructures, search, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
   );
   const mapSearchResults = useMemo(
     () => search.trim() ? rawSearchResults.filter(isDashboardMapSearchResult).slice(0, 8) : [],
@@ -463,6 +518,20 @@ export function DashboardPage() {
     }
   }
 
+  function handleFccOwnerLayerChange(owner: string, enabled: boolean) {
+    setVisibleFccOwners((current) => ({ ...current, [owner]: enabled }));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, fccUtilityMicrowave: true }));
+    }
+  }
+
+  function handleAllFccOwnersChange(enabled: boolean) {
+    setVisibleFccOwners(Object.fromEntries(fccOwnerCounts.map(({ owner }) => [owner, enabled])));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, fccUtilityMicrowave: true }));
+    }
+  }
+
   function openEditorDrawer() {
     setRightMode("editor");
     setRightCollapsed(false);
@@ -544,6 +613,8 @@ export function DashboardPage() {
         transmissionLines={visibleTransmissionLines}
         publicTransmissionLines={layerFilteredPublicTransmissionLines}
         publicSubstations={layerFilteredPublicSubstations}
+        fccUtilityTowers={layerFilteredFccUtilityTowers}
+        fccMicrowaveLinks={layerFilteredFccMicrowaveLinks}
         syntheticSubstations={visibleSyntheticSubstations}
         transmissionStructures={layerFilteredTransmissionStructures}
         opgwCables={visibleOpgwCables}
@@ -564,7 +635,7 @@ export function DashboardPage() {
       <div className="dashboard-floating-topbar">
         <div className="dashboard-compact-brand">
           <strong>GridAssetLink</strong>
-          <span>HIFLD lines, substations, structures, and splices</span>
+          <span>HIFLD, FCC utility towers, substations, structures, and splices</span>
         </div>
         <div className="dashboard-map-global-search-wrap">
           <label className="dashboard-map-global-search">
@@ -574,7 +645,7 @@ export function DashboardPage() {
               onChange={(event) => handleGlobalSearchChange(event.target.value)}
               onFocus={() => setSearchOpen(Boolean(search.trim()))}
               onKeyDown={handleGlobalSearchKeyDown}
-              placeholder="Search HIFLD lines, substations, owners, structures, or splice closures"
+              placeholder="Search HIFLD, FCC call signs, owners, substations, structures, or splices"
               aria-autocomplete="list"
               aria-expanded={searchOpen && mapSearchResults.length > 0}
             />
@@ -655,7 +726,11 @@ export function DashboardPage() {
                     visiblePublicLineCount={layerFilteredPublicTransmissionLines.length}
                     publicSubstationCount={visiblePublicSubstations.length}
                     visiblePublicSubstationCount={layerFilteredPublicSubstations.length}
-                    utilityOwnerCount={substationOwnerCounts.length + transmissionLineOwnerCounts.length}
+                    fccTowerCount={visibleFccUtilityTowers.length}
+                    visibleFccTowerCount={layerFilteredFccUtilityTowers.length}
+                    fccLinkCount={visibleFccMicrowaveLinks.length}
+                    visibleFccLinkCount={layerFilteredFccMicrowaveLinks.length}
+                    utilityOwnerCount={new Set([...substationOwnerCounts, ...transmissionLineOwnerCounts, ...fccOwnerCounts].map(({ owner }) => owner)).size}
                     structureCount={visibleTransmissionStructures.length}
                     spliceClosureCount={visibleSpliceClosures.length}
                     dataWarnings={mapDataWarnings}
@@ -663,11 +738,15 @@ export function DashboardPage() {
                     visibleTransmissionLineOwners={visibleTransmissionLineOwners}
                     substationOwnerCounts={substationOwnerCounts}
                     visibleSubstationOwners={visibleSubstationOwners}
+                    fccOwnerCounts={fccOwnerCounts}
+                    visibleFccOwners={visibleFccOwners}
                     onLayerChange={handleStreetLayerChange}
                     onTransmissionLineOwnerChange={handleTransmissionLineOwnerLayerChange}
                     onAllTransmissionLineOwnersChange={handleAllTransmissionLineOwnersChange}
                     onSubstationOwnerChange={handleSubstationOwnerLayerChange}
                     onAllSubstationOwnersChange={handleAllSubstationOwnersChange}
+                    onFccOwnerChange={handleFccOwnerLayerChange}
+                    onAllFccOwnersChange={handleAllFccOwnersChange}
                   />
                   {streetLayers.missingLocationAssets ? (
                     <MissingMapLocationPanel
@@ -1274,6 +1353,8 @@ function buildSummaryCards(
   lines: TransmissionLine[],
   publicLines: PublicTransmissionLineFeature[],
   publicSubstations: PublicSubstationFeature[],
+  fccTowers: FccUtilityTowerFeature[],
+  fccLinks: FccMicrowaveLinkFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
   structures: TransmissionStructureFeature[],
   opgw: OpgwCableFeature[],
@@ -1284,13 +1365,14 @@ function buildSummaryCards(
 ) {
   const stateCount = new Set(publicLines.flatMap((line) => line.properties.states)).size;
   const voltageClassCount = new Set(publicLines.map((line) => line.properties.voltageClass || "unknown")).size;
-  const ownerCounts = ownerCountsFor(publicSubstations, publicLines);
+  const ownerCounts = combinedOwnerCounts(publicSubstations, publicLines, fccTowers, fccLinks);
   const utilityOwnerCount = ownerCounts.filter(({ owner }) => owner !== "Unknown public owner").length;
   const topOwner = ownerCounts.find(({ owner }) => owner !== "Unknown public owner") || ownerCounts[0];
   return [
     { label: "Transmission Maps", value: maps.length, note: "public HIFLD reference", Icon: Network },
     { label: "HIFLD Lines", value: publicLines.length, note: "read-only public reference", Icon: Route },
     { label: "Substation Nodes", value: publicSubstations.length, note: "verified public owner", Icon: MapPin },
+    { label: "FCC Utility Towers", value: fccTowers.length, note: `${fccLinks.length} public ULS links`, Icon: RadioTower },
     { label: "Utility Owners", value: utilityOwnerCount, note: "verified public buckets", Icon: Layers },
     { label: "Top Owner Bucket", value: topOwner?.count || 0, note: topOwner?.owner || "none", Icon: Gauge },
     { label: "Structures", value: structures.length, note: "synthetic demo points", Icon: MapPin },
@@ -1307,6 +1389,8 @@ function buildSearchResults(
   lines: TransmissionLine[],
   publicLines: PublicTransmissionLineFeature[],
   publicSubstations: PublicSubstationFeature[],
+  fccTowers: FccUtilityTowerFeature[],
+  fccLinks: FccMicrowaveLinkFeature[],
   syntheticSubstations: SyntheticSubstationFeature[],
   structures: TransmissionStructureFeature[],
   opgw: OpgwCableFeature[],
@@ -1318,6 +1402,8 @@ function buildSearchResults(
   const all: StreetMapSelection[] = [
     ...publicLines.map((record) => ({ kind: "public_transmission_line" as const, id: record.properties.id, label: publicLineLabel(record), record })),
     ...publicSubstations.map((record) => ({ kind: "public_substation" as const, id: record.properties.id, label: publicSubstationLabel(record), record })),
+    ...fccTowers.map((record) => ({ kind: "fcc_utility_tower" as const, id: record.properties.id, label: fccTowerLabel(record), record })),
+    ...fccLinks.map((record) => ({ kind: "fcc_microwave_link" as const, id: record.properties.id, label: fccLinkLabel(record), record })),
     ...syntheticSubstations.map((record) => ({ kind: "synthetic_substation" as const, id: record.properties.id, label: record.properties.name, record })),
     ...structures.map((record) => ({ kind: "transmission_structure" as const, id: record.properties.id, label: record.properties.structureNumber, record })),
     ...opgw.map((record) => ({ kind: "opgw_cable" as const, id: record.properties.id, label: record.properties.cableName, record })),
@@ -1341,9 +1427,19 @@ function publicSubstationLabel(record: PublicSubstationFeature) {
   return `${record.properties.name} / ${record.properties.utilityOwner}`;
 }
 
+function fccTowerLabel(record: FccUtilityTowerFeature) {
+  return `${record.properties.callSign} loc ${record.properties.locationNumber} / ${record.properties.utilityOwner}`;
+}
+
+function fccLinkLabel(record: FccMicrowaveLinkFeature) {
+  return `${record.properties.callSign} path ${record.properties.pathNumber} / ${record.properties.utilityOwner}`;
+}
+
 function isDashboardMapSearchResult(selection: StreetMapSelection) {
   return selection.kind === "public_transmission_line"
     || selection.kind === "public_substation"
+    || selection.kind === "fcc_utility_tower"
+    || selection.kind === "fcc_microwave_link"
     || selection.kind === "transmission_structure"
     || selection.kind === "splice_closure";
 }
@@ -1360,6 +1456,8 @@ function matchesDashboardFilters(selection: StreetMapSelection, assetType: strin
 function selectionStatus(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return selection.record.properties.status || "unknown";
   if (selection.kind === "public_substation") return selection.record.properties.status || "unknown";
+  if (selection.kind === "fcc_utility_tower") return selection.record.properties.licenseStatus || "active";
+  if (selection.kind === "fcc_microwave_link") return selection.record.properties.pathStatus || "active";
   if (selection.kind === "synthetic_substation") return selection.record.properties.status;
   if (selection.kind === "transmission_structure") return selection.record.properties.hasSplice ? "assigned" : selection.record.properties.hasOpgw ? "existing" : "planned";
   if (selection.kind === "opgw_cable") return selection.record.properties.status;
@@ -1373,6 +1471,8 @@ function selectionStatus(selection: StreetMapSelection) {
 function selectionRegion(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return selection.record.properties.states[0] || "MA";
   if (selection.kind === "public_substation") return selection.record.properties.state;
+  if (selection.kind === "fcc_utility_tower") return selection.record.properties.state;
+  if (selection.kind === "fcc_microwave_link") return selection.record.properties.states[0] || "MA";
   if (selection.kind === "synthetic_substation") return selection.record.properties.state;
   if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "MA";
   const record = selection.record as { state?: string };
@@ -1382,6 +1482,7 @@ function selectionRegion(selection: StreetMapSelection) {
 function selectionVisibility(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return "public";
   if (selection.kind === "public_substation") return "public";
+  if (selection.kind === "fcc_utility_tower" || selection.kind === "fcc_microwave_link") return "public";
   if (selection.kind === "synthetic_substation") return selection.record.properties.visibility;
   if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "synthetic-demo";
   const record = selection.record as { visibility?: string };
@@ -1391,11 +1492,12 @@ function selectionVisibility(selection: StreetMapSelection) {
 function selectionUtilityOwner(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return publicTransmissionLineOwner(selection.record.properties);
   if (selection.kind === "public_substation") return selection.record.properties.utilityOwner;
+  if (selection.kind === "fcc_utility_tower" || selection.kind === "fcc_microwave_link") return selection.record.properties.utilityOwner;
   return "Unknown public owner";
 }
 
-function buildOwnerOptions(publicSubstations: PublicSubstationFeature[], publicLines: PublicTransmissionLineFeature[]) {
-  return ["all", ...ownerCountsFor(publicSubstations, publicLines).map(({ owner }) => owner)];
+function buildOwnerOptions(publicSubstations: PublicSubstationFeature[], publicLines: PublicTransmissionLineFeature[], fccTowers: FccUtilityTowerFeature[], fccLinks: FccMicrowaveLinkFeature[]) {
+  return ["all", ...combinedOwnerCounts(publicSubstations, publicLines, fccTowers, fccLinks).map(({ owner }) => owner)];
 }
 
 function ownerCountsFor(publicSubstations: PublicSubstationFeature[], publicLines: PublicTransmissionLineFeature[]) {
@@ -1406,6 +1508,29 @@ function ownerCountsFor(publicSubstations: PublicSubstationFeature[], publicLine
   publicLines.forEach((record) => {
     const owner = publicTransmissionLineOwner(record.properties);
     counts.set(owner, (counts.get(owner) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([owner, count]) => ({ owner, count }))
+    .sort((a, b) => b.count - a.count || a.owner.localeCompare(b.owner));
+}
+
+function fccOwnerCountsFor(towers: FccUtilityTowerFeature[], links: FccMicrowaveLinkFeature[]) {
+  const counts = new Map<string, number>();
+  towers.forEach((record) => {
+    counts.set(record.properties.utilityOwner, (counts.get(record.properties.utilityOwner) || 0) + 1);
+  });
+  links.forEach((record) => {
+    counts.set(record.properties.utilityOwner, (counts.get(record.properties.utilityOwner) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([owner, count]) => ({ owner, count }))
+    .sort((a, b) => b.count - a.count || a.owner.localeCompare(b.owner));
+}
+
+function combinedOwnerCounts(publicSubstations: PublicSubstationFeature[], publicLines: PublicTransmissionLineFeature[], fccTowers: FccUtilityTowerFeature[], fccLinks: FccMicrowaveLinkFeature[]) {
+  const counts = new Map<string, number>();
+  [...ownerCountsFor(publicSubstations, publicLines), ...fccOwnerCountsFor(fccTowers, fccLinks)].forEach(({ owner, count }) => {
+    counts.set(owner, (counts.get(owner) || 0) + count);
   });
   return [...counts.entries()]
     .map(([owner, count]) => ({ owner, count }))
@@ -1438,6 +1563,14 @@ function selectionSearchText(selection: StreetMapSelection) {
   if (selection.kind === "public_substation") {
     const properties = selection.record.properties;
     return [selection.label, properties.id, properties.name, properties.utilityOwner, properties.city, properties.county, properties.state, properties.nearestPublicLineId].join(" ");
+  }
+  if (selection.kind === "fcc_utility_tower") {
+    const properties = selection.record.properties;
+    return [selection.label, properties.id, properties.nodeName, properties.callSign, properties.utilityOwner, properties.rawLicenseeName, properties.frn, properties.locationName, properties.address, properties.city, properties.county, properties.state, properties.towerRegistrationNumber, properties.frequencyBandsMhz.join(" ")].join(" ");
+  }
+  if (selection.kind === "fcc_microwave_link") {
+    const properties = selection.record.properties;
+    return [selection.label, properties.id, properties.linkName, properties.callSign, properties.utilityOwner, properties.rawLicenseeName, properties.pathNumber, properties.pathTypeDesc, properties.frequencyAssignedMhz, properties.frequencyUpperBandMhz, properties.txNodeId, properties.rxNodeId, properties.states.join(" ")].join(" ");
   }
   if (selection.kind === "transmission_structure") {
     const properties = selection.record.properties;
@@ -1484,6 +1617,7 @@ function publicLayerSet(layers: Record<StreetMapLayerKey, boolean>) {
   return {
     ...layers,
     publicTransmissionLines: true,
+    fccUtilityMicrowave: true,
     syntheticSubstations: false,
     transmissionLines: false,
     substations: false,

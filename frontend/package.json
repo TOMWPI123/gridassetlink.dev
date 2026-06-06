@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "data:transmission": "tsx scripts/ingest-public-transmission-lines.ts",
     "data:public-substations": "tsx scripts/ingest-public-substations.ts",
+    "data:fcc-utility-microwave": "tsx scripts/ingest-fcc-utility-microwave.ts",
     "data:synthetic-substations": "tsx scripts/generate-synthetic-substations.ts",
     "data:structures": "tsx scripts/generate-transmission-structures.ts",
     "data:opgw": "tsx scripts/generate-synthetic-opgw.ts",
@@ -22,6 +23,7 @@
     "data:map": "npm run data:transmission && npm run data:public-substations && npm run data:synthetic-substations && npm run data:fiber-network && npm run data:validate-fiber-network"
   },
   "dependencies": {
+    "adm-zip": "^0.5.17",
     "lucide-react": "^0.475.0",
     "maplibre-gl": "^5.24.0",
     "next": "^16.1.6",

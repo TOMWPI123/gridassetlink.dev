@@ -284,6 +284,99 @@ export type PublicSubstationCollection = {
   features: PublicSubstationFeature[];
 };
 
+export type FccUtilityTowerProperties = {
+  id: string;
+  nodeName: string;
+  callSign: string;
+  utilityOwner: string;
+  rawLicenseeName: string;
+  frn?: string | null;
+  radioServiceCode?: string | null;
+  licenseStatus?: "active" | "unknown";
+  grantDate?: string | null;
+  expirationDate?: string | null;
+  locationNumber: number;
+  locationName?: string | null;
+  locationTypeCode?: string | null;
+  locationClassCode?: string | null;
+  address?: string | null;
+  city?: string | null;
+  county?: string | null;
+  state: IsoNeState;
+  towerRegistrationNumber?: string | null;
+  groundElevationM?: number | null;
+  supportHeightM?: number | null;
+  overallHeightM?: number | null;
+  structureType?: string | null;
+  linkedPathIds: string[];
+  frequencyBandsMhz: number[];
+  source: "FCC ULS";
+  sourceType: "public-reference";
+  readOnly: true;
+  synthetic: false;
+  isoNe: true;
+  publicDataNotice: "Public FCC ULS microwave site record. Utility telecom planning reference only; not for operations.";
+};
+
+export type FccUtilityTowerFeature = {
+  type: "Feature";
+  properties: FccUtilityTowerProperties;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type FccUtilityTowerCollection = {
+  type: "FeatureCollection";
+  features: FccUtilityTowerFeature[];
+};
+
+export type FccMicrowaveLinkProperties = {
+  id: string;
+  linkName: string;
+  callSign: string;
+  utilityOwner: string;
+  rawLicenseeName: string;
+  radioServiceCode?: string | null;
+  typeOfOperation?: string | null;
+  stationClass?: string | null;
+  pathNumber: number;
+  pathTypeDesc?: string | null;
+  txNodeId: string;
+  rxNodeId: string;
+  txLocationNumber: number;
+  rxLocationNumber: number;
+  txAntennaNumber?: number | null;
+  rxAntennaNumber?: number | null;
+  receiverCallSign?: string | null;
+  frequencyAssignedMhz?: number | null;
+  frequencyUpperBandMhz?: number | null;
+  eirp?: number | null;
+  powerOutput?: number | null;
+  transmitterMake?: string | null;
+  transmitterModel?: string | null;
+  pathDistanceMiles?: number | null;
+  pathStatus?: string | null;
+  linkStartDate?: string | null;
+  linkEndDate?: string | null;
+  states: IsoNeState[];
+  source: "FCC ULS";
+  sourceType: "public-reference";
+  readOnly: true;
+  synthetic: false;
+  isoNe: true;
+  publicDataNotice: "Public FCC ULS microwave path record. Utility telecom planning reference only; not for operations.";
+};
+
+export type FccMicrowaveLinkFeature = {
+  type: "Feature";
+  properties: FccMicrowaveLinkProperties;
+  geometry: { type: "LineString"; coordinates: Coordinate[] };
+};
+
+export type FccMicrowaveLinkCollection = {
+  type: "FeatureCollection";
+  features: FccMicrowaveLinkFeature[];
+};
+
 export type SyntheticSubstationProperties = {
   id: string;
   name: string;
@@ -619,6 +712,7 @@ export type MapAnnotation = {
 export type StreetMapLayerKey =
   | "publicTransmissionLines"
   | "publicSubstations"
+  | "fccUtilityMicrowave"
   | "syntheticSubstations"
   | "transmissionStructures"
   | "syntheticOpgwCables"

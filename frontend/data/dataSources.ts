@@ -38,6 +38,18 @@ export const dataSourceRecords: DataSourceRecord[] = [
     handling: "For transmission lines, only close spatial matches with compatible voltage are used. For substations, only close spatial matches within the configured match tolerance are used. OpenStreetMap data is attributed to OpenStreetMap contributors and is subject to the Open Database License.",
   },
   {
+    name: "FCC ULS Microwave Public Access Files",
+    category: "Public reference",
+    url: "https://data.fcc.gov/download/pub/uls/complete/l_micro.zip",
+    role: "Public utility-licensee microwave tower/site nodes and point-to-point path references inside the ISO New England map bounds.",
+    handling: "Generated from FCC ULS public access tables. The app includes only active microwave records whose public licensee name matches a utility-owner pattern and whose public FCC coordinates fall inside CT, MA, RI, NH, VT, or ME. Path links and parameters are FCC public license fields only, including call sign, path number, site/location number, frequency, EIRP, ASR number when present, structure height, and license dates. Records are read-only and not operational telecom inventory.",
+    generatedFiles: [
+      "frontend/public/data/fcc-uls-utility-towers.geojson",
+      "frontend/public/data/fcc-uls-utility-microwave-links.geojson",
+      "frontend/public/data/fcc-uls-utility-microwave.meta.json",
+    ],
+  },
+  {
     name: "CARTO basemap tiles",
     category: "Basemap",
     url: "https://docs.carto.com/faqs/carto-basemaps",

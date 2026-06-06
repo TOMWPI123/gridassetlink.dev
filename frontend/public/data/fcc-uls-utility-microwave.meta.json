@@ -1,0 +1,44 @@
+{
+  "sourceName": "FCC ULS Microwave Public Access Files",
+  "sourceType": "public-reference",
+  "sourceUrl": "https://data.fcc.gov/download/pub/uls/complete/l_micro.zip",
+  "generatedAt": "2026-06-06T18:41:46.632Z",
+  "statesIncluded": [
+    "CT",
+    "MA",
+    "RI",
+    "NH",
+    "VT",
+    "ME"
+  ],
+  "utilityLicenseCount": 568,
+  "utilityTowerCount": 630,
+  "utilityMicrowaveLinkCount": 354,
+  "ownerSummary": {
+    "Eversource Energy": 257,
+    "National Grid": 199,
+    "Eversource Energy links": 184,
+    "National Grid links": 83,
+    "Central Maine Power": 77,
+    "Central Maine Power links": 44,
+    "Versant Power": 42,
+    "Versant Power links": 28,
+    "Vermont Electric Power Company": 13,
+    "Consolidated Edison": 12,
+    "Vermont Electric Power Company links": 12,
+    "Green Mountain Power": 10,
+    "New York Power Authority": 8,
+    "New York State Electric & Gas": 5,
+    "Unitil": 4,
+    "Municipal utility": 3,
+    "New York Power Authority links": 2,
+    "Green Mountain Power links": 1
+  },
+  "frequencySummary": {
+    "6-7 GHz": 263,
+    "11-15 GHz": 76,
+    "18 GHz": 8,
+    "below 2 GHz": 7
+  },
+  "notes": "Public FCC ULS microwave records only. Utility-owned/licensee records inside ISO New England bounds. Not for operations."
+}

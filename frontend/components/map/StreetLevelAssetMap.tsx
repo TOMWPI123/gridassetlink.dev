@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
@@ -10,6 +10,8 @@ export type StreetMapSelection =
   | { kind: "transmission_line"; id: string; label: string; record: TransmissionLine }
   | { kind: "public_transmission_line"; id: string; label: string; record: PublicTransmissionLineFeature }
   | { kind: "public_substation"; id: string; label: string; record: PublicSubstationFeature }
+  | { kind: "fcc_utility_tower"; id: string; label: string; record: FccUtilityTowerFeature }
+  | { kind: "fcc_microwave_link"; id: string; label: string; record: FccMicrowaveLinkFeature }
   | { kind: "synthetic_substation"; id: string; label: string; record: SyntheticSubstationFeature }
   | { kind: "transmission_structure"; id: string; label: string; record: TransmissionStructureFeature }
   | { kind: "opgw_cable"; id: string; label: string; record: OpgwCableFeature }
@@ -32,6 +34,8 @@ type StreetLevelAssetMapProps = {
   transmissionLines: TransmissionLine[];
   publicTransmissionLines: PublicTransmissionLineFeature[];
   publicSubstations: PublicSubstationFeature[];
+  fccUtilityTowers: FccUtilityTowerFeature[];
+  fccMicrowaveLinks: FccMicrowaveLinkFeature[];
   syntheticSubstations: SyntheticSubstationFeature[];
   transmissionStructures: TransmissionStructureFeature[];
   opgwCables: OpgwCableFeature[];
@@ -61,6 +65,8 @@ export function StreetLevelAssetMap({
   transmissionLines,
   publicTransmissionLines,
   publicSubstations,
+  fccUtilityTowers,
+  fccMicrowaveLinks,
   syntheticSubstations,
   transmissionStructures,
   opgwCables,
@@ -87,6 +93,8 @@ export function StreetLevelAssetMap({
           transmissionLines={transmissionLines}
           publicTransmissionLines={publicTransmissionLines}
           publicSubstations={publicSubstations}
+          fccUtilityTowers={fccUtilityTowers}
+          fccMicrowaveLinks={fccMicrowaveLinks}
           syntheticSubstations={syntheticSubstations}
           transmissionStructures={transmissionStructures}
           opgwCables={opgwCables}

@@ -77,6 +77,20 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
       geometryType: selection.record.geometry.type,
     };
   }
+  if (selection.kind === "fcc_utility_tower") {
+    return {
+      ...selection.record.properties,
+      longitude: selection.record.geometry.coordinates[0],
+      latitude: selection.record.geometry.coordinates[1],
+      geometryType: selection.record.geometry.type,
+    };
+  }
+  if (selection.kind === "fcc_microwave_link") {
+    return {
+      ...selection.record.properties,
+      geometryType: selection.record.geometry.type,
+    };
+  }
   if (selection.kind === "synthetic_substation") {
     return selection.record.properties as unknown as Record<string, unknown>;
   }
@@ -95,6 +109,8 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
 function detailBadgesForSelection(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return ["Public", "Read-only"];
   if (selection.kind === "public_substation") return ["Public", "Read-only", "Owner bucket"];
+  if (selection.kind === "fcc_utility_tower") return ["Public FCC", "Utility licensee", "Read-only"];
+  if (selection.kind === "fcc_microwave_link") return ["Public FCC", "Microwave path", "Read-only"];
   if (selection.kind === "synthetic_substation") return ["Synthetic", "Demo", "Private"];
   if (selection.kind === "transmission_structure") return ["Synthetic structure", "Demo"];
   if (selection.kind === "opgw_cable") return ["Synthetic OPGW", "Demo"];
@@ -107,6 +123,8 @@ function detailBadgesForSelection(selection: StreetMapSelection) {
 function detailNoticeForSelection(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return "Public transmission line reference geometry. Owner bucket is based on the public HIFLD OWNER field when present, then a close OpenStreetMap power-line owner/operator tag match with compatible voltage, then explicit utility owner tokens in the public line name. Unsupported records stay Unknown public owner. Read-only and not for operations.";
   if (selection.kind === "public_substation") return "Public substation reference point. Utility owner is from an open public field when available, then a close OpenStreetMap operator/owner tag match. Unknown-owner records are excluded from the displayed public substation layer.";
+  if (selection.kind === "fcc_utility_tower") return "Public FCC ULS microwave site/tower reference. Included only when the public licensee name matches a utility-owner pattern and the coordinates are inside the ISO New England map bounds. Not an operational telecom inventory.";
+  if (selection.kind === "fcc_microwave_link") return "Public FCC ULS microwave path reference. Endpoint, frequency, EIRP, path, and owner fields come from public FCC license tables only. Do not treat this as private utility routing or an operational circuit.";
   if (selection.kind === "synthetic_substation") return "Synthetic demo/planning substation. Not a real utility asset.";
   if (selection.kind === "transmission_structure") return "Synthetic transmission structure point generated from public line geometry. It is not a real pole, tower, or utility structure location.";
   if (selection.kind === "opgw_cable") return "Synthetic OPGW planning route. Do not treat this as verified fiber or an operational telecom path.";

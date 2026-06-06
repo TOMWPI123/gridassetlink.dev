@@ -10,6 +10,10 @@ type MapLayerControlPanelProps = {
   visiblePublicLineCount?: number;
   publicSubstationCount?: number;
   visiblePublicSubstationCount?: number;
+  fccTowerCount?: number;
+  visibleFccTowerCount?: number;
+  fccLinkCount?: number;
+  visibleFccLinkCount?: number;
   utilityOwnerCount?: number;
   structureCount?: number;
   spliceClosureCount?: number;
@@ -18,15 +22,20 @@ type MapLayerControlPanelProps = {
   visibleTransmissionLineOwners?: Record<string, boolean>;
   substationOwnerCounts?: Array<{ owner: string; count: number }>;
   visibleSubstationOwners?: Record<string, boolean>;
+  fccOwnerCounts?: Array<{ owner: string; count: number }>;
+  visibleFccOwners?: Record<string, boolean>;
   onTransmissionLineOwnerChange?: (owner: string, enabled: boolean) => void;
   onAllTransmissionLineOwnersChange?: (enabled: boolean) => void;
   onSubstationOwnerChange?: (owner: string, enabled: boolean) => void;
   onAllSubstationOwnersChange?: (enabled: boolean) => void;
+  onFccOwnerChange?: (owner: string, enabled: boolean) => void;
+  onAllFccOwnersChange?: (enabled: boolean) => void;
 };
 
 const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges?: string[] }> = [
   { key: "publicTransmissionLines", label: "HIFLD transmission lines", note: "Public HIFLD line geometry grouped by HIFLD OWNER, close OSM line owner/operator matches, and explicit line-name owner tokens", badges: ["Public", "Owner buckets"] },
   { key: "publicSubstations", label: "Verified-owner substation nodes", note: "Open-source substation nodes grouped by public source fields or close OSM owner/operator matches", badges: ["Public", "Owner buckets"] },
+  { key: "fccUtilityMicrowave", label: "FCC utility microwave", note: "Public FCC ULS utility licensee tower/site nodes and point-to-point microwave links", badges: ["Public", "FCC ULS"] },
   { key: "transmissionStructures", label: "Transmission structures", note: "Synthetic demo structure points sampled from public line geometry", badges: ["Synthetic", "Demo"] },
   { key: "spliceClosures", label: "Splice closures", note: "Synthetic demo splice closures mounted on synthetic structures", badges: ["Synthetic", "Demo"] },
 ];
@@ -38,6 +47,10 @@ export function MapLayerControlPanel({
   visiblePublicLineCount = publicLineCount,
   publicSubstationCount = 0,
   visiblePublicSubstationCount = publicSubstationCount,
+  fccTowerCount = 0,
+  visibleFccTowerCount = fccTowerCount,
+  fccLinkCount = 0,
+  visibleFccLinkCount = fccLinkCount,
   utilityOwnerCount = 0,
   structureCount = 0,
   spliceClosureCount = 0,
@@ -46,19 +59,25 @@ export function MapLayerControlPanel({
   visibleTransmissionLineOwners = {},
   substationOwnerCounts = [],
   visibleSubstationOwners = {},
+  fccOwnerCounts = [],
+  visibleFccOwners = {},
   onTransmissionLineOwnerChange,
   onAllTransmissionLineOwnersChange,
   onSubstationOwnerChange,
   onAllSubstationOwnersChange,
+  onFccOwnerChange,
+  onAllFccOwnersChange,
 }: MapLayerControlPanelProps) {
   const counts: Partial<Record<StreetMapLayerKey, number>> = {
     publicTransmissionLines: publicLineCount,
     publicSubstations: publicSubstationCount,
+    fccUtilityMicrowave: fccTowerCount + fccLinkCount,
     transmissionStructures: structureCount,
     spliceClosures: spliceClosureCount,
   };
   const visibleLineOwnerCount = transmissionLineOwnerCounts.filter(({ owner }) => visibleTransmissionLineOwners[owner] !== false).length;
   const visibleSubstationOwnerCount = substationOwnerCounts.filter(({ owner }) => visibleSubstationOwners[owner] !== false).length;
+  const visibleFccOwnerCount = fccOwnerCounts.filter(({ owner }) => visibleFccOwners[owner] !== false).length;
   return (
     <aside className="street-layer-control-panel" aria-label="Street-level layer and drawing controls">
       <div className="street-panel-title"><Layers size={16} />Street Map Layers</div>
@@ -110,11 +129,24 @@ export function MapLayerControlPanel({
                 onAllOwnersChange={onAllSubstationOwnersChange}
               />
             ) : null}
+            {layer.key === "fccUtilityMicrowave" && layers.fccUtilityMicrowave ? (
+              <OwnerSublayerList
+                title="FCC utility owner sublayers"
+                visibleCount={visibleFccTowerCount + visibleFccLinkCount}
+                totalCount={fccTowerCount + fccLinkCount}
+                visibleOwnerCount={visibleFccOwnerCount}
+                totalOwnerCount={fccOwnerCounts.length}
+                ownerCounts={fccOwnerCounts}
+                visibleOwners={visibleFccOwners}
+                onOwnerChange={onFccOwnerChange}
+                onAllOwnersChange={onAllFccOwnersChange}
+              />
+            ) : null}
           </div>
         ))}
       </div>
       <div className="street-map-todo-note">
-        Dashboard map is limited to public HIFLD transmission-line references, verified-owner public substation nodes, close OpenStreetMap owner/operator matches, and synthetic demo transmission structures and splice closures. Transmission owner sublayers use public HIFLD OWNER fields, compatible OSM line owner/operator matches, and explicit public line-name tokens; telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
+        Dashboard map is limited to public HIFLD transmission-line references, verified-owner public substation nodes, public FCC ULS utility microwave records, close OpenStreetMap owner/operator matches, and synthetic demo transmission structures and splice closures. FCC records are public license/tower references only; telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
       </div>
     </aside>
   );
@@ -173,6 +205,7 @@ function OwnerSublayerList({
 function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string, string>) {
   if (layer === "publicTransmissionLines") return warnings?.publicLines;
   if (layer === "publicSubstations") return warnings?.publicSubstations;
+  if (layer === "fccUtilityMicrowave") return warnings?.fccUtilityMicrowave;
   if (layer === "transmissionStructures") return warnings?.structures;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   return "";
