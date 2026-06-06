@@ -1,8 +1,11 @@
 "use client";
 
-import { AlertTriangle, Cable, Cpu, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, ShieldCheck, SlidersHorizontal, Workflow, X } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { AlertTriangle, Cable, Cpu, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, ShieldCheck, SlidersHorizontal, Workflow, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSession } from "@/lib/api";
+import { appNavGroups } from "@/components/navigation";
 import { isoNeDiagramAnnotations } from "@/data/mapAnnotations";
 import { seedMapNodes } from "@/data/nodeParameters";
 import { seedEditableSubstations } from "@/data/substations";
@@ -40,7 +43,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
 };
 
 type MapStatus = "loading" | "active" | "error";
-type RightDrawerMode = "summary" | "layers" | "details" | "editor";
+type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "details" | "editor";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
 
 const availableDeviceIds = ["NODE-WBS-ICON", "NODE-AUB-ICON", "NODE-BOS-OTN", "NODE-RI-RTR", "NODE-NH-MW"];
@@ -60,6 +63,7 @@ const addAssetOptions: Array<{ kind: AddAssetKind; label: string; note: string }
 ];
 
 export function DashboardPage() {
+  const pathname = usePathname();
   const [mode, setMode] = useState<DashboardMapMode>("street-level");
   const [transmissionMaps, setTransmissionMaps] = useState(seedTransmissionMaps);
   const [activeMapId, setActiveMapId] = useState(seedTransmissionMaps[1].id);
@@ -81,9 +85,8 @@ export function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [rightMode, setRightMode] = useState<RightDrawerMode>("summary");
+  const [rightMode, setRightMode] = useState<RightDrawerMode>("modules");
   const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
@@ -354,50 +357,6 @@ export function DashboardPage() {
         <button type="button" onClick={() => openEditorDrawer()}><Plus size={15} />Add Asset</button>
       </div>
 
-      <aside className={`dashboard-left-filter-panel ${leftCollapsed ? "collapsed" : ""}`} aria-label="Map filters and results">
-        <button className="dashboard-panel-collapse" type="button" onClick={() => setLeftCollapsed((current) => !current)}>
-          {leftCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-        </button>
-        {!leftCollapsed ? (
-          <>
-            <div className="dashboard-panel-heading">
-              <Filter size={16} />
-              <div>
-                <strong>Filters</strong>
-                <span>{publicOnly ? "Public reference only" : "Private planning overlays"}</span>
-              </div>
-            </div>
-            <label className="dashboard-panel-search">
-              <Search size={14} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search map records" />
-            </label>
-            <div className="dashboard-filter-grid">
-              <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={setAssetTypeFilter} options={["all", "public_transmission_line", "synthetic_substation", "substation", "node", "transmission_line", "work_order"]} />
-              <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={["all", "existing", "planned", "proposed", "open"]} />
-              <FilterSelect label="Region" value={regionFilter} onChange={setRegionFilter} options={["all", "MA", "RI", "CT", "NH", "VT", "ME"]} />
-              <FilterSelect label="Criticality" value="all" onChange={() => undefined} options={["all", "critical", "high", "normal"]} />
-              <FilterSelect label="Manufacturer" value="all" onChange={() => undefined} options={["all", "SEL", "Cisco", "Nokia", "Other"]} />
-              <FilterSelect label="Lifecycle" value="all" onChange={() => undefined} options={["all", "Existing", "Proposed", "Out of Service"]} />
-              <FilterSelect label="Phase Type" value="all" onChange={() => undefined} options={["all", "ABC", "A", "B", "C"]} />
-              <FilterSelect label="Circuit Type" value="all" onChange={() => undefined} options={["all", "C37.94", "SCADA", "Ethernet", "DS1"]} />
-              <FilterSelect label="Visibility" value={visibilityFilter} onChange={setVisibilityFilter} options={["all", "public", "team", "private"]} />
-            </div>
-            <div className="dashboard-results-heading">
-              <strong>Results</strong>
-              <span>{searchResults.length}</span>
-            </div>
-            <div className="dashboard-map-results-list">
-              {searchResults.length ? searchResults.map((result) => (
-                <button type="button" key={`${result.kind}-${result.id}`} onClick={() => focusSelection(result)}>
-                  <strong>{result.label}</strong>
-                  <span>{formatSelectionKind(result.kind)} / {selectionStatus(result)}</span>
-                </button>
-              )) : <p>{publicOnly ? "Sign in to view private planning records." : "No matching map records."}</p>}
-            </div>
-          </>
-        ) : null}
-      </aside>
-
       <aside className={`dashboard-right-floating-drawer ${rightCollapsed ? "collapsed" : ""}`} aria-label="Dashboard details drawer">
         <button className="dashboard-panel-collapse right" type="button" onClick={() => setRightCollapsed((current) => !current)}>
           {rightCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
@@ -405,13 +364,33 @@ export function DashboardPage() {
         {!rightCollapsed ? (
           <>
             <div className="dashboard-drawer-tabs">
+              <button type="button" className={rightMode === "modules" ? "active" : ""} onClick={() => setRightMode("modules")}><Network size={14} />Modules</button>
               <button type="button" className={rightMode === "summary" ? "active" : ""} onClick={() => setRightMode("summary")}><Gauge size={14} />Summary</button>
+              <button type="button" className={rightMode === "filters" ? "active" : ""} onClick={() => setRightMode("filters")}><Filter size={14} />Filters</button>
               <button type="button" className={rightMode === "layers" ? "active" : ""} onClick={() => setRightMode("layers")}><Layers size={14} />Layers</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
               <button type="button" className={rightMode === "editor" ? "active" : ""} onClick={() => setRightMode("editor")}><Plus size={14} />Add</button>
             </div>
             <div className="dashboard-drawer-body">
+              {rightMode === "modules" ? <ModulesDrawer pathname={pathname} /> : null}
               {rightMode === "summary" ? <SummaryDrawer cards={summaryCards} publicOnly={publicOnly} mapStatusMessage={mapStatusMessage} /> : null}
+              {rightMode === "filters" ? (
+                <FiltersResultsDrawer
+                  publicOnly={publicOnly}
+                  search={search}
+                  assetTypeFilter={assetTypeFilter}
+                  statusFilter={statusFilter}
+                  regionFilter={regionFilter}
+                  visibilityFilter={visibilityFilter}
+                  searchResults={searchResults}
+                  onSearchChange={setSearch}
+                  onAssetTypeChange={setAssetTypeFilter}
+                  onStatusChange={setStatusFilter}
+                  onRegionChange={setRegionFilter}
+                  onVisibilityChange={setVisibilityFilter}
+                  onSelectResult={focusSelection}
+                />
+              ) : null}
               {rightMode === "layers" ? (
                 <div className="dashboard-drawer-stack">
                   <MapLayerControlPanel
@@ -523,6 +502,109 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
       </select>
     </label>
   );
+}
+
+function ModulesDrawer({ pathname }: { pathname: string }) {
+  return (
+    <section className="dashboard-module-drawer" aria-label="Application modules">
+      <div className="dashboard-panel-heading">
+        <Network size={16} />
+        <div>
+          <strong>TelecomNE modules</strong>
+          <span>Operate, plan, analyze, and admin sections</span>
+        </div>
+      </div>
+      <div className="dashboard-module-sections">
+        {appNavGroups.map((group) => (
+          <section className="dashboard-module-section" key={group.title}>
+            <div className="dashboard-module-section-title">{group.title}</div>
+            <div className="dashboard-module-link-grid">
+              {group.items.map(([href, label, Icon]) => (
+                <Link className={`dashboard-module-link ${isActiveModule(pathname, href) ? "active" : ""}`} href={href} key={href}>
+                  <Icon size={15} />
+                  <span>{label}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FiltersResultsDrawer({
+  publicOnly,
+  search,
+  assetTypeFilter,
+  statusFilter,
+  regionFilter,
+  visibilityFilter,
+  searchResults,
+  onSearchChange,
+  onAssetTypeChange,
+  onStatusChange,
+  onRegionChange,
+  onVisibilityChange,
+  onSelectResult,
+}: {
+  publicOnly: boolean;
+  search: string;
+  assetTypeFilter: string;
+  statusFilter: string;
+  regionFilter: string;
+  visibilityFilter: string;
+  searchResults: StreetMapSelection[];
+  onSearchChange: (value: string) => void;
+  onAssetTypeChange: (value: string) => void;
+  onStatusChange: (value: string) => void;
+  onRegionChange: (value: string) => void;
+  onVisibilityChange: (value: string) => void;
+  onSelectResult: (selection: StreetMapSelection) => void;
+}) {
+  return (
+    <section className="dashboard-filter-results-panel" aria-label="Map filters and results">
+      <div className="dashboard-panel-heading">
+        <Filter size={16} />
+        <div>
+          <strong>Filters and results</strong>
+          <span>{publicOnly ? "Public reference only" : "Private planning overlays"}</span>
+        </div>
+      </div>
+      <label className="dashboard-panel-search">
+        <Search size={14} />
+        <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search map records" />
+      </label>
+      <div className="dashboard-filter-grid">
+        <FilterSelect label="Asset Types" value={assetTypeFilter} onChange={onAssetTypeChange} options={["all", "public_transmission_line", "synthetic_substation", "substation", "node", "transmission_line", "work_order"]} />
+        <FilterSelect label="Status" value={statusFilter} onChange={onStatusChange} options={["all", "existing", "planned", "proposed", "open"]} />
+        <FilterSelect label="Region" value={regionFilter} onChange={onRegionChange} options={["all", "MA", "RI", "CT", "NH", "VT", "ME"]} />
+        <FilterSelect label="Criticality" value="all" onChange={() => undefined} options={["all", "critical", "high", "normal"]} />
+        <FilterSelect label="Manufacturer" value="all" onChange={() => undefined} options={["all", "SEL", "Cisco", "Nokia", "Other"]} />
+        <FilterSelect label="Lifecycle" value="all" onChange={() => undefined} options={["all", "Existing", "Proposed", "Out of Service"]} />
+        <FilterSelect label="Phase Type" value="all" onChange={() => undefined} options={["all", "ABC", "A", "B", "C"]} />
+        <FilterSelect label="Circuit Type" value="all" onChange={() => undefined} options={["all", "C37.94", "SCADA", "Ethernet", "DS1"]} />
+        <FilterSelect label="Visibility" value={visibilityFilter} onChange={onVisibilityChange} options={["all", "public", "team", "private"]} />
+      </div>
+      <div className="dashboard-results-heading">
+        <strong>Results</strong>
+        <span>{searchResults.length}</span>
+      </div>
+      <div className="dashboard-map-results-list">
+        {searchResults.length ? searchResults.map((result) => (
+          <button type="button" key={`${result.kind}-${result.id}`} onClick={() => onSelectResult(result)}>
+            <strong>{result.label}</strong>
+            <span>{formatSelectionKind(result.kind)} / {selectionStatus(result)}</span>
+          </button>
+        )) : <p>{publicOnly ? "Sign in to view private planning records." : "No matching map records."}</p>}
+      </div>
+    </section>
+  );
+}
+
+function isActiveModule(pathname: string, href: string) {
+  if (pathname === "/" && href === "/dashboard") return true;
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function SummaryDrawer({ cards, publicOnly, mapStatusMessage }: { cards: ReturnType<typeof buildSummaryCards>; publicOnly: boolean; mapStatusMessage: string }) {
