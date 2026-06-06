@@ -25,7 +25,7 @@ type MapLayerControlPanelProps = {
 };
 
 const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges?: string[] }> = [
-  { key: "publicTransmissionLines", label: "HIFLD transmission lines", note: "Public HIFLD line geometry grouped by public OWNER field and explicit line-name owner tokens", badges: ["Public", "Owner buckets"] },
+  { key: "publicTransmissionLines", label: "HIFLD transmission lines", note: "Public HIFLD line geometry grouped by HIFLD OWNER, close OSM line owner/operator matches, and explicit line-name owner tokens", badges: ["Public", "Owner buckets"] },
   { key: "publicSubstations", label: "Verified-owner substation nodes", note: "Open-source substation nodes grouped by public source fields or close OSM owner/operator matches", badges: ["Public", "Owner buckets"] },
   { key: "transmissionStructures", label: "Transmission structures", note: "Synthetic demo structure points sampled from public line geometry", badges: ["Synthetic", "Demo"] },
   { key: "spliceClosures", label: "Splice closures", note: "Synthetic demo splice closures mounted on synthetic structures", badges: ["Synthetic", "Demo"] },
@@ -114,7 +114,7 @@ export function MapLayerControlPanel({
         ))}
       </div>
       <div className="street-map-todo-note">
-        Dashboard map is limited to public HIFLD transmission-line references, verified-owner public substation nodes, close OpenStreetMap owner/operator matches, and synthetic demo transmission structures and splice closures. Utility owner filters use {utilityOwnerCount} public owner buckets; telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
+        Dashboard map is limited to public HIFLD transmission-line references, verified-owner public substation nodes, close OpenStreetMap owner/operator matches, and synthetic demo transmission structures and splice closures. Transmission owner sublayers use public HIFLD OWNER fields, compatible OSM line owner/operator matches, and explicit public line-name tokens; telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
       </div>
     </aside>
   );

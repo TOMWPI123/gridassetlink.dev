@@ -1433,7 +1433,7 @@ function formatSelectionKind(kind: StreetMapSelection["kind"]) {
 function selectionSearchText(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") {
     const properties = selection.record.properties;
-    return [selection.label, properties.id, properties.name, publicTransmissionLineOwner(properties), properties.rawOwner, properties.ownerSource, properties.voltageClass, properties.states.join(" ")].join(" ");
+    return [selection.label, properties.id, properties.name, publicTransmissionLineOwner(properties), properties.rawOwner, properties.ownerSource, properties.osmLineElementId, properties.osmLineName, properties.osmOperator, properties.osmOwner, properties.voltageClass, properties.states.join(" ")].join(" ");
   }
   if (selection.kind === "public_substation") {
     const properties = selection.record.properties;

@@ -105,7 +105,7 @@ function detailBadgesForSelection(selection: StreetMapSelection) {
 }
 
 function detailNoticeForSelection(selection: StreetMapSelection) {
-  if (selection.kind === "public_transmission_line") return "Public transmission line reference geometry. Owner bucket is based on the public HIFLD OWNER field when present, then explicit utility owner tokens in the public line name, otherwise Unknown public owner. Read-only and not for operations.";
+  if (selection.kind === "public_transmission_line") return "Public transmission line reference geometry. Owner bucket is based on the public HIFLD OWNER field when present, then a close OpenStreetMap power-line owner/operator tag match with compatible voltage, then explicit utility owner tokens in the public line name. Unsupported records stay Unknown public owner. Read-only and not for operations.";
   if (selection.kind === "public_substation") return "Public substation reference point. Utility owner is from an open public field when available, then a close OpenStreetMap operator/owner tag match. Unknown-owner records are excluded from the displayed public substation layer.";
   if (selection.kind === "synthetic_substation") return "Synthetic demo/planning substation. Not a real utility asset.";
   if (selection.kind === "transmission_structure") return "Synthetic transmission structure point generated from public line geometry. It is not a real pole, tower, or utility structure location.";

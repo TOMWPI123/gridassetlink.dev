@@ -2,7 +2,19 @@
   "sourceName": "HIFLD Electric Power Transmission Lines",
   "sourceType": "public-reference",
   "sourceUrl": "https://services2.arcgis.com/LYMgRMwHfrWWEg3s/ArcGIS/rest/services/HIFLD_US_Electric_Power_Transmission_Lines/FeatureServer/0",
-  "generatedAt": "2026-06-06T17:47:47.181Z",
+  "ownerSources": [
+    {
+      "sourceName": "HIFLD Electric Power Transmission Lines",
+      "sourceUrl": "https://services2.arcgis.com/LYMgRMwHfrWWEg3s/ArcGIS/rest/services/HIFLD_US_Electric_Power_Transmission_Lines/FeatureServer/0",
+      "attribution": "Public HIFLD transmission-line geometry and OWNER attributes."
+    },
+    {
+      "sourceName": "OpenStreetMap power=line owner/operator tags",
+      "sourceUrl": "https://overpass-api.de/api/interpreter",
+      "attribution": "OpenStreetMap contributors; used only for close public spatial matches with compatible voltage."
+    }
+  ],
+  "generatedAt": "2026-06-06T18:16:06.735Z",
   "featureCount": 2182,
   "statesIncluded": [
     "CT",
@@ -12,24 +24,37 @@
     "VT",
     "ME"
   ],
+  "osmLineOwnerMatchMaxMiles": 0.15,
+  "osmLineOwnerMatchCount": 412,
+  "osmLineRecordsWithOwner": 3168,
   "ownerSummary": {
-    "Unknown public owner": 1674,
-    "Eversource Energy": 281,
-    "Central Maine Power": 121,
-    "Long Island Power Authority": 65,
+    "Unknown public owner": 1262,
+    "Eversource Energy": 510,
+    "Central Maine Power": 158,
+    "Long Island Power Authority": 67,
+    "National Grid": 50,
     "Vermont Electric Power Company": 39,
+    "United Illuminating Company": 38,
+    "Versant Power": 21,
+    "Rhode Island Energy": 13,
+    "New York State Electric & Gas": 9,
+    "Consolidated Edison": 8,
+    "Eversource Energy / United Illuminating Company": 4,
     "Citizens Utilities Company": 1,
-    "Green Mountain Power": 1
+    "Green Mountain Power": 1,
+    "NB Power": 1
   },
   "ownerSourceSummary": {
-    "unknown": 1674,
+    "unknown": 1262,
     "hifld_owner_field": 507,
+    "openstreetmap_line_operator_tag": 412,
     "line_name_owner_token": 1
   },
   "ownerConfidenceSummary": {
-    "unknown": 1674,
+    "unknown": 1262,
     "public_record": 507,
+    "openstreetmap_spatial_match": 412,
     "line_name_token": 1
   },
-  "notes": "Public reference data only. Not for operations."
+  "notes": "Public reference data only. Not for operations. Owner buckets use public HIFLD OWNER fields, close OpenStreetMap line owner/operator matches, and explicit public line-name tokens; unsupported lines remain Unknown public owner."
 }

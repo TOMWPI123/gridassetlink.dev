@@ -1,7 +1,7 @@
 export const UNKNOWN_PUBLIC_OWNER = "Unknown public owner";
 
-export type PublicOwnerSource = "hifld_owner_field" | "line_name_owner_token" | "unknown";
-export type PublicOwnerConfidence = "public_record" | "line_name_token" | "unknown";
+export type PublicOwnerSource = "hifld_owner_field" | "openstreetmap_line_operator_tag" | "openstreetmap_line_owner_tag" | "line_name_owner_token" | "unknown";
+export type PublicOwnerConfidence = "public_record" | "openstreetmap_spatial_match" | "line_name_token" | "unknown";
 
 export type PublicOwnerResolution = {
   owner: string;
@@ -10,6 +10,8 @@ export type PublicOwnerResolution = {
 };
 
 const ownerAliases = new Map<string, string>([
+  ["EVERSOURCE", "Eversource Energy"],
+  ["EVERSOURCE ENERGY", "Eversource Energy"],
   ["PUBLIC SERVICE CO OF NH", "Eversource Energy"],
   ["PUBLIC SERVICE COMPANY OF NEW HAMPSHIRE", "Eversource Energy"],
   ["CONNECTICUT LIGHT & POWER CO", "Eversource Energy"],
@@ -18,11 +20,45 @@ const ownerAliases = new Map<string, string>([
   ["WESTERN MASSACHUSETTS ELECTRIC CO", "Eversource Energy"],
   ["NSTAR ELECTRIC COMPANY", "Eversource Energy"],
   ["NSTAR ELECTRIC CO", "Eversource Energy"],
+  ["NATIONAL GRID", "National Grid"],
+  ["NEW ENGLAND POWER", "National Grid"],
+  ["NEW ENGLAND POWER CO", "National Grid"],
+  ["NEW ENGLAND POWER COMPANY", "National Grid"],
+  ["MASSACHUSETTS ELECTRIC", "National Grid"],
+  ["MASSACHUSETTS ELECTRIC CO", "National Grid"],
+  ["MASSACHUSETTS ELECTRIC COMPANY", "National Grid"],
+  ["NARRAGANSETT ELECTRIC", "National Grid"],
+  ["NARRAGANSETT ELECTRIC CO", "National Grid"],
+  ["NARRAGANSETT ELECTRIC COMPANY", "National Grid"],
   ["CENTRAL MAINE POWER CO", "Central Maine Power"],
   ["CENTRAL MAINE POWER COMPANY", "Central Maine Power"],
+  ["CMP", "Central Maine Power"],
   ["VERMONT ELECTRIC POWER CO", "Vermont Electric Power Company"],
   ["VERMONT ELECTRIC POWER COMPANY", "Vermont Electric Power Company"],
+  ["VELCO", "Vermont Electric Power Company"],
+  ["GREEN MOUNTAIN POWER", "Green Mountain Power"],
+  ["UNITIL", "Unitil"],
+  ["FITCHBURG GAS AND ELECTRIC LIGHT COMPANY", "Unitil"],
+  ["UNITED ILLUMINATING", "United Illuminating Company"],
+  ["UNITED ILLUMINATING COMPANY", "United Illuminating Company"],
+  ["UNITED ILLIUMINATING COMPANY", "United Illuminating Company"],
+  ["THE UNITED ILLUMINATING COMPANY", "United Illuminating Company"],
+  ["AVANGRID", "Avangrid"],
+  ["AVANGRID NETWORKS", "Avangrid"],
+  ["RHODE ISLAND ENERGY", "Rhode Island Energy"],
+  ["VERSANT POWER", "Versant Power"],
+  ["BANGOR HYDRO", "Versant Power"],
+  ["BANGOR HYDRO ELECTRIC COMPANY", "Versant Power"],
+  ["MAINE PUBLIC SERVICE", "Versant Power"],
   ["LONG ISLAND POWER AUTHORITY", "Long Island Power Authority"],
+  ["LIPA", "Long Island Power Authority"],
+  ["NEW YORK POWER AUTHORITY", "New York Power Authority"],
+  ["NYSEG", "New York State Electric & Gas"],
+  ["NEW YORK STATE ELECTRIC & GAS", "New York State Electric & Gas"],
+  ["NEW YORK STATE ELECTRIC AND GAS", "New York State Electric & Gas"],
+  ["CONSOLIDATED EDISON", "Consolidated Edison"],
+  ["CON EDISON", "Consolidated Edison"],
+  ["NB POWER", "NB Power"],
   ["CITIZENS UTILITIES CO", "Citizens Utilities Company"],
 ]);
 
@@ -62,6 +98,14 @@ export function publicTransmissionLineOwner(properties: { owner?: string | null;
 function normalizePublicOwnerName(value?: string | null) {
   const cleaned = cleanPublicOwnerText(value);
   if (!cleaned) return "";
+  const ownerParts = cleaned.split(/\s*;\s*/).map((part) => part.trim()).filter(Boolean);
+  if (ownerParts.length > 1) {
+    return [...new Set(ownerParts.map((part) => normalizeSinglePublicOwnerName(part)).filter(Boolean))].join(" / ");
+  }
+  return normalizeSinglePublicOwnerName(cleaned);
+}
+
+function normalizeSinglePublicOwnerName(cleaned: string) {
   return ownerAliases.get(cleaned.toUpperCase()) || titleCaseOwner(cleaned);
 }
 

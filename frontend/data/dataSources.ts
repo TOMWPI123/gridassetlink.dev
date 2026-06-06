@@ -13,7 +13,7 @@ export const dataSourceRecords: DataSourceRecord[] = [
     category: "Public reference",
     url: "https://www.arcgis.com/home/item.html?id=13b4728b7403404cb72b52b5367a1ad6",
     role: "Public transmission-line geometry used as ISO New England map reference context.",
-    handling: "Imported from a public ArcGIS FeatureServer, converted to WGS84 GeoJSON, clipped to CT, MA, RI, NH, VT, and ME, and rendered read-only. Transmission owner buckets use the public HIFLD OWNER field when present, then explicit utility owner tokens in public line names; otherwise records remain Unknown public owner. The app does not infer private telecom routes from these lines.",
+    handling: "Imported from a public ArcGIS FeatureServer, converted to WGS84 GeoJSON, clipped to CT, MA, RI, NH, VT, and ME, and rendered read-only. Transmission owner buckets use the public HIFLD OWNER field when present, then close OpenStreetMap power-line owner/operator tag matches with compatible voltage, then explicit utility owner tokens in public line names; otherwise records remain Unknown public owner. The app does not infer private telecom routes from these lines.",
     generatedFiles: [
       "frontend/public/data/iso-ne-public-transmission-lines.geojson",
       "frontend/public/data/iso-ne-public-transmission-lines.meta.json",
@@ -34,8 +34,8 @@ export const dataSourceRecords: DataSourceRecord[] = [
     name: "OpenStreetMap via Overpass API",
     category: "Public enrichment",
     url: "https://www.openstreetmap.org/copyright",
-    role: "Public power=substation owner/operator tags used to verify owner buckets for nearby HIFLD substation points.",
-    handling: "Only close spatial matches within the configured match tolerance are used. OpenStreetMap data is attributed to OpenStreetMap contributors and is subject to the Open Database License.",
+    role: "Public power=line and power=substation owner/operator tags used for public owner-bucket enrichment.",
+    handling: "For transmission lines, only close spatial matches with compatible voltage are used. For substations, only close spatial matches within the configured match tolerance are used. OpenStreetMap data is attributed to OpenStreetMap contributors and is subject to the Open Database License.",
   },
   {
     name: "CARTO basemap tiles",

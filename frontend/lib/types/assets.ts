@@ -205,9 +205,14 @@ export type PublicTransmissionLineProperties = {
   status?: "existing" | "planned" | "proposed" | "unknown";
   owner?: string | null;
   utilityOwner?: string | null;
-  ownerSource?: "hifld_owner_field" | "line_name_owner_token" | "unknown";
-  ownerConfidence?: "public_record" | "line_name_token" | "unknown";
+  ownerSource?: "hifld_owner_field" | "openstreetmap_line_operator_tag" | "openstreetmap_line_owner_tag" | "line_name_owner_token" | "unknown";
+  ownerConfidence?: "public_record" | "openstreetmap_spatial_match" | "line_name_token" | "unknown";
   rawOwner?: string | null;
+  osmLineElementId?: string | null;
+  osmLineName?: string | null;
+  osmOperator?: string | null;
+  osmOwner?: string | null;
+  osmMatchDistanceMiles?: number | null;
   source: "HIFLD" | "OpenStreetMap" | "Public GIS";
   sourceType: "public-reference";
   readOnly: true;
