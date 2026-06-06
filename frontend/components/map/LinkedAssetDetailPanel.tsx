@@ -106,7 +106,7 @@ function detailBadgesForSelection(selection: StreetMapSelection) {
 
 function detailNoticeForSelection(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return "Public transmission line reference geometry. Read-only and not for operations.";
-  if (selection.kind === "public_substation") return "Public substation reference point. Utility owner is from an open public field when available, otherwise grouped from nearby public HIFLD line ownership for planning filters only.";
+  if (selection.kind === "public_substation") return "Public substation reference point. Utility owner is from an open public field when available, then a close OpenStreetMap operator/owner tag match, otherwise grouped from nearby public HIFLD line ownership for planning filters only.";
   if (selection.kind === "synthetic_substation") return "Synthetic demo/planning substation. Not a real utility asset.";
   if (selection.kind === "transmission_structure") return "Synthetic transmission structure point generated from public line geometry. It is not a real pole, tower, or utility structure location.";
   if (selection.kind === "opgw_cable") return "Synthetic OPGW planning route. Do not treat this as verified fiber or an operational telecom path.";

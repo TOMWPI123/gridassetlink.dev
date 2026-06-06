@@ -1,15 +1,27 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Coordinate, IsoNeState, PublicSubstationCollection, PublicSubstationFeature, PublicSubstationOwnerSource, PublicTransmissionLineCollection, PublicTransmissionLineFeature } from "../lib/types/assets";
+import type { Coordinate, IsoNeState, PublicSubstationCollection, PublicSubstationFeature, PublicSubstationOwnerSource } from "../lib/types/assets";
 import { ISO_NE_STATES, isInIsoNeBounds } from "./clip-to-iso-ne";
 
 const DEFAULT_HIFLD_SUBSTATIONS_FEATURESERVER_URL = "https://services5.arcgis.com/HDRa0B57OVrv2E1q/ArcGIS/rest/services/Electric_Substations/FeatureServer/0";
-const PUBLIC_NOTICE = "Public substation reference data only. Not for operations. Utility-owner buckets are public-field values when available, otherwise inferred from nearest public HIFLD transmission-line owner.";
+const DEFAULT_OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
+const ISO_NE_STATE_BBOXES: Array<{ label: IsoNeState; bbox: [number, number, number, number] }> = [
+  { label: "CT", bbox: [40.9, -73.8, 42.15, -71.75] },
+  { label: "MA", bbox: [41.15, -73.55, 42.9, -69.8] },
+  { label: "RI", bbox: [41.1, -71.95, 42.05, -71.05] },
+  { label: "NH", bbox: [42.65, -72.65, 45.35, -70.55] },
+  { label: "VT", bbox: [42.7, -73.45, 45.05, -71.45] },
+  { label: "ME", bbox: [42.95, -71.1, 47.55, -66.7] },
+];
+const PUBLIC_NOTICE = "Public substation reference data only. Not for operations. Only substation nodes with a directly supported public utility owner/operator source are included. Unknown-owner and nearest-line-only inferred records are excluded.";
 const OUTPUT_DIR = path.join(process.cwd(), "public", "data");
 const OUTPUT_GEOJSON = path.join(OUTPUT_DIR, "iso-ne-public-substations.geojson");
 const OUTPUT_META = path.join(OUTPUT_DIR, "iso-ne-public-substations.meta.json");
-const PUBLIC_LINES_PATH = path.join(OUTPUT_DIR, "iso-ne-public-transmission-lines.geojson");
-const MAX_OWNER_INFERENCE_DISTANCE_MILES = 4;
+const MAX_OSM_OWNER_MATCH_DISTANCE_MILES = 0.2;
+const USER_AGENT = "GridAssetLink synthetic planning demo public data enrichment (no private data)";
 
 type ArcGisQueryResponse = {
   features?: ArcGisFeature[];
@@ -27,13 +39,38 @@ type IngestMeta = {
   sourceName: string;
   sourceType: "public-reference";
   sourceUrl: string;
+  ownerSources: Array<{
+    sourceName: string;
+    sourceUrl: string;
+    attribution: string;
+  }>;
   generatedAt: string;
   featureCount: number;
+  rawCandidateCount: number;
+  excludedUnverifiedOwnerCount: number;
   statesIncluded: typeof ISO_NE_STATES;
-  ownerInferenceMaxMiles: number;
+  osmOwnerMatchMaxMiles: number;
+  osmOwnerMatchCount: number;
+  osmSubstationRecordsWithOwner: number;
   ownerSummary: Record<string, number>;
+  ownerSourceSummary: Record<string, number>;
+  ownerConfidenceSummary: Record<string, number>;
   notes: string;
   warning?: string;
+};
+
+type OsmSubstationOwnerRecord = {
+  osmElementId: string;
+  name: string;
+  operator: string;
+  owner: string;
+  utilityOwner: string;
+  ownerSource: Extract<PublicSubstationOwnerSource, "openstreetmap_operator_tag" | "openstreetmap_owner_tag">;
+  coordinate: Coordinate;
+};
+
+type OsmOwnerMatch = OsmSubstationOwnerRecord & {
+  distanceMiles: number;
 };
 
 async function main() {
@@ -43,23 +80,32 @@ async function main() {
   await mkdir(OUTPUT_DIR, { recursive: true });
 
   try {
-    const publicLines = await readPublicLines();
+    const osmSubstations = await readOpenStreetMapSubstationOwners();
     const outFields = await getSafeOutFields(sourceUrl);
     const features = await fetchAllFeatures(sourceUrl, outFields);
+    const rawCandidateCount = features.length;
     const normalized = features
-      .map((feature, index) => normalizeSubstationFeature(feature, index, publicLines.features))
+      .map((feature, index) => normalizeSubstationFeature(feature, index, osmSubstations))
       .filter((feature): feature is PublicSubstationFeature => feature !== null);
+    const verified = dedupeSubstations(normalized);
     await writeOutputs(
-      { type: "FeatureCollection", features: dedupeSubstations(normalized) },
+      { type: "FeatureCollection", features: verified },
       {
         sourceName,
         sourceType: "public-reference",
         sourceUrl,
+        ownerSources: ownerSourcesForMeta(sourceUrl),
         generatedAt: new Date().toISOString(),
-        featureCount: normalized.length,
+        featureCount: verified.length,
+        rawCandidateCount,
+        excludedUnverifiedOwnerCount: Math.max(0, rawCandidateCount - verified.length),
         statesIncluded: ISO_NE_STATES,
-        ownerInferenceMaxMiles: MAX_OWNER_INFERENCE_DISTANCE_MILES,
-        ownerSummary: summarizeOwners(normalized),
+        osmOwnerMatchMaxMiles: MAX_OSM_OWNER_MATCH_DISTANCE_MILES,
+        osmOwnerMatchCount: countByOwnerConfidence(verified, "openstreetmap_spatial_match"),
+        osmSubstationRecordsWithOwner: osmSubstations.length,
+        ownerSummary: summarizeOwners(verified),
+        ownerSourceSummary: summarizeOwnerSources(verified),
+        ownerConfidenceSummary: summarizeOwnerConfidence(verified),
         notes: PUBLIC_NOTICE,
       },
     );
@@ -71,17 +117,95 @@ async function main() {
         sourceName,
         sourceType: "public-reference",
         sourceUrl,
+        ownerSources: ownerSourcesForMeta(sourceUrl),
         generatedAt: new Date().toISOString(),
         featureCount: 0,
+        rawCandidateCount: 0,
+        excludedUnverifiedOwnerCount: 0,
         statesIncluded: ISO_NE_STATES,
-        ownerInferenceMaxMiles: MAX_OWNER_INFERENCE_DISTANCE_MILES,
+        osmOwnerMatchMaxMiles: MAX_OSM_OWNER_MATCH_DISTANCE_MILES,
+        osmOwnerMatchCount: 0,
+        osmSubstationRecordsWithOwner: 0,
         ownerSummary: {},
+        ownerSourceSummary: {},
+        ownerConfidenceSummary: {},
         notes: PUBLIC_NOTICE,
         warning,
       },
     );
     console.warn(`Public substation ingestion warning: ${warning}`);
   }
+}
+
+async function readOpenStreetMapSubstationOwners() {
+  if (process.env.SKIP_OSM_SUBSTATION_OWNER_ENRICHMENT === "1") return [];
+  const endpoints = (process.env.OVERPASS_API_URLS || DEFAULT_OVERPASS_ENDPOINTS.join(","))
+    .split(",")
+    .map((endpoint) => endpoint.trim())
+    .filter(Boolean);
+
+  const records = new Map<string, OsmSubstationOwnerRecord>();
+  for (const { label, bbox } of ISO_NE_STATE_BBOXES) {
+    const elements = await readOpenStreetMapSubstationsForBbox(label, bbox, endpoints);
+    elements
+      .map((element) => normalizeOsmOwnerRecord(element))
+      .filter((record): record is OsmSubstationOwnerRecord => record !== null)
+      .forEach((record) => records.set(record.osmElementId, record));
+  }
+
+  return [...records.values()];
+}
+
+async function readOpenStreetMapSubstationsForBbox(label: IsoNeState, [south, west, north, east]: [number, number, number, number], endpoints: string[]) {
+  const query = `[out:json][timeout:60];
+(
+  node["power"="substation"](${south},${west},${north},${east});
+  way["power"="substation"](${south},${west},${north},${east});
+  relation["power"="substation"](${south},${west},${north},${east});
+);
+out tags center;`;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain", "User-Agent": USER_AGENT },
+        body: query,
+      });
+      const text = await response.text();
+      if (!response.ok || !text.trim().startsWith("{")) {
+        throw new Error(`Overpass response was not JSON: ${response.status} ${response.statusText}`);
+      }
+      const data = JSON.parse(text) as { elements?: Array<{ type: string; id: number; lat?: number; lon?: number; center?: { lat?: number; lon?: number }; tags?: Record<string, string> }> };
+      return data.elements || [];
+    } catch (error) {
+      console.warn(`OpenStreetMap owner enrichment skipped ${label} at ${endpoint}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  return [];
+}
+
+function normalizeOsmOwnerRecord(element: { type: string; id: number; lat?: number; lon?: number; center?: { lat?: number; lon?: number }; tags?: Record<string, string> }): OsmSubstationOwnerRecord | null {
+  const longitude = element.lon ?? element.center?.lon;
+  const latitude = element.lat ?? element.center?.lat;
+  if (typeof longitude !== "number" || typeof latitude !== "number") return null;
+  const coordinate: Coordinate = [roundCoord(longitude), roundCoord(latitude)];
+  if (!isInIsoNeBounds(coordinate)) return null;
+  const tags = element.tags || {};
+  const operator = cleanText(tags.operator);
+  const owner = cleanText(tags.owner);
+  const utilityOwner = operator || owner;
+  if (!utilityOwner) return null;
+  return {
+    osmElementId: `${element.type}/${element.id}`,
+    name: cleanText(tags.name),
+    operator,
+    owner,
+    utilityOwner,
+    ownerSource: operator ? "openstreetmap_operator_tag" : "openstreetmap_owner_tag",
+    coordinate,
+  };
 }
 
 async function fetchAllFeatures(sourceUrl: string, outFields: string) {
@@ -136,16 +260,7 @@ async function getSafeOutFields(sourceUrl: string) {
   }
 }
 
-async function readPublicLines(): Promise<PublicTransmissionLineCollection> {
-  try {
-    const content = await readFile(PUBLIC_LINES_PATH, "utf-8");
-    return JSON.parse(content) as PublicTransmissionLineCollection;
-  } catch {
-    return { type: "FeatureCollection", features: [] };
-  }
-}
-
-function normalizeSubstationFeature(feature: ArcGisFeature, fallbackIndex: number, publicLines: PublicTransmissionLineFeature[]): PublicSubstationFeature | null {
+function normalizeSubstationFeature(feature: ArcGisFeature, fallbackIndex: number, osmSubstations: OsmSubstationOwnerRecord[]): PublicSubstationFeature | null {
   const raw = feature.properties || feature.attributes || {};
   const coordinates = pointCoordinates(feature);
   if (!coordinates || !isInIsoNeBounds(coordinates)) return null;
@@ -153,21 +268,23 @@ function normalizeSubstationFeature(feature: ArcGisFeature, fallbackIndex: numbe
   if (!isIsoNeState(state)) return null;
 
   const sourceId = cleanText(firstDefined(raw, ["ID", "OBJECTID", "OBJECTID_1", "FID"])) || `HIFLD-SUB-${fallbackIndex + 1}`;
+  const name = cleanText(firstDefined(raw, ["NAME", "name"])) || `Public substation ${sourceId}`;
   const rawOwner = cleanText(firstDefined(raw, ["OWNER", "OWNER_NAME", "OPERATOR", "UTILITY"]));
-  const nearest = rawOwner ? null : nearestPublicLineOwner(coordinates, publicLines);
-  const owner = ownerFrom(rawOwner, nearest);
-  const ownerSource = ownerSourceFrom(rawOwner, nearest);
+  const osmMatch = rawOwner ? null : nearestOsmOwner(coordinates, name, osmSubstations);
+  if (!rawOwner && !osmMatch) return null;
+  const owner = ownerFrom(rawOwner, osmMatch);
+  const ownerSource = ownerSourceFrom(rawOwner, osmMatch);
   const ownerConfidence = rawOwner
     ? "public_record"
-    : nearest
-      ? "public_line_inferred"
+    : osmMatch
+      ? "openstreetmap_spatial_match"
       : "unknown";
 
   return {
     type: "Feature",
     properties: {
       id: sourceId.startsWith("HIFLD-SUB-") ? sourceId : `HIFLD-SUB-${sourceId}`,
-      name: cleanText(firstDefined(raw, ["NAME", "name"])) || `Public substation ${sourceId}`,
+      name,
       city: cleanNullable(firstDefined(raw, ["CITY", "city"])),
       county: cleanNullable(firstDefined(raw, ["COUNTY", "county"])),
       state,
@@ -179,8 +296,13 @@ function normalizeSubstationFeature(feature: ArcGisFeature, fallbackIndex: numbe
       utilityOwner: owner,
       ownerSource,
       ownerConfidence,
-      nearestPublicLineId: nearest?.lineId || null,
-      nearestPublicLineDistanceMiles: nearest ? Number(nearest.distanceMiles.toFixed(3)) : null,
+      osmElementId: osmMatch?.osmElementId || null,
+      osmSubstationName: osmMatch?.name || null,
+      osmOperator: osmMatch?.operator || null,
+      osmOwner: osmMatch?.owner || null,
+      osmMatchDistanceMiles: osmMatch ? Number(osmMatch.distanceMiles.toFixed(3)) : null,
+      nearestPublicLineId: null,
+      nearestPublicLineDistanceMiles: null,
       source: "HIFLD",
       sourceType: "public-reference",
       readOnly: true,
@@ -191,6 +313,24 @@ function normalizeSubstationFeature(feature: ArcGisFeature, fallbackIndex: numbe
     },
     geometry: { type: "Point", coordinates },
   };
+}
+
+function nearestOsmOwner(coordinate: Coordinate, hifldName: string, osmSubstations: OsmSubstationOwnerRecord[]): OsmOwnerMatch | null {
+  let best: OsmOwnerMatch | null = null;
+  for (const osmSubstation of osmSubstations) {
+    const distanceMiles = haversineMiles(coordinate, osmSubstation.coordinate);
+    if (distanceMiles > MAX_OSM_OWNER_MATCH_DISTANCE_MILES) continue;
+    const candidate = { ...osmSubstation, distanceMiles };
+    if (!best || scoreOsmMatch(candidate, hifldName) > scoreOsmMatch(best, hifldName)) best = candidate;
+  }
+  return best;
+}
+
+function scoreOsmMatch(match: OsmOwnerMatch, hifldName: string) {
+  const normalizedHifldName = normalizeComparableName(hifldName);
+  const normalizedOsmName = normalizeComparableName(match.name);
+  const nameScore = normalizedHifldName && normalizedOsmName && normalizedHifldName === normalizedOsmName ? 100 : 0;
+  return nameScore + Math.max(0, 10 - match.distanceMiles * 10);
 }
 
 function pointCoordinates(feature: ArcGisFeature): Coordinate | null {
@@ -208,28 +348,6 @@ function pointCoordinates(feature: ArcGisFeature): Coordinate | null {
   return null;
 }
 
-function nearestPublicLineOwner(coordinate: Coordinate, publicLines: PublicTransmissionLineFeature[]) {
-  let best: { owner: string; lineId: string; distanceMiles: number } | null = null;
-  for (const line of publicLines) {
-    if (!line.properties.owner) continue;
-    const distanceMiles = distanceToLineMiles(coordinate, line.geometry.type === "LineString" ? line.geometry.coordinates : line.geometry.coordinates.flat());
-    if (!best || distanceMiles < best.distanceMiles) {
-      best = { owner: line.properties.owner, lineId: line.properties.id, distanceMiles };
-    }
-  }
-  if (!best || best.distanceMiles > MAX_OWNER_INFERENCE_DISTANCE_MILES) return null;
-  return best;
-}
-
-function distanceToLineMiles(point: Coordinate, line: Coordinate[]) {
-  if (!line.length) return Number.POSITIVE_INFINITY;
-  let best = Number.POSITIVE_INFINITY;
-  for (let index = 0; index < line.length; index += 1) {
-    best = Math.min(best, haversineMiles(point, line[index]));
-  }
-  return best;
-}
-
 function haversineMiles([lon1, lat1]: Coordinate, [lon2, lat2]: Coordinate) {
   const radiusMiles = 3958.8;
   const dLat = toRad(lat2 - lat1);
@@ -238,15 +356,15 @@ function haversineMiles([lon1, lat1]: Coordinate, [lon2, lat2]: Coordinate) {
   return radiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function ownerFrom(rawOwner: string, nearest: ReturnType<typeof nearestPublicLineOwner>) {
+function ownerFrom(rawOwner: string, osmMatch: OsmOwnerMatch | null) {
   if (rawOwner) return rawOwner;
-  if (nearest?.owner) return nearest.owner;
+  if (osmMatch?.utilityOwner) return osmMatch.utilityOwner;
   return "Unknown public owner";
 }
 
-function ownerSourceFrom(rawOwner: string, nearest: ReturnType<typeof nearestPublicLineOwner>): PublicSubstationOwnerSource {
+function ownerSourceFrom(rawOwner: string, osmMatch: OsmOwnerMatch | null): PublicSubstationOwnerSource {
   if (rawOwner) return "public_substation_owner_field";
-  if (nearest?.owner) return "nearest_public_hifld_transmission_line_owner";
+  if (osmMatch?.ownerSource) return osmMatch.ownerSource;
   return "unknown";
 }
 
@@ -267,11 +385,51 @@ function summarizeOwners(features: PublicSubstationFeature[]) {
   }, {});
 }
 
+function summarizeOwnerSources(features: PublicSubstationFeature[]) {
+  return features.reduce<Record<string, number>>((summary, feature) => {
+    summary[feature.properties.ownerSource] = (summary[feature.properties.ownerSource] || 0) + 1;
+    return summary;
+  }, {});
+}
+
+function summarizeOwnerConfidence(features: PublicSubstationFeature[]) {
+  return features.reduce<Record<string, number>>((summary, feature) => {
+    summary[feature.properties.ownerConfidence] = (summary[feature.properties.ownerConfidence] || 0) + 1;
+    return summary;
+  }, {});
+}
+
+function countByOwnerConfidence(features: PublicSubstationFeature[], ownerConfidence: PublicSubstationFeature["properties"]["ownerConfidence"]) {
+  return features.filter((feature) => feature.properties.ownerConfidence === ownerConfidence).length;
+}
+
 async function writeOutputs(collection: PublicSubstationCollection, metadata: IngestMeta) {
-  const finalMeta = { ...metadata, featureCount: collection.features.length, ownerSummary: summarizeOwners(collection.features) };
+  const finalMeta = {
+    ...metadata,
+    featureCount: collection.features.length,
+    ownerSummary: summarizeOwners(collection.features),
+    ownerSourceSummary: summarizeOwnerSources(collection.features),
+    ownerConfidenceSummary: summarizeOwnerConfidence(collection.features),
+    osmOwnerMatchCount: countByOwnerConfidence(collection.features, "openstreetmap_spatial_match"),
+  };
   await writeFile(OUTPUT_GEOJSON, `${JSON.stringify(collection, null, 2)}\n`, "utf-8");
   await writeFile(OUTPUT_META, `${JSON.stringify(finalMeta, null, 2)}\n`, "utf-8");
   console.log(`Wrote ${collection.features.length} public substation features to ${path.relative(process.cwd(), OUTPUT_GEOJSON)}`);
+}
+
+function ownerSourcesForMeta(sourceUrl: string): IngestMeta["ownerSources"] {
+  return [
+    {
+      sourceName: "HIFLD Electric Substations",
+      sourceUrl,
+      attribution: "Public HIFLD substation reference attributes.",
+    },
+    {
+      sourceName: "OpenStreetMap power=substation operator/owner tags",
+      sourceUrl: DEFAULT_OVERPASS_ENDPOINTS[0],
+      attribution: "OpenStreetMap contributors; used only for close public spatial matches.",
+    },
+  ];
 }
 
 function normalizeLayerUrl(value: string) {
@@ -309,6 +467,14 @@ function cleanText(value: unknown) {
   const text = String(value).trim();
   if (!text || /^not available$/i.test(text) || /^unknown$/i.test(text) || /^none$/i.test(text) || text === "-999999") return "";
   return text;
+}
+
+function normalizeComparableName(value: string) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\b(substation|station|switching|switchyard|unknown)\b/g, " ")
+    .trim();
 }
 
 function parsePublicNumber(value: unknown) {

@@ -102,6 +102,8 @@ export function DashboardPage() {
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
+  const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => dashboardStreetLayers);
+  const [visibleSubstationOwners, setVisibleSubstationOwners] = useState<Record<string, boolean>>({});
   const [publicTransmissionLines, setPublicTransmissionLines] = useState<PublicTransmissionLineFeature[]>([]);
   const [publicSubstations, setPublicSubstations] = useState<PublicSubstationFeature[]>([]);
   const [syntheticSubstations, setSyntheticSubstations] = useState<SyntheticSubstationFeature[]>([]);
@@ -187,6 +189,25 @@ export function DashboardPage() {
     () => publicSubstations.filter((feature) => feature.properties.isoNe),
     [publicSubstations],
   );
+  const substationOwnerCounts = useMemo(
+    () => ownerCountsFor(visiblePublicSubstations, []),
+    [visiblePublicSubstations],
+  );
+  useEffect(() => {
+    setVisibleSubstationOwners((current) => {
+      const activeOwners = new Set(substationOwnerCounts.map(({ owner }) => owner));
+      let changed = false;
+      const next: Record<string, boolean> = {};
+      substationOwnerCounts.forEach(({ owner }) => {
+        next[owner] = current[owner] ?? true;
+        if (!(owner in current)) changed = true;
+      });
+      Object.keys(current).forEach((owner) => {
+        if (!activeOwners.has(owner)) changed = true;
+      });
+      return changed ? next : current;
+    });
+  }, [substationOwnerCounts]);
   const visibleSyntheticSubstations = useMemo(
     () => syntheticSubstations.filter((feature) => feature.properties.synthetic && feature.properties.public === false),
     [syntheticSubstations],
@@ -215,9 +236,30 @@ export function DashboardPage() {
     () => publicOnly ? [] : planningRegions,
     [planningRegions, publicOnly],
   );
-  const effectiveStreetLayers = useMemo(
-    () => dashboardStreetLayers,
-    [],
+  const hasSubstationOwnerLayerState = Object.keys(visibleSubstationOwners).length > 0;
+  const visibleSubstationOwnerSet = useMemo(
+    () => new Set(Object.entries(visibleSubstationOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
+    [visibleSubstationOwners],
+  );
+  const layerFilteredPublicTransmissionLines = useMemo(
+    () => streetLayers.publicTransmissionLines ? visiblePublicTransmissionLines : [],
+    [streetLayers.publicTransmissionLines, visiblePublicTransmissionLines],
+  );
+  const layerFilteredPublicSubstations = useMemo(
+    () => {
+      if (!streetLayers.publicSubstations) return [];
+      if (!hasSubstationOwnerLayerState) return visiblePublicSubstations;
+      return visiblePublicSubstations.filter((feature) => visibleSubstationOwnerSet.has(feature.properties.utilityOwner));
+    },
+    [hasSubstationOwnerLayerState, streetLayers.publicSubstations, visiblePublicSubstations, visibleSubstationOwnerSet],
+  );
+  const layerFilteredTransmissionStructures = useMemo(
+    () => streetLayers.transmissionStructures ? visibleTransmissionStructures : [],
+    [streetLayers.transmissionStructures, visibleTransmissionStructures],
+  );
+  const layerFilteredSpliceClosures = useMemo(
+    () => streetLayers.spliceClosures ? visibleSpliceClosures : [],
+    [streetLayers.spliceClosures, visibleSpliceClosures],
   );
 
   const summaryCards = useMemo(
@@ -229,8 +271,8 @@ export function DashboardPage() {
     [visiblePublicSubstations, visiblePublicTransmissionLines],
   );
   const rawSearchResults = useMemo(
-    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search),
-    [search, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionStructures],
+    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, layerFilteredPublicTransmissionLines, layerFilteredPublicSubstations, visibleSyntheticSubstations, layerFilteredTransmissionStructures, visibleOpgwCables, layerFilteredSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search),
+    [layerFilteredPublicSubstations, layerFilteredPublicTransmissionLines, layerFilteredSpliceClosures, layerFilteredTransmissionStructures, search, visibleFiberAssignments, visibleNodes, visibleOpgwCables, visiblePatchPanels, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
   );
   const mapSearchResults = useMemo(
     () => search.trim() ? rawSearchResults.filter(isDashboardMapSearchResult).slice(0, 8) : [],
@@ -374,6 +416,24 @@ export function DashboardPage() {
     setRightCollapsed(false);
   }
 
+  function handleStreetLayerChange(layer: StreetMapLayerKey, enabled: boolean) {
+    setStreetLayers((current) => ({ ...current, [layer]: enabled }));
+  }
+
+  function handleSubstationOwnerLayerChange(owner: string, enabled: boolean) {
+    setVisibleSubstationOwners((current) => ({ ...current, [owner]: enabled }));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, publicSubstations: true }));
+    }
+  }
+
+  function handleAllSubstationOwnersChange(enabled: boolean) {
+    setVisibleSubstationOwners(Object.fromEntries(substationOwnerCounts.map(({ owner }) => [owner, enabled])));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, publicSubstations: true }));
+    }
+  }
+
   function openEditorDrawer() {
     setRightMode("editor");
     setRightCollapsed(false);
@@ -453,16 +513,16 @@ export function DashboardPage() {
         substations={visibleSubstations}
         nodes={visibleNodes}
         transmissionLines={visibleTransmissionLines}
-        publicTransmissionLines={visiblePublicTransmissionLines}
-        publicSubstations={visiblePublicSubstations}
+        publicTransmissionLines={layerFilteredPublicTransmissionLines}
+        publicSubstations={layerFilteredPublicSubstations}
         syntheticSubstations={visibleSyntheticSubstations}
-        transmissionStructures={visibleTransmissionStructures}
+        transmissionStructures={layerFilteredTransmissionStructures}
         opgwCables={visibleOpgwCables}
-        spliceClosures={visibleSpliceClosures}
+        spliceClosures={layerFilteredSpliceClosures}
         fiberAssignments={visibleFiberAssignments}
         patchPanels={visiblePatchPanels}
         planningRegions={visiblePlanningRegions}
-        layers={effectiveStreetLayers}
+        layers={streetLayers}
         activeTool={activeTool}
         placementHint={placementHint}
         command={mapCommand}
@@ -560,15 +620,21 @@ export function DashboardPage() {
               {rightMode === "layers" ? (
                 <div className="dashboard-drawer-stack">
                   <MapLayerControlPanel
-                    layers={effectiveStreetLayers}
+                    layers={streetLayers}
                     publicLineCount={visiblePublicTransmissionLines.length}
                     publicSubstationCount={visiblePublicSubstations.length}
-                    utilityOwnerCount={ownerOptions.length - 1}
+                    visiblePublicSubstationCount={layerFilteredPublicSubstations.length}
+                    utilityOwnerCount={substationOwnerCounts.length}
                     structureCount={visibleTransmissionStructures.length}
                     spliceClosureCount={visibleSpliceClosures.length}
                     dataWarnings={mapDataWarnings}
+                    substationOwnerCounts={substationOwnerCounts}
+                    visibleSubstationOwners={visibleSubstationOwners}
+                    onLayerChange={handleStreetLayerChange}
+                    onSubstationOwnerChange={handleSubstationOwnerLayerChange}
+                    onAllSubstationOwnersChange={handleAllSubstationOwnersChange}
                   />
-                  {effectiveStreetLayers.missingLocationAssets ? (
+                  {streetLayers.missingLocationAssets ? (
                     <MissingMapLocationPanel
                       substations={substations}
                       nodes={nodes}
@@ -617,7 +683,7 @@ export function DashboardPage() {
 
       <div className="dashboard-security-note map-overlay-note">
         <AlertTriangle size={15} />
-        <span>Dashboard map shows public HIFLD lines/substations plus synthetic demo structures and splice closures. Utility-owner buckets use public fields or explicit nearest-line public inference. Do not enter CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
+        <span>Dashboard map shows public HIFLD lines, verified-owner public substation nodes, and synthetic demo structures and splice closures. Utility-owner buckets use public substation fields or close OpenStreetMap owner/operator tag matches. Do not enter CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
       </div>
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
@@ -1152,8 +1218,8 @@ function buildSummaryCards(
   return [
     { label: "Transmission Maps", value: maps.length, note: "public HIFLD reference", Icon: Network },
     { label: "HIFLD Lines", value: publicLines.length, note: "read-only public reference", Icon: Route },
-    { label: "Substation Nodes", value: publicSubstations.length, note: "public HIFLD reference", Icon: MapPin },
-    { label: "Utility Owners", value: utilityOwnerCount, note: "public/inferred buckets", Icon: Layers },
+    { label: "Substation Nodes", value: publicSubstations.length, note: "verified public owner", Icon: MapPin },
+    { label: "Utility Owners", value: utilityOwnerCount, note: "verified public buckets", Icon: Layers },
     { label: "Top Owner Bucket", value: topOwner?.count || 0, note: topOwner?.owner || "none", Icon: Gauge },
     { label: "Structures", value: structures.length, note: "synthetic demo points", Icon: MapPin },
     { label: "Splice Closures", value: closures.length, note: "synthetic demo closures", Icon: Cable },

@@ -229,6 +229,8 @@ export type PublicTransmissionLineCollection = {
 export type PublicSubstationOwnerSource =
   | "public_substation_owner_field"
   | "public_substation_source_field"
+  | "openstreetmap_operator_tag"
+  | "openstreetmap_owner_tag"
   | "nearest_public_hifld_transmission_line_owner"
   | "unknown";
 
@@ -245,7 +247,12 @@ export type PublicSubstationProperties = {
   lineCount?: number | null;
   utilityOwner: string;
   ownerSource: PublicSubstationOwnerSource;
-  ownerConfidence: "public_record" | "public_source_label" | "public_line_inferred" | "unknown";
+  ownerConfidence: "public_record" | "public_source_label" | "openstreetmap_spatial_match" | "public_line_inferred" | "unknown";
+  osmElementId?: string | null;
+  osmSubstationName?: string | null;
+  osmOperator?: string | null;
+  osmOwner?: string | null;
+  osmMatchDistanceMiles?: number | null;
   nearestPublicLineId?: string | null;
   nearestPublicLineDistanceMiles?: number | null;
   source: "HIFLD" | "OpenStreetMap" | "Public GIS";
