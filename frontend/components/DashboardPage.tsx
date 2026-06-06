@@ -89,7 +89,7 @@ export function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(true);
   const [rightMode, setRightMode] = useState<RightDrawerMode>("modules");
   const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);

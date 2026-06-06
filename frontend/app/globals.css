@@ -3315,8 +3315,37 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 
 @media (max-width: 720px) {
   .dashboard-right-floating-drawer {
-    left: 12px;
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
     width: auto;
+    max-height: min(72dvh, 620px);
+    border-radius: 12px 12px 8px 8px;
+  }
+  .dashboard-right-floating-drawer.collapsed {
+    top: 126px;
+    left: auto;
+    right: 12px;
+    bottom: auto;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    border-radius: 8px;
+    overflow: visible;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .dashboard-right-floating-drawer.collapsed .dashboard-panel-collapse.right {
+    position: static;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--dash-border);
+    background: var(--dash-panel);
+    box-shadow: 0 18px 48px rgba(0,0,0,.32);
+    backdrop-filter: blur(16px);
   }
   .dashboard-left-filter-panel:not(.collapsed) {
     display: none;
