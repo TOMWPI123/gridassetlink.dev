@@ -712,7 +712,8 @@ export type MapAnnotation = {
 export type StreetMapLayerKey =
   | "publicTransmissionLines"
   | "publicSubstations"
-  | "fccUtilityMicrowave"
+  | "fccUtilityTowers"
+  | "fccMicrowaveLinks"
   | "syntheticSubstations"
   | "transmissionStructures"
   | "syntheticOpgwCables"

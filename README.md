@@ -105,7 +105,7 @@ The website includes a `/data-sources` page and a dashboard Sources drawer tab. 
 - HIFLD transmission-line owner sublayers use the public HIFLD `OWNER` field when present, then close OpenStreetMap `power=line` / `power=minor_line` owner/operator tag matches with compatible voltage, then explicit utility owner tokens in public line names; otherwise the line remains in `Unknown public owner`.
 - HIFLD Electric Substations are used as public reference points only when owner/operator can be verified from public source data or close OpenStreetMap `power=substation` owner/operator tag matches.
 - OpenStreetMap data is used for public owner/operator tag enrichment and is attributed to OpenStreetMap contributors under the Open Database License.
-- FCC ULS Microwave Public Access Files are used for a read-only utility microwave layer. The layer includes public FCC microwave site/tower nodes and point-to-point paths only when the active public licensee name matches a utility-owner pattern and coordinates fall inside the ISO New England map bounds.
+- FCC ULS Microwave Public Access Files are used for read-only FCC utility tower/site and microwave path layers. The tower layer shows public site nodes; the microwave path layer shows point-to-point links with assigned-frequency group filters. Records are included only when the active public licensee name matches a utility-owner pattern and coordinates fall inside the ISO New England map bounds.
 - CARTO basemap tiles are used only as visual map background context.
 - Transmission structures, OPGW, splices, fiber strands, patch panels, assignments, SEL ICON examples, circuits, and work orders are synthetic demo/planning records unless later replaced by user-verified engineering records.
 
@@ -170,7 +170,7 @@ Public transmission-line ingestion can enrich unknown HIFLD line-owner records w
 
 Public substation ingestion uses a public HIFLD Electric Substations FeatureServer plus OpenStreetMap `power=substation` owner/operator tags from Overpass for owner verification. The generated public substation layer includes only records with directly supported public owner/operator evidence; unknown-owner and nearest-line-only inferred records are excluded.
 
-FCC utility microwave ingestion uses the public FCC ULS complete microwave public access ZIP. The script parses active license, entity, location, path, microwave, and frequency tables, filters to utility licensee names, filters coordinates to Connecticut, Massachusetts, Rhode Island, New Hampshire, Vermont, and Maine, and writes read-only FCC tower/site and microwave path GeoJSON. The raw FCC ZIP is cached outside the repository by default because it is large. Override it with:
+FCC utility microwave ingestion uses the public FCC ULS complete microwave public access ZIP. The script parses active license, entity, location, path, microwave, and frequency tables, filters to utility licensee names, filters coordinates to Connecticut, Massachusetts, Rhode Island, New Hampshire, Vermont, and Maine, and writes read-only FCC tower/site and microwave path GeoJSON. The dashboard renders these as separate FCC tower/site and FCC microwave path layers; microwave path links can be grouped by public assigned-frequency bands. The raw FCC ZIP is cached outside the repository by default because it is large. Override it with:
 
 ```bash
 FCC_ULS_MICROWAVE_ZIP=C:\path\to\l_micro.zip npm run data:fcc-utility-microwave

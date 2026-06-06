@@ -88,6 +88,7 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
   if (selection.kind === "fcc_microwave_link") {
     return {
       ...selection.record.properties,
+      pathFrequencyBand: fccFrequencyBandLabel(selection.record.properties.frequencyAssignedMhz),
       geometryType: selection.record.geometry.type,
     };
   }
@@ -142,4 +143,14 @@ function formatValue(value: unknown) {
   if (Array.isArray(value)) return value.join(", ");
   if (value && typeof value === "object") return JSON.stringify(value);
   return String(value ?? "-");
+}
+
+function fccFrequencyBandLabel(frequencyMhz?: number | null) {
+  if (!frequencyMhz) return "unknown";
+  if (frequencyMhz >= 21000) return "23 GHz+";
+  if (frequencyMhz >= 17000) return "18 GHz";
+  if (frequencyMhz >= 10000) return "11-15 GHz";
+  if (frequencyMhz >= 5800) return "6-10 GHz";
+  if (frequencyMhz >= 1900) return "2 GHz";
+  return "below 2 GHz";
 }

@@ -41,8 +41,8 @@ export const dataSourceRecords: DataSourceRecord[] = [
     name: "FCC ULS Microwave Public Access Files",
     category: "Public reference",
     url: "https://data.fcc.gov/download/pub/uls/complete/l_micro.zip",
-    role: "Public utility-licensee microwave tower/site nodes and point-to-point path references inside the ISO New England map bounds.",
-    handling: "Generated from FCC ULS public access tables. The app includes only active microwave records whose public licensee name matches a utility-owner pattern and whose public FCC coordinates fall inside CT, MA, RI, NH, VT, or ME. Path links and parameters are FCC public license fields only, including call sign, path number, site/location number, frequency, EIRP, ASR number when present, structure height, and license dates. Records are read-only and not operational telecom inventory.",
+      role: "Public utility-licensee microwave tower/site nodes and point-to-point path references inside the ISO New England map bounds.",
+      handling: "Generated from FCC ULS public access tables. The dashboard exposes tower/site nodes and microwave path links as separate read-only public-reference layers. The microwave link layer includes path-frequency grouping from FCC assigned-frequency fields. The app includes only active microwave records whose public licensee name matches a utility-owner pattern and whose public FCC coordinates fall inside CT, MA, RI, NH, VT, or ME. Path links and parameters are FCC public license fields only, including call sign, path number, site/location number, frequency, EIRP, ASR number when present, structure height, and license dates. Records are not operational telecom inventory.",
     generatedFiles: [
       "frontend/public/data/fcc-uls-utility-towers.geojson",
       "frontend/public/data/fcc-uls-utility-microwave-links.geojson",

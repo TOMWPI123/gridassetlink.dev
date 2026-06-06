@@ -23,7 +23,8 @@ import type { Coordinate, DashboardMapMode, FccMicrowaveLinkCollection, FccMicro
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
   publicSubstations: true,
-  fccUtilityMicrowave: false,
+  fccUtilityTowers: false,
+  fccMicrowaveLinks: false,
   syntheticSubstations: false,
   transmissionStructures: true,
   syntheticOpgwCables: false,
@@ -50,7 +51,8 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   ...initialStreetLayers,
   publicTransmissionLines: true,
   publicSubstations: true,
-  fccUtilityMicrowave: true,
+  fccUtilityTowers: true,
+  fccMicrowaveLinks: true,
   transmissionStructures: true,
   spliceClosures: true,
 };
@@ -109,7 +111,9 @@ export function DashboardPage() {
   const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => dashboardStreetLayers);
   const [visibleTransmissionLineOwners, setVisibleTransmissionLineOwners] = useState<Record<string, boolean>>({});
   const [visibleSubstationOwners, setVisibleSubstationOwners] = useState<Record<string, boolean>>({});
-  const [visibleFccOwners, setVisibleFccOwners] = useState<Record<string, boolean>>({});
+  const [visibleFccTowerOwners, setVisibleFccTowerOwners] = useState<Record<string, boolean>>({});
+  const [visibleFccLinkOwners, setVisibleFccLinkOwners] = useState<Record<string, boolean>>({});
+  const [visibleFccFrequencyBands, setVisibleFccFrequencyBands] = useState<Record<string, boolean>>({});
   const [publicTransmissionLines, setPublicTransmissionLines] = useState<PublicTransmissionLineFeature[]>([]);
   const [publicSubstations, setPublicSubstations] = useState<PublicSubstationFeature[]>([]);
   const [fccUtilityTowers, setFccUtilityTowers] = useState<FccUtilityTowerFeature[]>([]);
@@ -155,13 +159,13 @@ export function DashboardPage() {
       const fccTowers = await fetchGeoJson<FccUtilityTowerCollection>("/data/fcc-uls-utility-towers.geojson")
         .then((collection) => collection.features || [])
         .catch((error) => {
-          warnings.fccUtilityMicrowave = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          warnings.fccUtilityTowers = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
           return [] as FccUtilityTowerFeature[];
         });
       const fccLinks = await fetchGeoJson<FccMicrowaveLinkCollection>("/data/fcc-uls-utility-microwave-links.geojson")
         .then((collection) => collection.features || [])
         .catch((error) => {
-          warnings.fccUtilityMicrowave = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          warnings.fccMicrowaveLinks = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
           return [] as FccMicrowaveLinkFeature[];
         });
       const splices = await fetchGeoJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json").catch((error) => {
@@ -241,13 +245,27 @@ export function DashboardPage() {
     () => fccMicrowaveLinks.filter((feature) => feature.properties.isoNe),
     [fccMicrowaveLinks],
   );
-  const fccOwnerCounts = useMemo(
-    () => fccOwnerCountsFor(visibleFccUtilityTowers, visibleFccMicrowaveLinks),
-    [visibleFccMicrowaveLinks, visibleFccUtilityTowers],
+  const fccTowerOwnerCounts = useMemo(
+    () => fccOwnerCountsFor(visibleFccUtilityTowers, []),
+    [visibleFccUtilityTowers],
   );
   useEffect(() => {
-    setVisibleFccOwners((current) => mergeVisibleOwnerState(current, fccOwnerCounts));
-  }, [fccOwnerCounts]);
+    setVisibleFccTowerOwners((current) => mergeVisibleOwnerState(current, fccTowerOwnerCounts));
+  }, [fccTowerOwnerCounts]);
+  const fccLinkOwnerCounts = useMemo(
+    () => fccOwnerCountsFor([], visibleFccMicrowaveLinks),
+    [visibleFccMicrowaveLinks],
+  );
+  useEffect(() => {
+    setVisibleFccLinkOwners((current) => mergeVisibleOwnerState(current, fccLinkOwnerCounts));
+  }, [fccLinkOwnerCounts]);
+  const fccFrequencyBandCounts = useMemo(
+    () => fccFrequencyBandCountsFor(visibleFccMicrowaveLinks),
+    [visibleFccMicrowaveLinks],
+  );
+  useEffect(() => {
+    setVisibleFccFrequencyBands((current) => mergeVisibleFrequencyBandState(current, fccFrequencyBandCounts));
+  }, [fccFrequencyBandCounts]);
   const visibleSyntheticSubstations = useMemo(
     () => syntheticSubstations.filter((feature) => feature.properties.synthetic && feature.properties.public === false),
     [syntheticSubstations],
@@ -278,7 +296,9 @@ export function DashboardPage() {
   );
   const hasSubstationOwnerLayerState = Object.keys(visibleSubstationOwners).length > 0;
   const hasTransmissionLineOwnerLayerState = Object.keys(visibleTransmissionLineOwners).length > 0;
-  const hasFccOwnerLayerState = Object.keys(visibleFccOwners).length > 0;
+  const hasFccTowerOwnerLayerState = Object.keys(visibleFccTowerOwners).length > 0;
+  const hasFccLinkOwnerLayerState = Object.keys(visibleFccLinkOwners).length > 0;
+  const hasFccFrequencyBandLayerState = Object.keys(visibleFccFrequencyBands).length > 0;
   const visibleTransmissionLineOwnerSet = useMemo(
     () => new Set(Object.entries(visibleTransmissionLineOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
     [visibleTransmissionLineOwners],
@@ -287,9 +307,17 @@ export function DashboardPage() {
     () => new Set(Object.entries(visibleSubstationOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
     [visibleSubstationOwners],
   );
-  const visibleFccOwnerSet = useMemo(
-    () => new Set(Object.entries(visibleFccOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
-    [visibleFccOwners],
+  const visibleFccTowerOwnerSet = useMemo(
+    () => new Set(Object.entries(visibleFccTowerOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
+    [visibleFccTowerOwners],
+  );
+  const visibleFccLinkOwnerSet = useMemo(
+    () => new Set(Object.entries(visibleFccLinkOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
+    [visibleFccLinkOwners],
+  );
+  const visibleFccFrequencyBandSet = useMemo(
+    () => new Set(Object.entries(visibleFccFrequencyBands).filter(([, enabled]) => enabled).map(([band]) => band)),
+    [visibleFccFrequencyBands],
   );
   const layerFilteredPublicTransmissionLines = useMemo(
     () => {
@@ -309,19 +337,22 @@ export function DashboardPage() {
   );
   const layerFilteredFccUtilityTowers = useMemo(
     () => {
-      if (!streetLayers.fccUtilityMicrowave) return [];
-      if (!hasFccOwnerLayerState) return visibleFccUtilityTowers;
-      return visibleFccUtilityTowers.filter((feature) => visibleFccOwnerSet.has(feature.properties.utilityOwner));
+      if (!streetLayers.fccUtilityTowers) return [];
+      if (!hasFccTowerOwnerLayerState) return visibleFccUtilityTowers;
+      return visibleFccUtilityTowers.filter((feature) => visibleFccTowerOwnerSet.has(feature.properties.utilityOwner));
     },
-    [hasFccOwnerLayerState, streetLayers.fccUtilityMicrowave, visibleFccOwnerSet, visibleFccUtilityTowers],
+    [hasFccTowerOwnerLayerState, streetLayers.fccUtilityTowers, visibleFccTowerOwnerSet, visibleFccUtilityTowers],
   );
   const layerFilteredFccMicrowaveLinks = useMemo(
     () => {
-      if (!streetLayers.fccUtilityMicrowave) return [];
-      if (!hasFccOwnerLayerState) return visibleFccMicrowaveLinks;
-      return visibleFccMicrowaveLinks.filter((feature) => visibleFccOwnerSet.has(feature.properties.utilityOwner));
+      if (!streetLayers.fccMicrowaveLinks) return [];
+      return visibleFccMicrowaveLinks.filter((feature) => {
+        const ownerVisible = !hasFccLinkOwnerLayerState || visibleFccLinkOwnerSet.has(feature.properties.utilityOwner);
+        const frequencyVisible = !hasFccFrequencyBandLayerState || visibleFccFrequencyBandSet.has(fccFrequencyBandLabel(feature.properties.frequencyAssignedMhz));
+        return ownerVisible && frequencyVisible;
+      });
     },
-    [hasFccOwnerLayerState, streetLayers.fccUtilityMicrowave, visibleFccMicrowaveLinks, visibleFccOwnerSet],
+    [hasFccFrequencyBandLayerState, hasFccLinkOwnerLayerState, streetLayers.fccMicrowaveLinks, visibleFccFrequencyBandSet, visibleFccLinkOwnerSet, visibleFccMicrowaveLinks],
   );
   const layerFilteredTransmissionStructures = useMemo(
     () => streetLayers.transmissionStructures ? visibleTransmissionStructures : [],
@@ -518,17 +549,45 @@ export function DashboardPage() {
     }
   }
 
-  function handleFccOwnerLayerChange(owner: string, enabled: boolean) {
-    setVisibleFccOwners((current) => ({ ...current, [owner]: enabled }));
+  function handleFccTowerOwnerLayerChange(owner: string, enabled: boolean) {
+    setVisibleFccTowerOwners((current) => ({ ...current, [owner]: enabled }));
     if (enabled) {
-      setStreetLayers((current) => ({ ...current, fccUtilityMicrowave: true }));
+      setStreetLayers((current) => ({ ...current, fccUtilityTowers: true }));
     }
   }
 
-  function handleAllFccOwnersChange(enabled: boolean) {
-    setVisibleFccOwners(Object.fromEntries(fccOwnerCounts.map(({ owner }) => [owner, enabled])));
+  function handleAllFccTowerOwnersChange(enabled: boolean) {
+    setVisibleFccTowerOwners(Object.fromEntries(fccTowerOwnerCounts.map(({ owner }) => [owner, enabled])));
     if (enabled) {
-      setStreetLayers((current) => ({ ...current, fccUtilityMicrowave: true }));
+      setStreetLayers((current) => ({ ...current, fccUtilityTowers: true }));
+    }
+  }
+
+  function handleFccLinkOwnerLayerChange(owner: string, enabled: boolean) {
+    setVisibleFccLinkOwners((current) => ({ ...current, [owner]: enabled }));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, fccMicrowaveLinks: true }));
+    }
+  }
+
+  function handleAllFccLinkOwnersChange(enabled: boolean) {
+    setVisibleFccLinkOwners(Object.fromEntries(fccLinkOwnerCounts.map(({ owner }) => [owner, enabled])));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, fccMicrowaveLinks: true }));
+    }
+  }
+
+  function handleFccFrequencyBandChange(frequencyBand: string, enabled: boolean) {
+    setVisibleFccFrequencyBands((current) => ({ ...current, [frequencyBand]: enabled }));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, fccMicrowaveLinks: true }));
+    }
+  }
+
+  function handleAllFccFrequencyBandsChange(enabled: boolean) {
+    setVisibleFccFrequencyBands(Object.fromEntries(fccFrequencyBandCounts.map(({ frequencyBand }) => [frequencyBand, enabled])));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, fccMicrowaveLinks: true }));
     }
   }
 
@@ -635,7 +694,7 @@ export function DashboardPage() {
       <div className="dashboard-floating-topbar">
         <div className="dashboard-compact-brand">
           <strong>GridAssetLink</strong>
-          <span>HIFLD, FCC utility towers, substations, structures, and splices</span>
+        <span>HIFLD, FCC towers/links, substations, structures, and splices</span>
         </div>
         <div className="dashboard-map-global-search-wrap">
           <label className="dashboard-map-global-search">
@@ -730,7 +789,7 @@ export function DashboardPage() {
                     visibleFccTowerCount={layerFilteredFccUtilityTowers.length}
                     fccLinkCount={visibleFccMicrowaveLinks.length}
                     visibleFccLinkCount={layerFilteredFccMicrowaveLinks.length}
-                    utilityOwnerCount={new Set([...substationOwnerCounts, ...transmissionLineOwnerCounts, ...fccOwnerCounts].map(({ owner }) => owner)).size}
+                    utilityOwnerCount={new Set([...substationOwnerCounts, ...transmissionLineOwnerCounts, ...fccTowerOwnerCounts, ...fccLinkOwnerCounts].map(({ owner }) => owner)).size}
                     structureCount={visibleTransmissionStructures.length}
                     spliceClosureCount={visibleSpliceClosures.length}
                     dataWarnings={mapDataWarnings}
@@ -738,15 +797,23 @@ export function DashboardPage() {
                     visibleTransmissionLineOwners={visibleTransmissionLineOwners}
                     substationOwnerCounts={substationOwnerCounts}
                     visibleSubstationOwners={visibleSubstationOwners}
-                    fccOwnerCounts={fccOwnerCounts}
-                    visibleFccOwners={visibleFccOwners}
+                    fccTowerOwnerCounts={fccTowerOwnerCounts}
+                    visibleFccTowerOwners={visibleFccTowerOwners}
+                    fccLinkOwnerCounts={fccLinkOwnerCounts}
+                    visibleFccLinkOwners={visibleFccLinkOwners}
+                    fccFrequencyBandCounts={fccFrequencyBandCounts}
+                    visibleFccFrequencyBands={visibleFccFrequencyBands}
                     onLayerChange={handleStreetLayerChange}
                     onTransmissionLineOwnerChange={handleTransmissionLineOwnerLayerChange}
                     onAllTransmissionLineOwnersChange={handleAllTransmissionLineOwnersChange}
                     onSubstationOwnerChange={handleSubstationOwnerLayerChange}
                     onAllSubstationOwnersChange={handleAllSubstationOwnersChange}
-                    onFccOwnerChange={handleFccOwnerLayerChange}
-                    onAllFccOwnersChange={handleAllFccOwnersChange}
+                    onFccTowerOwnerChange={handleFccTowerOwnerLayerChange}
+                    onAllFccTowerOwnersChange={handleAllFccTowerOwnersChange}
+                    onFccLinkOwnerChange={handleFccLinkOwnerLayerChange}
+                    onAllFccLinkOwnersChange={handleAllFccLinkOwnersChange}
+                    onFccFrequencyBandChange={handleFccFrequencyBandChange}
+                    onAllFccFrequencyBandsChange={handleAllFccFrequencyBandsChange}
                   />
                   {streetLayers.missingLocationAssets ? (
                     <MissingMapLocationPanel
@@ -1372,7 +1439,8 @@ function buildSummaryCards(
     { label: "Transmission Maps", value: maps.length, note: "public HIFLD reference", Icon: Network },
     { label: "HIFLD Lines", value: publicLines.length, note: "read-only public reference", Icon: Route },
     { label: "Substation Nodes", value: publicSubstations.length, note: "verified public owner", Icon: MapPin },
-    { label: "FCC Utility Towers", value: fccTowers.length, note: `${fccLinks.length} public ULS links`, Icon: RadioTower },
+    { label: "FCC Utility Towers", value: fccTowers.length, note: "public ULS site nodes", Icon: RadioTower },
+    { label: "FCC MW Links", value: fccLinks.length, note: `${fccFrequencyBandCountsFor(fccLinks).length} frequency groups`, Icon: Route },
     { label: "Utility Owners", value: utilityOwnerCount, note: "verified public buckets", Icon: Layers },
     { label: "Top Owner Bucket", value: topOwner?.count || 0, note: topOwner?.owner || "none", Icon: Gauge },
     { label: "Structures", value: structures.length, note: "synthetic demo points", Icon: MapPin },
@@ -1527,6 +1595,37 @@ function fccOwnerCountsFor(towers: FccUtilityTowerFeature[], links: FccMicrowave
     .sort((a, b) => b.count - a.count || a.owner.localeCompare(b.owner));
 }
 
+function fccFrequencyBandCountsFor(links: FccMicrowaveLinkFeature[]) {
+  const counts = new Map<string, number>();
+  links.forEach((record) => {
+    const frequencyBand = fccFrequencyBandLabel(record.properties.frequencyAssignedMhz);
+    counts.set(frequencyBand, (counts.get(frequencyBand) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([frequencyBand, count]) => ({ frequencyBand, count }))
+    .sort((a, b) => frequencyBandSortValue(a.frequencyBand) - frequencyBandSortValue(b.frequencyBand) || a.frequencyBand.localeCompare(b.frequencyBand));
+}
+
+function fccFrequencyBandLabel(frequencyMhz?: number | null) {
+  if (!frequencyMhz) return "unknown";
+  if (frequencyMhz >= 21000) return "23 GHz+";
+  if (frequencyMhz >= 17000) return "18 GHz";
+  if (frequencyMhz >= 10000) return "11-15 GHz";
+  if (frequencyMhz >= 5800) return "6-10 GHz";
+  if (frequencyMhz >= 1900) return "2 GHz";
+  return "below 2 GHz";
+}
+
+function frequencyBandSortValue(frequencyBand: string) {
+  if (frequencyBand === "below 2 GHz") return 1;
+  if (frequencyBand === "2 GHz") return 2;
+  if (frequencyBand === "6-10 GHz") return 6;
+  if (frequencyBand === "11-15 GHz") return 11;
+  if (frequencyBand === "18 GHz") return 18;
+  if (frequencyBand === "23 GHz+") return 23;
+  return 99;
+}
+
 function combinedOwnerCounts(publicSubstations: PublicSubstationFeature[], publicLines: PublicTransmissionLineFeature[], fccTowers: FccUtilityTowerFeature[], fccLinks: FccMicrowaveLinkFeature[]) {
   const counts = new Map<string, number>();
   [...ownerCountsFor(publicSubstations, publicLines), ...fccOwnerCountsFor(fccTowers, fccLinks)].forEach(({ owner, count }) => {
@@ -1547,6 +1646,20 @@ function mergeVisibleOwnerState(current: Record<string, boolean>, ownerCounts: A
   });
   Object.keys(current).forEach((owner) => {
     if (!activeOwners.has(owner)) changed = true;
+  });
+  return changed ? next : current;
+}
+
+function mergeVisibleFrequencyBandState(current: Record<string, boolean>, frequencyBandCounts: Array<{ frequencyBand: string; count: number }>) {
+  const activeBands = new Set(frequencyBandCounts.map(({ frequencyBand }) => frequencyBand));
+  let changed = false;
+  const next: Record<string, boolean> = {};
+  frequencyBandCounts.forEach(({ frequencyBand }) => {
+    next[frequencyBand] = current[frequencyBand] ?? true;
+    if (!(frequencyBand in current)) changed = true;
+  });
+  Object.keys(current).forEach((frequencyBand) => {
+    if (!activeBands.has(frequencyBand)) changed = true;
   });
   return changed ? next : current;
 }
@@ -1617,7 +1730,8 @@ function publicLayerSet(layers: Record<StreetMapLayerKey, boolean>) {
   return {
     ...layers,
     publicTransmissionLines: true,
-    fccUtilityMicrowave: true,
+    fccUtilityTowers: true,
+    fccMicrowaveLinks: true,
     syntheticSubstations: false,
     transmissionLines: false,
     substations: false,

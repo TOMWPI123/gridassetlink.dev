@@ -22,20 +22,29 @@ type MapLayerControlPanelProps = {
   visibleTransmissionLineOwners?: Record<string, boolean>;
   substationOwnerCounts?: Array<{ owner: string; count: number }>;
   visibleSubstationOwners?: Record<string, boolean>;
-  fccOwnerCounts?: Array<{ owner: string; count: number }>;
-  visibleFccOwners?: Record<string, boolean>;
+  fccTowerOwnerCounts?: Array<{ owner: string; count: number }>;
+  visibleFccTowerOwners?: Record<string, boolean>;
+  fccLinkOwnerCounts?: Array<{ owner: string; count: number }>;
+  visibleFccLinkOwners?: Record<string, boolean>;
+  fccFrequencyBandCounts?: Array<{ frequencyBand: string; count: number }>;
+  visibleFccFrequencyBands?: Record<string, boolean>;
   onTransmissionLineOwnerChange?: (owner: string, enabled: boolean) => void;
   onAllTransmissionLineOwnersChange?: (enabled: boolean) => void;
   onSubstationOwnerChange?: (owner: string, enabled: boolean) => void;
   onAllSubstationOwnersChange?: (enabled: boolean) => void;
-  onFccOwnerChange?: (owner: string, enabled: boolean) => void;
-  onAllFccOwnersChange?: (enabled: boolean) => void;
+  onFccTowerOwnerChange?: (owner: string, enabled: boolean) => void;
+  onAllFccTowerOwnersChange?: (enabled: boolean) => void;
+  onFccLinkOwnerChange?: (owner: string, enabled: boolean) => void;
+  onAllFccLinkOwnersChange?: (enabled: boolean) => void;
+  onFccFrequencyBandChange?: (frequencyBand: string, enabled: boolean) => void;
+  onAllFccFrequencyBandsChange?: (enabled: boolean) => void;
 };
 
 const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges?: string[] }> = [
   { key: "publicTransmissionLines", label: "HIFLD transmission lines", note: "Public HIFLD line geometry grouped by HIFLD OWNER, close OSM line owner/operator matches, and explicit line-name owner tokens", badges: ["Public", "Owner buckets"] },
   { key: "publicSubstations", label: "Verified-owner substation nodes", note: "Open-source substation nodes grouped by public source fields or close OSM owner/operator matches", badges: ["Public", "Owner buckets"] },
-  { key: "fccUtilityMicrowave", label: "FCC utility microwave", note: "Public FCC ULS utility licensee tower/site nodes and point-to-point microwave links", badges: ["Public", "FCC ULS"] },
+  { key: "fccUtilityTowers", label: "FCC utility tower nodes", note: "Public FCC ULS utility licensee microwave tower/site records", badges: ["Public", "FCC ULS", "Nodes"] },
+  { key: "fccMicrowaveLinks", label: "FCC microwave path links", note: "Public FCC ULS point-to-point microwave paths grouped by owner and path frequency", badges: ["Public", "FCC ULS", "Frequency"] },
   { key: "transmissionStructures", label: "Transmission structures", note: "Synthetic demo structure points sampled from public line geometry", badges: ["Synthetic", "Demo"] },
   { key: "spliceClosures", label: "Splice closures", note: "Synthetic demo splice closures mounted on synthetic structures", badges: ["Synthetic", "Demo"] },
 ];
@@ -59,25 +68,36 @@ export function MapLayerControlPanel({
   visibleTransmissionLineOwners = {},
   substationOwnerCounts = [],
   visibleSubstationOwners = {},
-  fccOwnerCounts = [],
-  visibleFccOwners = {},
+  fccTowerOwnerCounts = [],
+  visibleFccTowerOwners = {},
+  fccLinkOwnerCounts = [],
+  visibleFccLinkOwners = {},
+  fccFrequencyBandCounts = [],
+  visibleFccFrequencyBands = {},
   onTransmissionLineOwnerChange,
   onAllTransmissionLineOwnersChange,
   onSubstationOwnerChange,
   onAllSubstationOwnersChange,
-  onFccOwnerChange,
-  onAllFccOwnersChange,
+  onFccTowerOwnerChange,
+  onAllFccTowerOwnersChange,
+  onFccLinkOwnerChange,
+  onAllFccLinkOwnersChange,
+  onFccFrequencyBandChange,
+  onAllFccFrequencyBandsChange,
 }: MapLayerControlPanelProps) {
   const counts: Partial<Record<StreetMapLayerKey, number>> = {
     publicTransmissionLines: publicLineCount,
     publicSubstations: publicSubstationCount,
-    fccUtilityMicrowave: fccTowerCount + fccLinkCount,
+    fccUtilityTowers: fccTowerCount,
+    fccMicrowaveLinks: fccLinkCount,
     transmissionStructures: structureCount,
     spliceClosures: spliceClosureCount,
   };
   const visibleLineOwnerCount = transmissionLineOwnerCounts.filter(({ owner }) => visibleTransmissionLineOwners[owner] !== false).length;
   const visibleSubstationOwnerCount = substationOwnerCounts.filter(({ owner }) => visibleSubstationOwners[owner] !== false).length;
-  const visibleFccOwnerCount = fccOwnerCounts.filter(({ owner }) => visibleFccOwners[owner] !== false).length;
+  const visibleFccTowerOwnerCount = fccTowerOwnerCounts.filter(({ owner }) => visibleFccTowerOwners[owner] !== false).length;
+  const visibleFccLinkOwnerCount = fccLinkOwnerCounts.filter(({ owner }) => visibleFccLinkOwners[owner] !== false).length;
+  const visibleFccFrequencyBandCount = fccFrequencyBandCounts.filter(({ frequencyBand }) => visibleFccFrequencyBands[frequencyBand] !== false).length;
   return (
     <aside className="street-layer-control-panel" aria-label="Street-level layer and drawing controls">
       <div className="street-panel-title"><Layers size={16} />Street Map Layers</div>
@@ -129,24 +149,50 @@ export function MapLayerControlPanel({
                 onAllOwnersChange={onAllSubstationOwnersChange}
               />
             ) : null}
-            {layer.key === "fccUtilityMicrowave" && layers.fccUtilityMicrowave ? (
+            {layer.key === "fccUtilityTowers" && layers.fccUtilityTowers ? (
               <OwnerSublayerList
-                title="FCC utility owner sublayers"
-                visibleCount={visibleFccTowerCount + visibleFccLinkCount}
-                totalCount={fccTowerCount + fccLinkCount}
-                visibleOwnerCount={visibleFccOwnerCount}
-                totalOwnerCount={fccOwnerCounts.length}
-                ownerCounts={fccOwnerCounts}
-                visibleOwners={visibleFccOwners}
-                onOwnerChange={onFccOwnerChange}
-                onAllOwnersChange={onAllFccOwnersChange}
+                title="FCC tower owner sublayers"
+                visibleCount={visibleFccTowerCount}
+                totalCount={fccTowerCount}
+                visibleOwnerCount={visibleFccTowerOwnerCount}
+                totalOwnerCount={fccTowerOwnerCounts.length}
+                ownerCounts={fccTowerOwnerCounts}
+                visibleOwners={visibleFccTowerOwners}
+                onOwnerChange={onFccTowerOwnerChange}
+                onAllOwnersChange={onAllFccTowerOwnersChange}
+              />
+            ) : null}
+            {layer.key === "fccMicrowaveLinks" && layers.fccMicrowaveLinks ? (
+              <OwnerSublayerList
+                title="FCC link owner sublayers"
+                visibleCount={visibleFccLinkCount}
+                totalCount={fccLinkCount}
+                visibleOwnerCount={visibleFccLinkOwnerCount}
+                totalOwnerCount={fccLinkOwnerCounts.length}
+                ownerCounts={fccLinkOwnerCounts}
+                visibleOwners={visibleFccLinkOwners}
+                onOwnerChange={onFccLinkOwnerChange}
+                onAllOwnersChange={onAllFccLinkOwnersChange}
+              />
+            ) : null}
+            {layer.key === "fccMicrowaveLinks" && layers.fccMicrowaveLinks ? (
+              <FrequencySublayerList
+                title="Path frequency sublayers"
+                visibleCount={visibleFccLinkCount}
+                totalCount={fccLinkCount}
+                visibleFrequencyBandCount={visibleFccFrequencyBandCount}
+                totalFrequencyBandCount={fccFrequencyBandCounts.length}
+                frequencyBandCounts={fccFrequencyBandCounts}
+                visibleFrequencyBands={visibleFccFrequencyBands}
+                onFrequencyBandChange={onFccFrequencyBandChange}
+                onAllFrequencyBandsChange={onAllFccFrequencyBandsChange}
               />
             ) : null}
           </div>
         ))}
       </div>
       <div className="street-map-todo-note">
-        Dashboard map is limited to public HIFLD transmission-line references, verified-owner public substation nodes, public FCC ULS utility microwave records, close OpenStreetMap owner/operator matches, and synthetic demo transmission structures and splice closures. FCC records are public license/tower references only; telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
+        Dashboard map is limited to public HIFLD transmission-line references, verified-owner public substation nodes, public FCC ULS utility tower/site records, public FCC ULS microwave path links, close OpenStreetMap owner/operator matches, and synthetic demo transmission structures and splice closures. FCC records are public license/path references only; telecom circuits, devices, work orders, OPGW cables, assignments, and patch panels are not rendered here.
       </div>
     </aside>
   );
@@ -202,10 +248,61 @@ function OwnerSublayerList({
   );
 }
 
+function FrequencySublayerList({
+  title,
+  visibleCount,
+  totalCount,
+  visibleFrequencyBandCount,
+  totalFrequencyBandCount,
+  frequencyBandCounts,
+  visibleFrequencyBands,
+  onFrequencyBandChange,
+  onAllFrequencyBandsChange,
+}: {
+  title: string;
+  visibleCount: number;
+  totalCount: number;
+  visibleFrequencyBandCount: number;
+  totalFrequencyBandCount: number;
+  frequencyBandCounts: Array<{ frequencyBand: string; count: number }>;
+  visibleFrequencyBands: Record<string, boolean>;
+  onFrequencyBandChange?: (frequencyBand: string, enabled: boolean) => void;
+  onAllFrequencyBandsChange?: (enabled: boolean) => void;
+}) {
+  return (
+    <div className="street-owner-sublayers" aria-label={title}>
+      <div className="street-owner-sublayer-heading">
+        <span>
+          {title}
+          <small>{visibleCount} of {totalCount} links shown / {visibleFrequencyBandCount} of {totalFrequencyBandCount} frequency groups</small>
+        </span>
+        <span className="street-owner-sublayer-actions">
+          <button type="button" onClick={() => onAllFrequencyBandsChange?.(true)}>All</button>
+          <button type="button" onClick={() => onAllFrequencyBandsChange?.(false)}>None</button>
+        </span>
+      </div>
+      <div className="street-owner-sublayer-list">
+        {frequencyBandCounts.map(({ frequencyBand, count }) => (
+          <label className="street-owner-sublayer-toggle" key={frequencyBand}>
+            <input
+              type="checkbox"
+              checked={visibleFrequencyBands[frequencyBand] !== false}
+              onChange={(event) => onFrequencyBandChange?.(frequencyBand, event.currentTarget.checked)}
+            />
+            <span>{frequencyBand}</span>
+            <em>{count}</em>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string, string>) {
   if (layer === "publicTransmissionLines") return warnings?.publicLines;
   if (layer === "publicSubstations") return warnings?.publicSubstations;
-  if (layer === "fccUtilityMicrowave") return warnings?.fccUtilityMicrowave;
+  if (layer === "fccUtilityTowers") return warnings?.fccUtilityTowers;
+  if (layer === "fccMicrowaveLinks") return warnings?.fccMicrowaveLinks;
   if (layer === "transmissionStructures") return warnings?.structures;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   return "";

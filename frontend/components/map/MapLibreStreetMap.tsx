@@ -319,7 +319,8 @@ export function MapLibreStreetMap({
       <div className="maplibre-legend" aria-hidden="true">
         {layers.publicTransmissionLines ? <span><i className="legend-line" />HIFLD transmission lines</span> : null}
         {layers.publicSubstations ? <span><i className="legend-substation" />Public substations by owner</span> : null}
-        {layers.fccUtilityMicrowave ? <span><i className="legend-node" />FCC utility microwave</span> : null}
+        {layers.fccUtilityTowers ? <span><i className="legend-node" />FCC utility towers</span> : null}
+        {layers.fccMicrowaveLinks ? <span><i className="legend-line" />FCC microwave links</span> : null}
         {layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW</span> : null}
         {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
         {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
@@ -438,7 +439,7 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     type: "line",
     source: sourceIds.fccMicrowaveLinks,
     paint: {
-      "line-color": fccOwnerColorExpression() as never,
+      "line-color": fccFrequencyBandColorExpression() as never,
       "line-width": ["interpolate", ["linear"], ["zoom"], 5, 1.8, 10, 4.2],
       "line-opacity": 0.82,
       "line-dasharray": ["literal", [1.2, 0.7]],
@@ -770,6 +771,30 @@ function fccOwnerColorExpression() {
   ];
 }
 
+function fccFrequencyBandColorExpression() {
+  return [
+    "match",
+    ["get", "frequencyBand"],
+    "below 2 GHz", "#d5dde2",
+    "2 GHz", "#7dd3fc",
+    "6-10 GHz", "#41d6c6",
+    "11-15 GHz", "#efc95f",
+    "18 GHz", "#ff8ecf",
+    "23 GHz+", "#b390ff",
+    "#f5a524",
+  ];
+}
+
+function fccFrequencyBandLabel(frequencyMhz?: number | null) {
+  if (!frequencyMhz) return "unknown";
+  if (frequencyMhz >= 21000) return "23 GHz+";
+  if (frequencyMhz >= 17000) return "18 GHz";
+  if (frequencyMhz >= 10000) return "11-15 GHz";
+  if (frequencyMhz >= 5800) return "6-10 GHz";
+  if (frequencyMhz >= 1900) return "2 GHz";
+  return "below 2 GHz";
+}
+
 function buildDatasets(
   substations: Substation[],
   nodes: MapNode[],
@@ -864,7 +889,7 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    fccMicrowaveLinks: layers.fccUtilityMicrowave ? collection(fccMicrowaveLinks.map((feature) => ({
+    fccMicrowaveLinks: layers.fccMicrowaveLinks ? collection(fccMicrowaveLinks.map((feature) => ({
       type: "Feature",
       properties: {
         kind: "fcc_microwave_link",
@@ -876,6 +901,7 @@ function buildDatasets(
         rawLicenseeName: feature.properties.rawLicenseeName,
         pathNumber: feature.properties.pathNumber,
         pathTypeDesc: feature.properties.pathTypeDesc || null,
+        frequencyBand: fccFrequencyBandLabel(feature.properties.frequencyAssignedMhz),
         frequencyAssignedMhz: feature.properties.frequencyAssignedMhz ?? null,
         frequencyUpperBandMhz: feature.properties.frequencyUpperBandMhz ?? null,
         eirp: feature.properties.eirp ?? null,
@@ -886,7 +912,7 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    fccUtilityTowers: layers.fccUtilityMicrowave ? collection(fccUtilityTowers.map((feature) => ({
+    fccUtilityTowers: layers.fccUtilityTowers ? collection(fccUtilityTowers.map((feature) => ({
       type: "Feature",
       properties: {
         kind: "fcc_utility_tower",
