@@ -2,16 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Cable, Cpu, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, ShieldCheck, SlidersHorizontal, TableProperties, Workflow, X } from "lucide-react";
+import { AlertTriangle, Cable, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { appNavGroups } from "@/components/navigation";
-import { isoNeDiagramAnnotations } from "@/data/mapAnnotations";
 import { seedMapNodes } from "@/data/nodeParameters";
 import { seedEditableSubstations } from "@/data/substations";
 import { seedPlanningRegions, seedTransmissionLines } from "@/data/transmissionLines";
 import { seedTransmissionMaps } from "@/data/transmissionMaps";
-import { DashboardMapModeToggle } from "@/components/map/DashboardMapModeToggle";
-import { IsoNeDiagramMap } from "@/components/map/IsoNeDiagramMap";
 import { LinkedAssetDetailPanel } from "@/components/map/LinkedAssetDetailPanel";
 import { MapLayerControlPanel } from "@/components/map/MapLayerControlPanel";
 import { MissingMapLocationPanel, type MissingMapLocation } from "@/components/map/MissingMapLocationPanel";
@@ -19,31 +16,35 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import { TransmissionMapSelector } from "@/components/map/TransmissionMapSelector";
-import type { Coordinate, DashboardMapMode, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, PatchPanel, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationCollection, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableFeature, PatchPanel, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
-  syntheticSubstations: true,
-  transmissionStructures: true,
-  syntheticOpgwCables: true,
-  spliceClosures: true,
-  fiberAssignments: true,
-  patchPanels: true,
-  transmissionLines: true,
-  substations: true,
-  telecomNodes: true,
-  selIconNodes: true,
-  c3794Nodes: true,
-  fiberRoutes: true,
-  opgwRoutes: true,
-  distributionFiberRoutes: true,
-  circuitEndpoints: true,
-  workOrderLocations: true,
-  proposedChanges: true,
-  missingLocationAssets: true,
-  planningRegions: true,
-  isoNeReferenceOverlays: true,
+  syntheticSubstations: false,
+  transmissionStructures: false,
+  syntheticOpgwCables: false,
+  spliceClosures: false,
+  fiberAssignments: false,
+  patchPanels: false,
+  transmissionLines: false,
+  substations: false,
+  telecomNodes: false,
+  selIconNodes: false,
+  c3794Nodes: false,
+  fiberRoutes: false,
+  opgwRoutes: false,
+  distributionFiberRoutes: false,
+  circuitEndpoints: false,
+  workOrderLocations: false,
+  proposedChanges: false,
+  missingLocationAssets: false,
+  planningRegions: false,
+  isoNeReferenceOverlays: false,
+};
+
+const hifldOnlyStreetLayers: Record<StreetMapLayerKey, boolean> = {
+  ...initialStreetLayers,
+  publicTransmissionLines: true,
 };
 
 type MapStatus = "loading" | "active" | "error";
@@ -70,13 +71,12 @@ export function DashboardPage() {
   const pathname = usePathname();
   const [mode, setMode] = useState<DashboardMapMode>("street-level");
   const [transmissionMaps, setTransmissionMaps] = useState(seedTransmissionMaps);
-  const [activeMapId, setActiveMapId] = useState(seedTransmissionMaps[1].id);
+  const [activeMapId, setActiveMapId] = useState(seedTransmissionMaps[0].id);
   const [showMapEditor, setShowMapEditor] = useState(false);
   const [substations, setSubstations] = useState(seedEditableSubstations);
   const [nodes, setNodes] = useState(seedMapNodes);
   const [transmissionLines] = useState(seedTransmissionLines);
   const [planningRegions] = useState(seedPlanningRegions);
-  const [streetLayers, setStreetLayers] = useState(initialStreetLayers);
   const [activeTool, setActiveTool] = useState<MapDrawingTool>("select");
   const [selectedAsset, setSelectedAsset] = useState<StreetMapSelection | null>(null);
   const [draftSubstation, setDraftSubstation] = useState<Substation | null>(null);
@@ -116,56 +116,8 @@ export function DashboardPage() {
           warnings.publicLines = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
           return [] as PublicTransmissionLineFeature[];
         });
-      const synthetic = await fetchGeoJson<SyntheticSubstationCollection>("/data/iso-ne-synthetic-substations.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.syntheticSubstations = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as SyntheticSubstationFeature[];
-        });
-      const structures = await fetchGeoJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.structures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as TransmissionStructureFeature[];
-        });
-      const opgw = await fetchGeoJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.opgw = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as OpgwCableFeature[];
-        });
-      const closures = await fetchGeoJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.spliceClosures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as SpliceClosureFeature[];
-        });
-      const strands = await fetchGeoJson<FiberStrand[]>("/data/iso-ne-synthetic-fiber-strands.json").catch((error) => {
-        warnings.strands = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as FiberStrand[];
-      });
-      const splices = await fetchGeoJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json").catch((error) => {
-        warnings.splices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as FiberSplice[];
-      });
-      const panels = await fetchGeoJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json").catch((error) => {
-        warnings.patchPanels = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as PatchPanel[];
-      });
-      const assignments = await fetchGeoJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json").catch((error) => {
-        warnings.assignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as FiberAssignment[];
-      });
       if (cancelled) return;
       setPublicTransmissionLines(publicLines);
-      setSyntheticSubstations(synthetic);
-      setTransmissionStructures(structures);
-      setOpgwCables(opgw);
-      setSpliceClosures(closures);
-      setFiberStrands(strands);
-      setFiberSplices(splices);
-      setPatchPanels(panels);
-      setFiberAssignments(assignments);
       setMapDataWarnings(warnings);
     }
     void loadStaticMapData();
@@ -174,19 +126,19 @@ export function DashboardPage() {
     };
   }, []);
 
-  const publicOnly = false;
+  const publicOnly = true;
   const visibleTransmissionMaps = useMemo(
-    () => transmissionMaps,
+    () => transmissionMaps.filter((map) => map.mapType === "public_reference" || map.visibility === "public"),
     [transmissionMaps],
   );
   const activeMap = visibleTransmissionMaps.find((map) => map.id === activeMapId) || visibleTransmissionMaps[0] || transmissionMaps[0];
 
   const visibleSubstations = useMemo(
-    () => filterSubstationsForScope(substations, publicOnly),
+    () => publicOnly ? [] : filterSubstationsForScope(substations, publicOnly),
     [publicOnly, substations],
   );
   const visibleNodes = useMemo(
-    () => filterNodesForScope(nodes, publicOnly),
+    () => publicOnly ? [] : filterNodesForScope(nodes, publicOnly),
     [nodes, publicOnly],
   );
   const visibleTransmissionLines = useMemo(
@@ -222,12 +174,12 @@ export function DashboardPage() {
     [fiberAssignments],
   );
   const visiblePlanningRegions = useMemo(
-    () => planningRegions,
-    [planningRegions],
+    () => publicOnly ? [] : planningRegions,
+    [planningRegions, publicOnly],
   );
   const effectiveStreetLayers = useMemo(
-    () => streetLayers,
-    [streetLayers],
+    () => hifldOnlyStreetLayers,
+    [],
   );
 
   const summaryCards = useMemo(
@@ -313,18 +265,6 @@ export function DashboardPage() {
     setAddAssetKind(null);
     setActiveTool("select");
     showToast(`Saved node "${node.name}" with configurable parameters.`);
-  }
-
-  function handleDiagramAnnotation(annotationId: string) {
-    const annotation = isoNeDiagramAnnotations.find((item) => item.id === annotationId);
-    if (!annotation) return;
-    const substation = visibleSubstations.find((item) => item.id === annotation.entityId);
-    const node = visibleNodes.find((item) => item.id === annotation.entityId);
-    const line = visibleTransmissionLines.find((item) => item.id === annotation.entityId);
-    if (substation) focusSelection({ kind: "substation", id: substation.id, label: substation.name, record: substation });
-    else if (node) focusSelection({ kind: "node", id: node.id, label: node.name, record: node });
-    else if (line) focusSelection({ kind: "transmission_line", id: line.id, label: line.name, record: line });
-    else showToast(`Selected public reference annotation "${annotation.label}".`);
   }
 
   function focusSelection(selection: StreetMapSelection) {
@@ -440,11 +380,11 @@ export function DashboardPage() {
       <div className="dashboard-floating-topbar">
         <div className="dashboard-compact-brand">
           <strong>GridAssetLink</strong>
-          <span>ISO New England planning map</span>
+          <span>HIFLD transmission-line map</span>
         </div>
         <label className="dashboard-map-global-search">
           <Search size={16} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search assets, circuits, work orders, substations" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HIFLD transmission lines" />
         </label>
         <div className={`dashboard-map-status-pill ${mapStatus}`}>
           <RadioTower size={15} />
@@ -455,8 +395,6 @@ export function DashboardPage() {
       <div className="dashboard-top-right-toolbar" aria-label="Map toolbar">
         <button type="button" onClick={() => issueMapCommand("resetIsoNe")}><LocateFixed size={15} />Reset to ISO-NE</button>
         <button type="button" onClick={() => issueMapCommand("fitActiveMap")}><Maximize2 size={15} />Fit active map</button>
-        <button type="button" onClick={() => setMode(mode === "iso-ne-diagram" ? "street-level" : "iso-ne-diagram")}><Network size={15} />Open ISO-NE Diagram</button>
-        <button type="button" onClick={() => openEditorDrawer()}><Plus size={15} />Add Asset</button>
       </div>
 
       <aside className={`dashboard-right-floating-drawer ${rightCollapsed ? "collapsed" : ""}`} aria-label="Dashboard details drawer">
@@ -471,10 +409,6 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "filters" ? "active" : ""} onClick={() => setRightMode("filters")}><Filter size={14} />Filters</button>
               <button type="button" className={rightMode === "layers" ? "active" : ""} onClick={() => setRightMode("layers")}><Layers size={14} />Layers</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
-              <button type="button" className={rightMode === "strands" ? "active" : ""} onClick={() => setRightMode("strands")}><TableProperties size={14} />Strands</button>
-              <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
-              <button type="button" className={rightMode === "assignments" ? "active" : ""} onClick={() => setRightMode("assignments")}><Workflow size={14} />Assign</button>
-              <button type="button" className={rightMode === "editor" ? "active" : ""} onClick={() => setRightMode("editor")}><Plus size={14} />Add</button>
             </div>
             <div className="dashboard-drawer-body">
               {rightMode === "modules" ? <ModulesDrawer pathname={pathname} /> : null}
@@ -500,20 +434,8 @@ export function DashboardPage() {
                 <div className="dashboard-drawer-stack">
                   <MapLayerControlPanel
                     layers={effectiveStreetLayers}
-                    activeTool={activeTool}
                     publicLineCount={visiblePublicTransmissionLines.length}
-                    syntheticSubstationCount={visibleSyntheticSubstations.length}
-                    structureCount={visibleTransmissionStructures.length}
-                    opgwCableCount={visibleOpgwCables.length}
-                    spliceClosureCount={visibleSpliceClosures.length}
-                    fiberAssignmentCount={visibleFiberAssignments.length}
-                    patchPanelCount={visiblePatchPanels.length}
                     dataWarnings={mapDataWarnings}
-                    onToggleLayer={(layer) => setStreetLayers((current) => ({ ...current, [layer]: !current[layer] }))}
-                    onToolChange={(tool) => {
-                      setActiveTool(tool);
-                      if (tool !== "place_missing") setPlacementTarget(null);
-                    }}
                   />
                   {effectiveStreetLayers.missingLocationAssets ? (
                     <MissingMapLocationPanel
@@ -562,33 +484,9 @@ export function DashboardPage() {
         ) : null}
       </aside>
 
-      <div className="dashboard-bottom-left-modes">
-        <DashboardMapModeToggle value={mode} onChange={setMode} />
-      </div>
-
-      {mode === "iso-ne-diagram" ? (
-        <div className="dashboard-reference-overlay">
-          <button className="dashboard-reference-close" type="button" onClick={() => setMode("street-level")}><X size={15} /></button>
-          <IsoNeDiagramMap annotations={isoNeDiagramAnnotations} onSelectAnnotation={(annotation) => handleDiagramAnnotation(annotation.id)} />
-        </div>
-      ) : null}
-
-      {mode === "hybrid" ? (
-        <div className="dashboard-mini-reference-card">
-          <IsoNeDiagramMap annotations={isoNeDiagramAnnotations} onSelectAnnotation={(annotation) => handleDiagramAnnotation(annotation.id)} />
-        </div>
-      ) : null}
-
-      <div className="dashboard-active-map-floating">
-        <TransmissionMapSelector maps={visibleTransmissionMaps} activeMapId={activeMap.id} onChange={setActiveMapId} onCreateNew={() => {
-          setShowMapEditor(true);
-          openEditorDrawer();
-        }} />
-      </div>
-
       <div className="dashboard-security-note map-overlay-note">
         <AlertTriangle size={15} />
-        <span>This demo has no user accounts. Use synthetic/demo data only. Do not enter real CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
+        <span>Dashboard map shows public HIFLD transmission-line reference data only. Do not enter or infer CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
       </div>
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
@@ -1107,21 +1005,13 @@ function buildSummaryCards(
   panels: PatchPanel[],
   mapStatus: MapStatus,
 ) {
+  const stateCount = new Set(publicLines.flatMap((line) => line.properties.states)).size;
+  const voltageClassCount = new Set(publicLines.map((line) => line.properties.voltageClass || "unknown")).size;
   return [
-    { label: "Transmission Maps", value: maps.length, note: "public + synthetic", Icon: Network },
-    { label: "Public Lines", value: publicLines.length, note: "read-only HIFLD reference", Icon: Route },
-    { label: "Structures", value: structures.length, note: "synthetic numbered points", Icon: MapPin },
-    { label: "OPGW Cables", value: opgw.length, note: "synthetic dashed routes", Icon: Cable },
-    { label: "Splice Closures", value: closures.length, note: "synthetic OPGW closures", Icon: Cable },
-    { label: "Fiber Assignments", value: assignments.length, note: "synthetic planned services", Icon: Workflow },
-    { label: "Patch Panels", value: panels.length, note: "synthetic terminations", Icon: TableProperties },
-    { label: "Synthetic Substations", value: syntheticSubstations.length, note: "demo planning", Icon: MapPin },
-    { label: "Substations", value: substations.length, note: `${substations.filter((item) => item.latitude === undefined).length} missing location`, Icon: MapPin },
-    { label: "Transmission Lines", value: lines.length, note: "ISO-NE scoped", Icon: Route },
-    { label: "SEL ICON Nodes", value: nodes.filter((node) => node.nodeType === "sel_icon_node").length, note: "parameterized", Icon: Cpu },
-    { label: "Circuit Endpoints", value: nodes.filter((node) => node.nodeType === "circuit_endpoint").length, note: "C37.94/telecom", Icon: Workflow },
-    { label: "Fiber Nodes", value: nodes.filter((node) => node.nodeType === "fiber_node").length, note: "splice/patch context", Icon: Cable },
-    { label: "Demo Overlays", value: nodes.filter((node) => node.visibility === "private").length + substations.filter((item) => item.visibility === "private").length, note: "synthetic editable records", Icon: ShieldCheck },
+    { label: "Transmission Maps", value: maps.length, note: "public HIFLD reference", Icon: Network },
+    { label: "HIFLD Lines", value: publicLines.length, note: "read-only public reference", Icon: Route },
+    { label: "States Covered", value: stateCount, note: "ISO New England states", Icon: MapPin },
+    { label: "Voltage Classes", value: voltageClassCount, note: "HIFLD normalized classes", Icon: Gauge },
     { label: "MapLibre", value: mapStatus === "active" ? "Active" : mapStatus === "error" ? "Error" : "Loading", note: mapStatus === "active" ? "MapLibre active" : mapStatus === "error" ? "clear failure state" : "waiting for load", Icon: RadioTower },
   ];
 }

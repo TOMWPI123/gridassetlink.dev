@@ -301,13 +301,13 @@ export function MapLibreStreetMap({
     <div className="maplibre-street-map" data-testid="street-level-map">
       <div className="maplibre-map-root" ref={containerRef} aria-label={`${activeMap.name} MapLibre street-level planning map`} />
       <div className="maplibre-legend" aria-hidden="true">
-        <span><i className="legend-line" />Public transmission lines</span>
-        <span><i className="legend-opgw" />Synthetic OPGW</span>
-        <span><i className="legend-structure" />Synthetic structures/splices</span>
-        <span><i className="legend-substation" />Synthetic substations</span>
-        <span><i className="legend-substation" />Substations</span>
-        <span><i className="legend-node" />SEL ICON / telecom</span>
-        <span><i className="legend-work-order" />Work orders</span>
+        {layers.publicTransmissionLines ? <span><i className="legend-line" />HIFLD transmission lines</span> : null}
+        {layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW</span> : null}
+        {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
+        {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
+        {layers.substations ? <span><i className="legend-substation" />Substations</span> : null}
+        {layers.selIconNodes || layers.telecomNodes || layers.circuitEndpoints ? <span><i className="legend-node" />SEL ICON / telecom</span> : null}
+        {layers.workOrderLocations ? <span><i className="legend-work-order" />Work orders</span> : null}
       </div>
       {errorMessage ? (
         <div className="maplibre-map-error-state">
