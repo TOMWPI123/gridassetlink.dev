@@ -2,7 +2,7 @@
   "sourceName": "HIFLD Electric Power Transmission Lines",
   "sourceType": "public-reference",
   "sourceUrl": "https://services2.arcgis.com/LYMgRMwHfrWWEg3s/ArcGIS/rest/services/HIFLD_US_Electric_Power_Transmission_Lines/FeatureServer/0",
-  "generatedAt": "2026-06-05T23:45:14.164Z",
+  "generatedAt": "2026-06-06T17:47:47.181Z",
   "featureCount": 2182,
   "statesIncluded": [
     "CT",
@@ -12,5 +12,24 @@
     "VT",
     "ME"
   ],
+  "ownerSummary": {
+    "Unknown public owner": 1674,
+    "Eversource Energy": 281,
+    "Central Maine Power": 121,
+    "Long Island Power Authority": 65,
+    "Vermont Electric Power Company": 39,
+    "Citizens Utilities Company": 1,
+    "Green Mountain Power": 1
+  },
+  "ownerSourceSummary": {
+    "unknown": 1674,
+    "hifld_owner_field": 507,
+    "line_name_owner_token": 1
+  },
+  "ownerConfidenceSummary": {
+    "unknown": 1674,
+    "public_record": 507,
+    "line_name_token": 1
+  },
   "notes": "Public reference data only. Not for operations."
 }

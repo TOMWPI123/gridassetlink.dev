@@ -10,6 +10,7 @@ import { seedMapNodes } from "@/data/nodeParameters";
 import { seedEditableSubstations } from "@/data/substations";
 import { seedPlanningRegions, seedTransmissionLines } from "@/data/transmissionLines";
 import { seedTransmissionMaps } from "@/data/transmissionMaps";
+import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 import { LinkedAssetDetailPanel } from "@/components/map/LinkedAssetDetailPanel";
 import { MapLayerControlPanel } from "@/components/map/MapLayerControlPanel";
 import { MissingMapLocationPanel, type MissingMapLocation } from "@/components/map/MissingMapLocationPanel";
@@ -104,6 +105,7 @@ export function DashboardPage() {
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
   const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => dashboardStreetLayers);
+  const [visibleTransmissionLineOwners, setVisibleTransmissionLineOwners] = useState<Record<string, boolean>>({});
   const [visibleSubstationOwners, setVisibleSubstationOwners] = useState<Record<string, boolean>>({});
   const [publicTransmissionLines, setPublicTransmissionLines] = useState<PublicTransmissionLineFeature[]>([]);
   const [publicSubstations, setPublicSubstations] = useState<PublicSubstationFeature[]>([]);
@@ -194,6 +196,13 @@ export function DashboardPage() {
     () => publicTransmissionLines.filter((feature) => feature.properties.isoNe),
     [publicTransmissionLines],
   );
+  const transmissionLineOwnerCounts = useMemo(
+    () => ownerCountsFor([], visiblePublicTransmissionLines),
+    [visiblePublicTransmissionLines],
+  );
+  useEffect(() => {
+    setVisibleTransmissionLineOwners((current) => mergeVisibleOwnerState(current, transmissionLineOwnerCounts));
+  }, [transmissionLineOwnerCounts]);
   const visiblePublicSubstations = useMemo(
     () => publicSubstations.filter((feature) => feature.properties.isoNe),
     [publicSubstations],
@@ -203,19 +212,7 @@ export function DashboardPage() {
     [visiblePublicSubstations],
   );
   useEffect(() => {
-    setVisibleSubstationOwners((current) => {
-      const activeOwners = new Set(substationOwnerCounts.map(({ owner }) => owner));
-      let changed = false;
-      const next: Record<string, boolean> = {};
-      substationOwnerCounts.forEach(({ owner }) => {
-        next[owner] = current[owner] ?? true;
-        if (!(owner in current)) changed = true;
-      });
-      Object.keys(current).forEach((owner) => {
-        if (!activeOwners.has(owner)) changed = true;
-      });
-      return changed ? next : current;
-    });
+    setVisibleSubstationOwners((current) => mergeVisibleOwnerState(current, substationOwnerCounts));
   }, [substationOwnerCounts]);
   const visibleSyntheticSubstations = useMemo(
     () => syntheticSubstations.filter((feature) => feature.properties.synthetic && feature.properties.public === false),
@@ -246,13 +243,22 @@ export function DashboardPage() {
     [planningRegions, publicOnly],
   );
   const hasSubstationOwnerLayerState = Object.keys(visibleSubstationOwners).length > 0;
+  const hasTransmissionLineOwnerLayerState = Object.keys(visibleTransmissionLineOwners).length > 0;
+  const visibleTransmissionLineOwnerSet = useMemo(
+    () => new Set(Object.entries(visibleTransmissionLineOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
+    [visibleTransmissionLineOwners],
+  );
   const visibleSubstationOwnerSet = useMemo(
     () => new Set(Object.entries(visibleSubstationOwners).filter(([, enabled]) => enabled).map(([owner]) => owner)),
     [visibleSubstationOwners],
   );
   const layerFilteredPublicTransmissionLines = useMemo(
-    () => streetLayers.publicTransmissionLines ? visiblePublicTransmissionLines : [],
-    [streetLayers.publicTransmissionLines, visiblePublicTransmissionLines],
+    () => {
+      if (!streetLayers.publicTransmissionLines) return [];
+      if (!hasTransmissionLineOwnerLayerState) return visiblePublicTransmissionLines;
+      return visiblePublicTransmissionLines.filter((feature) => visibleTransmissionLineOwnerSet.has(publicTransmissionLineOwner(feature.properties)));
+    },
+    [hasTransmissionLineOwnerLayerState, streetLayers.publicTransmissionLines, visiblePublicTransmissionLines, visibleTransmissionLineOwnerSet],
   );
   const layerFilteredPublicSubstations = useMemo(
     () => {
@@ -427,6 +433,20 @@ export function DashboardPage() {
 
   function handleStreetLayerChange(layer: StreetMapLayerKey, enabled: boolean) {
     setStreetLayers((current) => ({ ...current, [layer]: enabled }));
+  }
+
+  function handleTransmissionLineOwnerLayerChange(owner: string, enabled: boolean) {
+    setVisibleTransmissionLineOwners((current) => ({ ...current, [owner]: enabled }));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, publicTransmissionLines: true }));
+    }
+  }
+
+  function handleAllTransmissionLineOwnersChange(enabled: boolean) {
+    setVisibleTransmissionLineOwners(Object.fromEntries(transmissionLineOwnerCounts.map(({ owner }) => [owner, enabled])));
+    if (enabled) {
+      setStreetLayers((current) => ({ ...current, publicTransmissionLines: true }));
+    }
   }
 
   function handleSubstationOwnerLayerChange(owner: string, enabled: boolean) {
@@ -632,15 +652,20 @@ export function DashboardPage() {
                   <MapLayerControlPanel
                     layers={streetLayers}
                     publicLineCount={visiblePublicTransmissionLines.length}
+                    visiblePublicLineCount={layerFilteredPublicTransmissionLines.length}
                     publicSubstationCount={visiblePublicSubstations.length}
                     visiblePublicSubstationCount={layerFilteredPublicSubstations.length}
-                    utilityOwnerCount={substationOwnerCounts.length}
+                    utilityOwnerCount={substationOwnerCounts.length + transmissionLineOwnerCounts.length}
                     structureCount={visibleTransmissionStructures.length}
                     spliceClosureCount={visibleSpliceClosures.length}
                     dataWarnings={mapDataWarnings}
+                    transmissionLineOwnerCounts={transmissionLineOwnerCounts}
+                    visibleTransmissionLineOwners={visibleTransmissionLineOwners}
                     substationOwnerCounts={substationOwnerCounts}
                     visibleSubstationOwners={visibleSubstationOwners}
                     onLayerChange={handleStreetLayerChange}
+                    onTransmissionLineOwnerChange={handleTransmissionLineOwnerLayerChange}
+                    onAllTransmissionLineOwnersChange={handleAllTransmissionLineOwnersChange}
                     onSubstationOwnerChange={handleSubstationOwnerLayerChange}
                     onAllSubstationOwnersChange={handleAllSubstationOwnersChange}
                   />
@@ -1364,7 +1389,7 @@ function selectionVisibility(selection: StreetMapSelection) {
 }
 
 function selectionUtilityOwner(selection: StreetMapSelection) {
-  if (selection.kind === "public_transmission_line") return selection.record.properties.owner || "Unknown public owner";
+  if (selection.kind === "public_transmission_line") return publicTransmissionLineOwner(selection.record.properties);
   if (selection.kind === "public_substation") return selection.record.properties.utilityOwner;
   return "Unknown public owner";
 }
@@ -1379,12 +1404,26 @@ function ownerCountsFor(publicSubstations: PublicSubstationFeature[], publicLine
     counts.set(record.properties.utilityOwner, (counts.get(record.properties.utilityOwner) || 0) + 1);
   });
   publicLines.forEach((record) => {
-    const owner = record.properties.owner || "Unknown public owner";
+    const owner = publicTransmissionLineOwner(record.properties);
     counts.set(owner, (counts.get(owner) || 0) + 1);
   });
   return [...counts.entries()]
     .map(([owner, count]) => ({ owner, count }))
     .sort((a, b) => b.count - a.count || a.owner.localeCompare(b.owner));
+}
+
+function mergeVisibleOwnerState(current: Record<string, boolean>, ownerCounts: Array<{ owner: string; count: number }>) {
+  const activeOwners = new Set(ownerCounts.map(({ owner }) => owner));
+  let changed = false;
+  const next: Record<string, boolean> = {};
+  ownerCounts.forEach(({ owner }) => {
+    next[owner] = current[owner] ?? true;
+    if (!(owner in current)) changed = true;
+  });
+  Object.keys(current).forEach((owner) => {
+    if (!activeOwners.has(owner)) changed = true;
+  });
+  return changed ? next : current;
 }
 
 function formatSelectionKind(kind: StreetMapSelection["kind"]) {
@@ -1394,7 +1433,7 @@ function formatSelectionKind(kind: StreetMapSelection["kind"]) {
 function selectionSearchText(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") {
     const properties = selection.record.properties;
-    return [selection.label, properties.id, properties.name, properties.owner, properties.voltageClass, properties.states.join(" ")].join(" ");
+    return [selection.label, properties.id, properties.name, publicTransmissionLineOwner(properties), properties.rawOwner, properties.ownerSource, properties.voltageClass, properties.states.join(" ")].join(" ");
   }
   if (selection.kind === "public_substation") {
     const properties = selection.record.properties;

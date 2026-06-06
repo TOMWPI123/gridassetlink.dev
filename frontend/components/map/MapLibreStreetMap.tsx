@@ -4,6 +4,7 @@ import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapL
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Coordinate, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
+import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 
 type MapLibreStreetMapProps = {
   activeMap: TransmissionMap;
@@ -740,6 +741,10 @@ function buildDatasets(
         status: feature.properties.status || "unknown",
         voltageKv: feature.properties.voltageKv ?? 0,
         voltageClass: feature.properties.voltageClass || "unknown",
+        utilityOwner: publicTransmissionLineOwner(feature.properties),
+        rawOwner: feature.properties.rawOwner || null,
+        ownerSource: feature.properties.ownerSource || "unknown",
+        ownerConfidence: feature.properties.ownerConfidence || "unknown",
         sourceType: feature.properties.sourceType,
         readOnly: true,
         synthetic: false,

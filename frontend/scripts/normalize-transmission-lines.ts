@@ -1,5 +1,6 @@
 import type { Coordinate, PublicTransmissionLineFeature } from "../lib/types/assets";
 import { getVoltageClass, parseVoltageKv } from "../lib/map/voltage";
+import { resolvePublicTransmissionOwner } from "../lib/map/public-owner";
 import { clipLineStringToIsoNe, flattenLineCoordinates, statesForCoordinates } from "./clip-to-iso-ne";
 
 type ArcGisFeature = {
@@ -26,7 +27,8 @@ export function normalizeTransmissionLineFeature(feature: ArcGisFeature, fallbac
   const voltageKv = parseVoltageKv(firstDefined(rawProperties, ["VOLTAGE", "VOLTAGE_KV", "KV", "MAX_VOLT", "MAXVOLT", "kV"]));
   const sourceId = stringify(firstDefined(rawProperties, ["ID", "OBJECTID", "FID", "GLOBALID", "GlobalID"])) || `HIFLD-ISO-NE-${fallbackIndex + 1}`;
   const name = cleanPublicText(firstDefined(rawProperties, ["NAME", "LINE_NAME", "LINE", "LINENAME", "SUB_1"]));
-  const owner = cleanPublicText(firstDefined(rawProperties, ["OWNER", "OWNER_1", "OWNER_NAME", "COMPANY", "NAICS_DESC"]));
+  const rawOwner = cleanPublicText(firstDefined(rawProperties, ["OWNER", "OWNER_1", "OWNER_NAME", "COMPANY"]));
+  const ownerResolution = resolvePublicTransmissionOwner(rawOwner, name);
   const status = normalizeStatus(firstDefined(rawProperties, ["STATUS", "STATUS_1", "IN_SERVICE"]));
 
   return {
@@ -37,7 +39,11 @@ export function normalizeTransmissionLineFeature(feature: ArcGisFeature, fallbac
       voltageKv,
       voltageClass: getVoltageClass(voltageKv),
       status,
-      owner: owner || null,
+      owner: ownerResolution.owner === "Unknown public owner" ? null : ownerResolution.owner,
+      utilityOwner: ownerResolution.owner,
+      ownerSource: ownerResolution.source,
+      ownerConfidence: ownerResolution.confidence,
+      rawOwner: rawOwner || null,
       source: "HIFLD",
       sourceType: "public-reference",
       readOnly: true,

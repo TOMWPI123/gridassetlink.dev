@@ -102,6 +102,7 @@ Do not enter real CEII, SCADA, relay, protection, telecom, credential, operation
 The website includes a `/data-sources` page and a dashboard Sources drawer tab. Those surfaces document the same source boundary used in this repository:
 
 - HIFLD Electric Power Transmission Lines are used as read-only public reference geometry for ISO New England map context.
+- HIFLD transmission-line owner sublayers use the public HIFLD `OWNER` field when present, then explicit utility owner tokens in public line names; otherwise the line remains in `Unknown public owner`.
 - HIFLD Electric Substations are used as public reference points only when owner/operator can be verified from public source data or close OpenStreetMap `power=substation` owner/operator tag matches.
 - OpenStreetMap data is used for public owner/operator tag enrichment and is attributed to OpenStreetMap contributors under the Open Database License.
 - CARTO basemap tiles are used only as visual map background context.
@@ -158,7 +159,7 @@ TRANSMISSION_LINES_FEATURESERVER_URL=https://example.com/arcgis/rest/services/Tr
 NEXT_PUBLIC_TRANSMISSION_LINES_SOURCE_NAME=HIFLD
 ```
 
-The ingestion script queries public geometry only, requests WGS84 output, filters/clips to Connecticut, Massachusetts, Rhode Island, New Hampshire, Vermont, and Maine, normalizes voltage classes, keeps only map-safe display fields, and writes read-only public reference GeoJSON. If the public service fails, the script writes an empty FeatureCollection plus a metadata warning so the app continues to run.
+The ingestion script queries public geometry only, requests WGS84 output, filters/clips to Connecticut, Massachusetts, Rhode Island, New Hampshire, Vermont, and Maine, normalizes voltage classes and owner buckets, keeps only map-safe display fields, and writes read-only public reference GeoJSON. If the public service fails, the script writes an empty FeatureCollection plus a metadata warning so the app continues to run.
 
 Public substation ingestion uses a public HIFLD Electric Substations FeatureServer plus OpenStreetMap `power=substation` owner/operator tags from Overpass for owner verification. The generated public substation layer includes only records with directly supported public owner/operator evidence; unknown-owner and nearest-line-only inferred records are excluded.
 

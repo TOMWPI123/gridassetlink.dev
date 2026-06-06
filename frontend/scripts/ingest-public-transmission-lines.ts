@@ -22,6 +22,9 @@ type IngestMeta = {
   generatedAt: string;
   featureCount: number;
   statesIncluded: typeof ISO_NE_STATES;
+  ownerSummary: Record<string, number>;
+  ownerSourceSummary: Record<string, number>;
+  ownerConfidenceSummary: Record<string, number>;
   notes: string;
   warning?: string;
 };
@@ -47,6 +50,9 @@ async function main() {
         generatedAt: new Date().toISOString(),
         featureCount: normalized.length,
         statesIncluded: ISO_NE_STATES,
+        ownerSummary: summarizeOwners(normalized),
+        ownerSourceSummary: summarizeOwnerSources(normalized),
+        ownerConfidenceSummary: summarizeOwnerConfidence(normalized),
         notes: PUBLIC_NOTICE,
       },
     );
@@ -61,6 +67,9 @@ async function main() {
         generatedAt: new Date().toISOString(),
         featureCount: 0,
         statesIncluded: ISO_NE_STATES,
+        ownerSummary: {},
+        ownerSourceSummary: {},
+        ownerConfidenceSummary: {},
         notes: PUBLIC_NOTICE,
         warning,
       },
@@ -138,6 +147,37 @@ function normalizeLayerUrl(value: string) {
   const trimmed = value.trim().replace(/\/+$/, "");
   if (/\/FeatureServer$/i.test(trimmed)) return `${trimmed}/0`;
   return trimmed;
+}
+
+function summarizeOwners(features: PublicTransmissionLineCollection["features"]) {
+  const counts: Record<string, number> = {};
+  features.forEach((feature) => {
+    const owner = feature.properties.utilityOwner || feature.properties.owner || "Unknown public owner";
+    counts[owner] = (counts[owner] || 0) + 1;
+  });
+  return sortRecord(counts);
+}
+
+function summarizeOwnerSources(features: PublicTransmissionLineCollection["features"]) {
+  const counts: Record<string, number> = {};
+  features.forEach((feature) => {
+    const source = feature.properties.ownerSource || "unknown";
+    counts[source] = (counts[source] || 0) + 1;
+  });
+  return sortRecord(counts);
+}
+
+function summarizeOwnerConfidence(features: PublicTransmissionLineCollection["features"]) {
+  const counts: Record<string, number> = {};
+  features.forEach((feature) => {
+    const confidence = feature.properties.ownerConfidence || "unknown";
+    counts[confidence] = (counts[confidence] || 0) + 1;
+  });
+  return sortRecord(counts);
+}
+
+function sortRecord(record: Record<string, number>) {
+  return Object.fromEntries(Object.entries(record).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
 }
 
 void main();

@@ -204,6 +204,10 @@ export type PublicTransmissionLineProperties = {
   voltageClass?: TransmissionVoltageClass;
   status?: "existing" | "planned" | "proposed" | "unknown";
   owner?: string | null;
+  utilityOwner?: string | null;
+  ownerSource?: "hifld_owner_field" | "line_name_owner_token" | "unknown";
+  ownerConfidence?: "public_record" | "line_name_token" | "unknown";
+  rawOwner?: string | null;
   source: "HIFLD" | "OpenStreetMap" | "Public GIS";
   sourceType: "public-reference";
   readOnly: true;

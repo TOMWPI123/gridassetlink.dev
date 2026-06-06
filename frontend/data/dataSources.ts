@@ -13,7 +13,7 @@ export const dataSourceRecords: DataSourceRecord[] = [
     category: "Public reference",
     url: "https://www.arcgis.com/home/item.html?id=13b4728b7403404cb72b52b5367a1ad6",
     role: "Public transmission-line geometry used as ISO New England map reference context.",
-    handling: "Imported from a public ArcGIS FeatureServer, converted to WGS84 GeoJSON, clipped to CT, MA, RI, NH, VT, and ME, and rendered read-only. The app does not infer private telecom routes from these lines.",
+    handling: "Imported from a public ArcGIS FeatureServer, converted to WGS84 GeoJSON, clipped to CT, MA, RI, NH, VT, and ME, and rendered read-only. Transmission owner buckets use the public HIFLD OWNER field when present, then explicit utility owner tokens in public line names; otherwise records remain Unknown public owner. The app does not infer private telecom routes from these lines.",
     generatedFiles: [
       "frontend/public/data/iso-ne-public-transmission-lines.geojson",
       "frontend/public/data/iso-ne-public-transmission-lines.meta.json",
