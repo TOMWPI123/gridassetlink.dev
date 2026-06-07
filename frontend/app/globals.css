@@ -1765,20 +1765,24 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 
 .maplibre-legend {
   position: absolute;
-  left: 14px;
+  left: 50%;
   bottom: 14px;
+  transform: translateX(-50%);
   z-index: 3;
   display: grid;
   grid-template-columns: auto;
   gap: 7px;
-  max-width: min(690px, calc(100% - 28px));
+  width: calc(100% - 28px);
+  max-width: min(980px, calc(100% - 28px));
   pointer-events: none;
+  text-align: left;
 }
 
 .maplibre-legend-list {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+  justify-content: flex-start;
 }
 
 .maplibre-legend-title {
@@ -2715,10 +2719,11 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 }
 
 .dashboard-map-page.map-first .maplibre-legend {
-  left: 18px;
-  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 14px;
-  max-width: 560px;
+  width: calc(100% - 24px);
+  max-width: 900px;
 }
 
 .dashboard-map-page.map-first .maplibre-legend span {
