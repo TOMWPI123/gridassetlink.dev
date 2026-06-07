@@ -56,11 +56,29 @@ export function LinkedAssetDetailPanel({ selection, onClose }: LinkedAssetDetail
           <pre>{JSON.stringify(nodeParameters, null, 2)}</pre>
         </details>
       ) : null}
-      {selection.kind === "opgw_cable" ? (
+      {selection.kind === "opgw_cable" || selection.kind === "opgw_route" || selection.kind === "opgw_cable_section" ? (
         <div className="linked-asset-actions">
           <a href={`/fiber-trace?cable=${encodeURIComponent(selection.id)}`}>Open Fiber Trace</a>
           <a href={`/outage-impact?cable=${encodeURIComponent(selection.id)}`}>Open Outage Impact</a>
+          {selection.kind === "opgw_cable_section" ? <button type="button">Add splice point</button> : null}
+          {selection.kind === "opgw_cable_section" ? <button type="button">Split cable section</button> : null}
+          {selection.kind === "opgw_cable_section" ? <button type="button">View strand assignments</button> : null}
           <button type="button">Convert assumption to planned fiber</button>
+          <button type="button">Create work order</button>
+        </div>
+      ) : null}
+      {selection.kind === "opgw_span_segment" ? (
+        <div className="linked-asset-actions">
+          <a href={`/outage-impact?span=${encodeURIComponent(selection.id)}`}>Analyze span outage</a>
+          <button type="button">Create inspection record</button>
+          <button type="button">Create work order</button>
+          <button type="button">Mark issue resolved</button>
+        </div>
+      ) : null}
+      {selection.kind === "opgw_splice_point" ? (
+        <div className="linked-asset-actions">
+          <a href={`/fiber-trace?splicePoint=${encodeURIComponent(selection.id)}`}>Open Fiber Trace</a>
+          <button type="button">Edit splice matrix</button>
           <button type="button">Create work order</button>
         </div>
       ) : null}
@@ -134,6 +152,39 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
       geometryType: selection.record.geometry.type,
     };
   }
+  if (selection.kind === "opgw_route") {
+    return {
+      ...selection.record.properties,
+      drawerTabs: "Summary / Engineering details / Fiber and strand / Work orders / Outage impact / Audit history",
+      conversionWorkflow: "synthetic assumption -> planned OPGW -> designed -> work order -> as-built verified",
+      geometryType: selection.record.geometry.type,
+    } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "opgw_cable_section") {
+    return {
+      ...selection.record.properties,
+      fiberTraceHierarchy: "Patch panel -> cable section -> span segments -> splice point/closure -> next cable section",
+      splitWorkflow: "Add splice point -> preview split -> supersede old section -> create two new sections -> reassign spans -> preserve strand continuity",
+      drawerTabs: "Summary / Engineering details / Fiber and strand / Work orders / Outage impact / Audit history",
+      geometryType: selection.record.geometry.type,
+    } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "opgw_span_segment") {
+    return {
+      ...selection.record.properties,
+      spanRecord: "Structure-to-structure OPGW span segment",
+      drawerTabs: "Summary / Engineering details / Work orders / Outage impact / Audit history",
+      geometryType: selection.record.geometry.type,
+    } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "opgw_splice_point") {
+    return {
+      ...selection.record.properties,
+      strandContinuity: "Continuity is preserved through associated splice closure matrix in the demo workflow.",
+      drawerTabs: "Summary / Engineering details / Fiber and strand / Work orders / Outage impact / Audit history",
+      geometryType: selection.record.geometry.type,
+    } as unknown as Record<string, unknown>;
+  }
   if (selection.kind === "transmission_structure" || selection.kind === "splice_closure") {
     return {
       ...selection.record.properties,
@@ -154,6 +205,10 @@ function detailBadgesForSelection(selection: StreetMapSelection) {
   if (selection.kind === "synthetic_substation") return ["Synthetic", "Demo", "Private"];
   if (selection.kind === "transmission_structure") return ["Synthetic structure", "Demo"];
   if (selection.kind === "opgw_cable") return ["Synthetic OPGW", "Demo"];
+  if (selection.kind === "opgw_route") return ["Synthetic OPGW route", "Demo"];
+  if (selection.kind === "opgw_cable_section") return ["Cable section", "Splice-to-splice"];
+  if (selection.kind === "opgw_span_segment") return ["Span segment", "Structure-to-structure"];
+  if (selection.kind === "opgw_splice_point") return ["Splice point", "Synthetic"];
   if (selection.kind === "splice_closure") return ["Synthetic splice", "Demo"];
   if (selection.kind === "fiber_assignment") return ["Synthetic assignment", "Demo"];
   if (selection.kind === "patch_panel") return ["Synthetic panel", "Demo"];
@@ -168,6 +223,10 @@ function detailNoticeForSelection(selection: StreetMapSelection) {
   if (selection.kind === "synthetic_substation") return "Synthetic demo/planning substation. Not a real utility asset.";
   if (selection.kind === "transmission_structure") return "Synthetic transmission structure point generated from public line geometry. It is not a real pole, tower, or utility structure location.";
   if (selection.kind === "opgw_cable") return "Synthetic planning assumption only. Not active fiber. Requires engineer/as-built verification.";
+  if (selection.kind === "opgw_route") return "Synthetic OPGW route planning assumption only. Public transmission lines are not proof of actual OPGW.";
+  if (selection.kind === "opgw_cable_section") return "Synthetic cable section from splice point to splice point. It is not active fiber unless explicitly imported or marked verified.";
+  if (selection.kind === "opgw_span_segment") return "Synthetic OPGW span segment between adjacent structures. Use for planning inspections, issues, work orders, and outage impact only.";
+  if (selection.kind === "opgw_splice_point") return "Synthetic splice point. Splice points define cable-section boundaries and do not prove real field splices.";
   if (selection.kind === "splice_closure") return "Synthetic splice closure at a synthetic structure point. It is for demo splicing workflows only.";
   if (selection.kind === "fiber_assignment") return "Synthetic fiber assignment for planning demonstration. It is not an actual circuit path.";
   if (selection.kind === "patch_panel") return "Synthetic patch panel and termination ports for demo planning.";

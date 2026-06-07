@@ -46,6 +46,16 @@ export function DataSourcesPage() {
           <h1 className="eyebrowless-title">Data Sources</h1>
           <div className="subtle">Public references, OpenStreetMap attribution, and synthetic planning-data boundaries</div>
         </div>
+        <div className="toolbar">
+          <button className="button" type="button" onClick={() => openDemoSafetyModal("disclaimer")}>
+            <Shield size={16} />
+            Demo Disclaimer
+          </button>
+          <button className="button primary" type="button" onClick={() => openDemoSafetyModal("sources")}>
+            <TableProperties size={16} />
+            Open Sources Modal
+          </button>
+        </div>
       </div>
       <div className="panel">
         <div className="panel-header">
@@ -74,6 +84,12 @@ export function DataSourcesPage() {
             <div className="panel-body">
               <p>{source.role}</p>
               <div className="subtle">{source.handling}</div>
+              <dl className="data-source-page-meta">
+                <div><dt>Source ID</dt><dd>{source.id}</dd></div>
+                <div><dt>Dataset type</dt><dd>{source.type}</dd></div>
+                <div><dt>Last reviewed</dt><dd>{source.lastReviewed}</dd></div>
+                <div><dt>Notes</dt><dd>{source.notes}</dd></div>
+              </dl>
               {source.generatedFiles?.length ? (
                 <div className="data-source-files">
                   {source.generatedFiles.map((file) => <code key={file}>{file}</code>)}
@@ -85,6 +101,10 @@ export function DataSourcesPage() {
       </div>
     </>
   );
+}
+
+function openDemoSafetyModal(view: "disclaimer" | "sources") {
+  window.dispatchEvent(new Event(view === "sources" ? "gridassetlink:open-data-sources" : "gridassetlink:open-demo-disclaimer"));
 }
 
 export function AdminSettingsPage() {

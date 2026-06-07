@@ -2,7 +2,7 @@
 
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 
@@ -18,6 +18,10 @@ type MapLibreStreetMapProps = {
   syntheticSubstations: SyntheticSubstationFeature[];
   transmissionStructures: TransmissionStructureFeature[];
   opgwCables: OpgwCableFeature[];
+  opgwRoutes: OpgwRouteFeature[];
+  opgwCableSections: OpgwCableSectionFeature[];
+  opgwSpanSegments: OpgwSpanSegmentFeature[];
+  opgwSplicePoints: OpgwSplicePointFeature[];
   spliceClosures: SpliceClosureFeature[];
   fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
@@ -57,6 +61,10 @@ const sourceIds = {
   fccMicrowaveLinks: "fcc-utility-microwave-links",
   structures: "synthetic-transmission-structures",
   opgwCables: "synthetic-opgw-cables",
+  opgwRoutes: "synthetic-opgw-routes",
+  opgwCableSections: "synthetic-opgw-cable-sections",
+  opgwSpanSegments: "synthetic-opgw-span-segments",
+  opgwSplicePoints: "synthetic-opgw-splice-points",
   spliceClosures: "synthetic-splice-closures",
   fiberAssignments: "synthetic-fiber-assignments",
   patchPanels: "synthetic-patch-panels",
@@ -73,6 +81,10 @@ const clickableLayerIds = [
   "public-substations",
   "fcc-utility-microwave-links",
   "fcc-utility-towers",
+  "synthetic-opgw-routes",
+  "synthetic-opgw-cable-sections",
+  "synthetic-opgw-span-segments",
+  "synthetic-opgw-splice-points",
   "synthetic-opgw-cables",
   "synthetic-opgw-capacity",
   "synthetic-opgw-outage-impact",
@@ -119,6 +131,10 @@ export function MapLibreStreetMap({
   syntheticSubstations,
   transmissionStructures,
   opgwCables,
+  opgwRoutes,
+  opgwCableSections,
+  opgwSpanSegments,
+  opgwSplicePoints,
   spliceClosures,
   fiberStrands,
   fiberAssignments,
@@ -145,12 +161,12 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberStrands, fiberAssignments, patchPanels, planningRegions, layers),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberStrands, fiberAssignments, patchPanels, planningRegions, layers],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberStrands, fiberAssignments, patchPanels, planningRegions, layers),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberStrands, fiberAssignments, patchPanels, planningRegions, layers],
   );
   const lookup = useMemo(
-    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions],
+    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, patchPanels, planningRegions),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, patchPanels, planningRegions],
   );
 
   useEffect(() => {
@@ -255,6 +271,10 @@ export function MapLibreStreetMap({
     updateSource(mapRef.current, sourceIds.fccUtilityTowers, datasets.fccUtilityTowers);
     updateSource(mapRef.current, sourceIds.structures, datasets.structures);
     updateSource(mapRef.current, sourceIds.opgwCables, datasets.opgwCables);
+    updateSource(mapRef.current, sourceIds.opgwRoutes, datasets.opgwRoutes);
+    updateSource(mapRef.current, sourceIds.opgwCableSections, datasets.opgwCableSections);
+    updateSource(mapRef.current, sourceIds.opgwSpanSegments, datasets.opgwSpanSegments);
+    updateSource(mapRef.current, sourceIds.opgwSplicePoints, datasets.opgwSplicePoints);
     updateSource(mapRef.current, sourceIds.spliceClosures, datasets.spliceClosures);
     updateSource(mapRef.current, sourceIds.fiberAssignments, datasets.fiberAssignments);
     updateSource(mapRef.current, sourceIds.patchPanels, datasets.patchPanels);
@@ -325,7 +345,9 @@ export function MapLibreStreetMap({
         {layers.publicSubstations ? <span><i className="legend-substation" />Public substations by owner</span> : null}
         {layers.fccUtilityTowers ? <span><i className="legend-node" />FCC utility towers</span> : null}
         {layers.fccMicrowaveLinks ? <span><i className="legend-line" />FCC microwave links</span> : null}
-        {layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW planning</span> : null}
+        {layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.opgwCableSections || layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW planning</span> : null}
+        {layers.opgwSpanSegments ? <span><i className="legend-opgw-span" />OPGW spans</span> : null}
+        {layers.opgwSplicePoints ? <span><i className="legend-splice-point" />Splice points</span> : null}
         {layers.availableStrandCapacity ? <span><i className="legend-opgw-capacity" />Available strands</span> : null}
         {layers.criticalRidingCircuits ? <span><i className="legend-critical-route" />Critical riding circuits</span> : null}
         {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
@@ -351,8 +373,11 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
   map.addSource(sourceIds.publicLines, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.fccMicrowaveLinks, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.opgwCables, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  map.addSource(sourceIds.opgwRoutes, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  map.addSource(sourceIds.opgwCableSections, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  map.addSource(sourceIds.opgwSpanSegments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.fiberAssignments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
-  [sourceIds.publicSubstations, sourceIds.fccUtilityTowers, sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.structures, sourceIds.spliceClosures, sourceIds.patchPanels, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
+  [sourceIds.publicSubstations, sourceIds.fccUtilityTowers, sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.structures, sourceIds.opgwSplicePoints, sourceIds.spliceClosures, sourceIds.patchPanels, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
     map.addSource(sourceId, {
       type: "geojson",
       data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0],
@@ -481,6 +506,71 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     minzoom: 10,
     layout: { "text-field": ["get", "callSign"], "text-size": 10, "text-offset": [0, 1.1], "text-anchor": "top" },
     paint: { "text-color": "#fff4d6", "text-halo-color": "#061012", "text-halo-width": 1.45 },
+  });
+  map.addLayer({
+    id: "synthetic-opgw-routes",
+    type: "line",
+    source: sourceIds.opgwRoutes,
+    paint: {
+      "line-color": opgwStatusColorExpression() as never,
+      "line-width": ["+", opgwFiberCountWidthExpression() as never, 1],
+      "line-opacity": 0.44,
+      "line-dasharray": opgwStatusDashExpression() as never,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-opgw-cable-sections-casing",
+    type: "line",
+    source: sourceIds.opgwCableSections,
+    paint: {
+      "line-color": "#041012",
+      "line-width": ["+", opgwFiberCountWidthExpression() as never, 3.2],
+      "line-opacity": 0.7,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-opgw-cable-sections",
+    type: "line",
+    source: sourceIds.opgwCableSections,
+    paint: {
+      "line-color": opgwCableSectionColorExpression() as never,
+      "line-width": opgwFiberCountWidthExpression() as never,
+      "line-opacity": 0.95,
+      "line-dasharray": opgwCableSectionDashExpression() as never,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-opgw-span-segments",
+    type: "line",
+    source: sourceIds.opgwSpanSegments,
+    paint: {
+      "line-color": opgwSpanStatusColorExpression() as never,
+      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 1.4, 10, 3.5, 13, 5.2],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.18, 9, 0.72, 13, 0.96],
+      "line-dasharray": ["literal", [1.1, 0.45]],
+    },
+  });
+  addClusterLayers(map, sourceIds.opgwSplicePoints, "synthetic-opgw-splice-points", "#7c7cff", "splice point");
+  map.addLayer({
+    id: "synthetic-opgw-splice-points",
+    type: "circle",
+    source: sourceIds.opgwSplicePoints,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": ["match", ["get", "spliceType"], "substation_deadend", 7.6, "tap", 6.8, 5.8],
+      "circle-color": ["match", ["get", "spliceType"], "substation_deadend", "#2f8cff", "tap", "#f5a524", "#9b7cff"],
+      "circle-stroke-color": "#f7f3ff",
+      "circle-stroke-width": 1.4,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-opgw-splice-point-labels",
+    type: "symbol",
+    source: sourceIds.opgwSplicePoints,
+    filter: ["!", ["has", "point_count"]],
+    minzoom: 10.8,
+    layout: { "text-field": ["get", "structureNumber"], "text-size": 9, "text-offset": [0, 1.05], "text-anchor": "top" },
+    paint: { "text-color": "#f2efff", "text-halo-color": "#061012", "text-halo-width": 1.2 },
   });
   map.addLayer({
     id: "synthetic-opgw-cables-casing",
@@ -805,6 +895,50 @@ function opgwFiberCountWidthExpression() {
   ];
 }
 
+function opgwCableSectionColorExpression() {
+  return [
+    "match",
+    ["get", "installStatus"],
+    "assumed", "#7c7cff",
+    "proposed", "#f5a524",
+    "planned", "#2f8cff",
+    "installed_synthetic", "#28e6c0",
+    "verified", "#28c76f",
+    "faulted", "#ff4d4f",
+    "retired", "#8f9aa0",
+    "superseded", "#8f9aa0",
+    "#8fd8ff",
+  ];
+}
+
+function opgwCableSectionDashExpression() {
+  return [
+    "match",
+    ["get", "installStatus"],
+    "assumed", ["literal", [1.6, 1.2]],
+    "proposed", ["literal", [1.1, 0.95]],
+    "faulted", ["literal", [1, 0.85]],
+    "retired", ["literal", [2, 1.3]],
+    "superseded", ["literal", [2, 1.3]],
+    ["literal", [1, 0]],
+  ];
+}
+
+function opgwSpanStatusColorExpression() {
+  return [
+    "match",
+    ["get", "spanStatus"],
+    "normal", "#bff7ff",
+    "inspection_due", "#f5a524",
+    "issue_found", "#ff7b43",
+    "work_order_open", "#efc95f",
+    "faulted", "#ff4d4f",
+    "resolved", "#6ee7b7",
+    "retired", "#8f9aa0",
+    "#bff7ff",
+  ];
+}
+
 function publicSubstationOwnerColorExpression() {
   return [
     "match",
@@ -877,12 +1011,16 @@ type OpgwPlanningStatus =
   | "public_reference_line"
   | "synthetic_assumption"
   | "engineer_reviewed"
+  | "proposed"
   | "planned"
   | "design"
   | "work_order_issued"
   | "in_service_synthetic"
   | "as_built_verified"
-  | "retired";
+  | "retired"
+  | "faulted"
+  | "abandoned"
+  | "superseded";
 
 type CableStrandStats = {
   total: number;
@@ -911,7 +1049,7 @@ function isAssumedOpgwStatus(status: OpgwPlanningStatus) {
 }
 
 function isPlannedOpgwStatus(status: OpgwPlanningStatus) {
-  return status === "planned" || status === "design" || status === "work_order_issued" || status === "in_service_synthetic";
+  return status === "proposed" || status === "planned" || status === "design" || status === "work_order_issued" || status === "in_service_synthetic";
 }
 
 function isVerifiedOpgwStatus(status: OpgwPlanningStatus) {
@@ -1017,6 +1155,10 @@ function buildDatasets(
   syntheticSubstations: SyntheticSubstationFeature[],
   transmissionStructures: TransmissionStructureFeature[],
   opgwCables: OpgwCableFeature[],
+  opgwRoutes: OpgwRouteFeature[],
+  opgwCableSections: OpgwCableSectionFeature[],
+  opgwSpanSegments: OpgwSpanSegmentFeature[],
+  opgwSplicePoints: OpgwSplicePointFeature[],
   spliceClosures: SpliceClosureFeature[],
   fiberStrands: FiberStrand[],
   fiberAssignments: FiberAssignment[],
@@ -1167,6 +1309,118 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
+    opgwRoutes: layers.assumedOpgwRoutes || layers.opgwRoutes || layers.opgwOutageImpact ? collection(opgwRoutes.flatMap((feature) => {
+      const visible =
+        (layers.assumedOpgwRoutes && isAssumedOpgwStatus(feature.properties.routeStatus))
+        || (layers.plannedOpgwFiber && isPlannedOpgwStatus(feature.properties.routeStatus))
+        || (layers.verifiedOpgwFiber && isVerifiedOpgwStatus(feature.properties.routeStatus))
+        || layers.opgwRoutes
+        || (layers.opgwOutageImpact && feature.properties.outageImpactCount > 0);
+      if (!visible) return [];
+      return [{
+        type: "Feature" as const,
+        properties: {
+          kind: "opgw_route",
+          id: feature.properties.opgwRouteId,
+          label: feature.properties.routeName,
+          status: feature.properties.routeStatus,
+          opgwStatus: feature.properties.routeStatus,
+          transmissionLineId: feature.properties.transmissionLineId,
+          routeMiles: feature.properties.routeMiles,
+          fiberCount: feature.properties.totalFiberCount,
+          totalStructures: feature.properties.totalStructures,
+          totalSpans: feature.properties.totalSpans,
+          totalCableSections: feature.properties.totalCableSections,
+          totalSplicePoints: feature.properties.totalSplicePoints,
+          availableStrands: feature.properties.availableStrands,
+          assignedStrands: feature.properties.assignedStrands,
+          criticalCircuits: feature.properties.criticalRidingCircuits,
+          synthetic: true,
+          warning: feature.properties.warning,
+        },
+        geometry: feature.geometry,
+      }];
+    })) : emptyCollection,
+    opgwCableSections: layers.opgwCableSections || layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.availableStrandCapacity || layers.opgwOutageImpact ? collection(opgwCableSections.flatMap((feature) => {
+      const statusVisible =
+        layers.opgwCableSections
+        || (layers.assumedOpgwRoutes && feature.properties.installStatus === "assumed")
+        || (layers.plannedOpgwFiber && ["proposed", "planned", "installed_synthetic"].includes(feature.properties.installStatus))
+        || (layers.verifiedOpgwFiber && feature.properties.installStatus === "verified")
+        || (layers.availableStrandCapacity && feature.properties.availableStrands <= 12)
+        || (layers.opgwOutageImpact && feature.properties.assignedServices > 0 && feature.properties.availableStrands <= 12);
+      if (!statusVisible) return [];
+      return [{
+        type: "Feature" as const,
+        properties: {
+          kind: "opgw_cable_section",
+          id: feature.properties.cableSectionId,
+          label: feature.properties.cableSectionId,
+          status: feature.properties.installStatus,
+          installStatus: feature.properties.installStatus,
+          opgwRouteId: feature.properties.opgwRouteId,
+          transmissionLineId: feature.properties.transmissionLineId,
+          fromSplicePointId: feature.properties.fromSplicePointId,
+          toSplicePointId: feature.properties.toSplicePointId,
+          fromStructureNumber: feature.properties.fromStructureNumber,
+          toStructureNumber: feature.properties.toStructureNumber,
+          routeMiles: feature.properties.routeMiles,
+          totalSpans: feature.properties.totalSpans,
+          fiberCount: feature.properties.fiberCount,
+          availableStrands: feature.properties.availableStrands,
+          assignedStrands: feature.properties.assignedStrands,
+          reservedStrands: feature.properties.reservedStrands,
+          assignedServices: feature.properties.assignedServices,
+          synthetic: true,
+          warning: feature.properties.warning,
+        },
+        geometry: feature.geometry,
+      }];
+    })) : emptyCollection,
+    opgwSpanSegments: layers.opgwSpanSegments || layers.opgwOpenWorkOrders || layers.opgwSpanInspectionIssues || layers.opgwOutageImpact ? collection(opgwSpanSegments.flatMap((feature) => {
+      const visible =
+        layers.opgwSpanSegments
+        || (layers.opgwOpenWorkOrders && feature.properties.openWorkOrderCount > 0)
+        || (layers.opgwSpanInspectionIssues && feature.properties.hasMidspanIssue)
+        || (layers.opgwOutageImpact && feature.properties.outageRiskScore >= 70);
+      if (!visible) return [];
+      return [{
+        type: "Feature" as const,
+        properties: {
+          kind: "opgw_span_segment",
+          id: feature.properties.spanSegmentId,
+          label: `${feature.properties.fromStructureNumber} to ${feature.properties.toStructureNumber}`,
+          status: feature.properties.spanStatus,
+          spanStatus: feature.properties.spanStatus,
+          cableSectionId: feature.properties.cableSectionId,
+          opgwRouteId: feature.properties.opgwRouteId,
+          transmissionLineId: feature.properties.transmissionLineId,
+          spanLengthFt: feature.properties.spanLengthFt,
+          fiberCount: feature.properties.fiberCount,
+          inspectionStatus: feature.properties.inspectionStatus,
+          outageRiskScore: feature.properties.outageRiskScore,
+          openWorkOrderCount: feature.properties.openWorkOrderCount,
+          hasMidspanIssue: feature.properties.hasMidspanIssue,
+          synthetic: true,
+        },
+        geometry: feature.geometry,
+      }];
+    })) : emptyCollection,
+    opgwSplicePoints: layers.opgwSplicePoints ? collection(opgwSplicePoints.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "opgw_splice_point",
+        id: feature.properties.splicePointId,
+        label: feature.properties.splicePointId,
+        status: feature.properties.status,
+        spliceType: feature.properties.spliceType,
+        structureNumber: feature.properties.structureNumber,
+        closureId: feature.properties.closureId || null,
+        associatedCableSections: feature.properties.associatedCableSectionIds.length,
+        synthetic: true,
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
     opgwCables: collection(opgwCables.flatMap((feature) => {
       const status = opgwPlanningStatus(feature);
       const confidenceLevel = opgwConfidenceLevel(feature);
@@ -1177,7 +1431,7 @@ function buildDatasets(
       const hasOutageImpact = assignmentStats.criticalCircuits > 0 && (confidenceLevel === "low" || strandStats.available <= Math.max(2, Math.floor(feature.properties.fiberCount * 0.12)));
       const routeLayerVisible =
         layers.syntheticOpgwCables
-        || (layers.assumedOpgwRoutes && isAssumedOpgwStatus(status))
+        || (layers.assumedOpgwRoutes && isAssumedOpgwStatus(status) && !layers.opgwRoutes)
         || (layers.plannedOpgwFiber && isPlannedOpgwStatus(status))
         || (layers.verifiedOpgwFiber && isVerifiedOpgwStatus(status));
       const capacityLayerVisible = layers.availableStrandCapacity;
@@ -1350,6 +1604,10 @@ function buildSelectionLookup(
   syntheticSubstations: SyntheticSubstationFeature[],
   transmissionStructures: TransmissionStructureFeature[],
   opgwCables: OpgwCableFeature[],
+  opgwRoutes: OpgwRouteFeature[],
+  opgwCableSections: OpgwCableSectionFeature[],
+  opgwSpanSegments: OpgwSpanSegmentFeature[],
+  opgwSplicePoints: OpgwSplicePointFeature[],
   spliceClosures: SpliceClosureFeature[],
   fiberAssignments: FiberAssignment[],
   patchPanels: PatchPanel[],
@@ -1424,6 +1682,38 @@ function buildSelectionLookup(
       record,
     };
   });
+  opgwRoutes.forEach((record) => {
+    lookup[`opgw_route:${record.properties.opgwRouteId}`] = {
+      kind: "opgw_route",
+      id: record.properties.opgwRouteId,
+      label: record.properties.routeName,
+      record,
+    };
+  });
+  opgwCableSections.forEach((record) => {
+    lookup[`opgw_cable_section:${record.properties.cableSectionId}`] = {
+      kind: "opgw_cable_section",
+      id: record.properties.cableSectionId,
+      label: record.properties.cableSectionId,
+      record,
+    };
+  });
+  opgwSpanSegments.forEach((record) => {
+    lookup[`opgw_span_segment:${record.properties.spanSegmentId}`] = {
+      kind: "opgw_span_segment",
+      id: record.properties.spanSegmentId,
+      label: `${record.properties.fromStructureNumber} to ${record.properties.toStructureNumber}`,
+      record,
+    };
+  });
+  opgwSplicePoints.forEach((record) => {
+    lookup[`opgw_splice_point:${record.properties.splicePointId}`] = {
+      kind: "opgw_splice_point",
+      id: record.properties.splicePointId,
+      label: record.properties.splicePointId,
+      record,
+    };
+  });
   spliceClosures.forEach((record) => {
     lookup[`splice_closure:${record.properties.id}`] = {
       kind: "splice_closure",
@@ -1488,6 +1778,10 @@ function selectionCoordinates(selection: StreetMapSelection): Coordinate[] {
   if (selection.kind === "synthetic_substation") return [selection.record.geometry.coordinates];
   if (selection.kind === "transmission_structure") return [selection.record.geometry.coordinates];
   if (selection.kind === "opgw_cable") return selection.record.geometry.type === "LineString" ? selection.record.geometry.coordinates : selection.record.geometry.coordinates.flat();
+  if (selection.kind === "opgw_route") return selection.record.geometry.type === "LineString" ? selection.record.geometry.coordinates : selection.record.geometry.coordinates.flat();
+  if (selection.kind === "opgw_cable_section") return selection.record.geometry.coordinates;
+  if (selection.kind === "opgw_span_segment") return selection.record.geometry.coordinates;
+  if (selection.kind === "opgw_splice_point") return [selection.record.geometry.coordinates];
   if (selection.kind === "splice_closure") return [selection.record.geometry.coordinates];
   if (selection.kind === "planning_region") return selection.record.geometry.coordinates[0];
   if ("latitude" in selection.record && selection.record.latitude !== undefined && selection.record.longitude !== undefined) {

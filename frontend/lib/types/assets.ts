@@ -489,6 +489,168 @@ export type OpgwCableCollection = {
   features: OpgwCableFeature[];
 };
 
+export type OpgwWorkflowStatus =
+  | "synthetic_assumption"
+  | "engineer_reviewed"
+  | "proposed"
+  | "planned"
+  | "design"
+  | "work_order_issued"
+  | "in_service_synthetic"
+  | "as_built_verified"
+  | "retired"
+  | "faulted"
+  | "abandoned"
+  | "superseded";
+
+export type OpgwCableSectionStatus =
+  | "assumed"
+  | "proposed"
+  | "planned"
+  | "installed_synthetic"
+  | "verified"
+  | "faulted"
+  | "retired"
+  | "superseded";
+
+export type OpgwSpanSegmentStatus =
+  | "normal"
+  | "inspection_due"
+  | "issue_found"
+  | "work_order_open"
+  | "faulted"
+  | "resolved"
+  | "retired";
+
+export type OpgwRouteRecord = {
+  opgwRouteId: string;
+  transmissionLineId: string;
+  routeName: string;
+  fromSubstationId?: string;
+  toSubstationId?: string;
+  fromStructureId: string;
+  toStructureId: string;
+  voltageClass?: string;
+  routeStatus: OpgwWorkflowStatus;
+  sourceType: "synthetic-demo";
+  syntheticConfidence: "low" | "medium" | "high" | "user_verified";
+  routeMiles: number;
+  totalStructures: number;
+  totalSpans: number;
+  totalCableSections: number;
+  totalSplicePoints: number;
+  totalFiberCount: number;
+  availableStrands: number;
+  assignedStrands: number;
+  reservedStrands: number;
+  criticalRidingCircuits: number;
+  openWorkOrders: number;
+  outageImpactCount: number;
+  synthetic: true;
+  warning: string;
+  notes?: string;
+};
+
+export type OpgwRouteFeature = {
+  type: "Feature";
+  properties: OpgwRouteRecord;
+  geometry:
+    | { type: "LineString"; coordinates: Coordinate[] }
+    | { type: "MultiLineString"; coordinates: Coordinate[][] };
+};
+
+export type OpgwCableSectionRecord = {
+  cableSectionId: string;
+  opgwRouteId: string;
+  transmissionLineId: string;
+  fromSplicePointId: string;
+  toSplicePointId: string;
+  fromStructureId: string;
+  toStructureId: string;
+  fromStructureNumber: string;
+  toStructureNumber: string;
+  fromSubstationId?: string;
+  toSubstationId?: string;
+  fiberCount: 24 | 48 | 72 | 96 | 144;
+  cableType: "OPGW";
+  manufacturer?: string;
+  installStatus: OpgwCableSectionStatus;
+  syntheticConfidence: "low" | "medium" | "high" | "user_verified";
+  installYear?: number;
+  routeMiles: number;
+  totalSpans: number;
+  strandCount: number;
+  availableStrands: number;
+  assignedStrands: number;
+  reservedStrands: number;
+  assignedServices: number;
+  associatedSpliceClosureIds: string[];
+  associatedPatchPanelIds: string[];
+  retiredOrSupersededBy?: string;
+  auditStatus: "current" | "superseded_demo" | "verified_import";
+  synthetic: true;
+  warning: string;
+  notes?: string;
+};
+
+export type OpgwCableSectionFeature = {
+  type: "Feature";
+  properties: OpgwCableSectionRecord;
+  geometry: { type: "LineString"; coordinates: Coordinate[] };
+};
+
+export type OpgwSpanSegmentRecord = {
+  spanSegmentId: string;
+  cableSectionId: string;
+  opgwRouteId: string;
+  transmissionLineId: string;
+  fromStructureId: string;
+  toStructureId: string;
+  fromStructureNumber: string;
+  toStructureNumber: string;
+  spanLengthFt: number;
+  fiberCount: 24 | 48 | 72 | 96 | 144;
+  cableStatus: OpgwCableSectionStatus;
+  spanStatus: OpgwSpanSegmentStatus;
+  hasMidspanIssue: boolean;
+  sagClearanceNote?: string;
+  inspectionStatus: "not_started" | "inspection_due" | "passed" | "issue_found" | "resolved";
+  outageRiskScore: number;
+  openWorkOrderCount: number;
+  synthetic: true;
+  notes?: string;
+};
+
+export type OpgwSpanSegmentFeature = {
+  type: "Feature";
+  properties: OpgwSpanSegmentRecord;
+  geometry: { type: "LineString"; coordinates: Coordinate[] };
+};
+
+export type OpgwSplicePointRecord = {
+  splicePointId: string;
+  opgwRouteId: string;
+  transmissionLineId: string;
+  structureId: string;
+  structureNumber: string;
+  substationId?: string;
+  spliceType: "substation_deadend" | "line_splice" | "junction" | "tap" | "transition" | "termination";
+  closureId?: string;
+  associatedCableSectionIds: string[];
+  latitude: number;
+  longitude: number;
+  status: "synthetic_assumption" | "planned" | "verified" | "retired";
+  syntheticConfidence: "low" | "medium" | "high" | "user_verified";
+  synthetic: true;
+  notes?: string;
+};
+
+export type OpgwSplicePointFeature = {
+  type: "Feature";
+  properties: OpgwSplicePointRecord;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
 export type FiberStrand = {
   id: string;
   cableId: string;
@@ -720,12 +882,18 @@ export type StreetMapLayerKey =
   | "assumedOpgwRoutes"
   | "plannedOpgwFiber"
   | "verifiedOpgwFiber"
+  | "opgwCableSections"
+  | "opgwSpanSegments"
+  | "opgwSplicePoints"
+  | "fiberStrandsLayer"
   | "spliceClosures"
   | "fiberAssignments"
   | "patchPanels"
   | "availableStrandCapacity"
   | "criticalRidingCircuits"
   | "opgwOutageImpact"
+  | "opgwOpenWorkOrders"
+  | "opgwSpanInspectionIssues"
   | "transmissionLines"
   | "substations"
   | "telecomNodes"

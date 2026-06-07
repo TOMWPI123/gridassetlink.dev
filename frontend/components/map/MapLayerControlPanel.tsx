@@ -21,10 +21,15 @@ type MapLayerControlPanelProps = {
   assumedOpgwRouteCount?: number;
   plannedOpgwRouteCount?: number;
   verifiedOpgwRouteCount?: number;
+  opgwCableSectionCount?: number;
+  opgwSpanSegmentCount?: number;
+  opgwSplicePointCount?: number;
   patchPanelCount?: number;
   availableStrandCount?: number;
   criticalRidingCircuitCount?: number;
   outageImpactCount?: number;
+  openOpgwWorkOrderCount?: number;
+  spanInspectionIssueCount?: number;
   dataWarnings?: Record<string, string>;
   transmissionLineOwnerCounts?: Array<{ owner: string; count: number }>;
   visibleTransmissionLineOwners?: Record<string, boolean>;
@@ -58,15 +63,24 @@ const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; ba
 ];
 
 const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges: string[] }> = [
-  { key: "publicTransmissionLines", label: "Transmission Lines", note: "Public HIFLD reference corridors only; not proof of OPGW.", badges: ["Public", "Read-only"] },
-  { key: "assumedOpgwRoutes", label: "Assumed OPGW Routes", note: "Synthetic assumptions generated from transmission corridors.", badges: ["Synthetic", "Assumed"] },
-  { key: "plannedOpgwFiber", label: "Planned OPGW Fiber", note: "Synthetic planned/design/work-order route states.", badges: ["Synthetic", "Planning"] },
-  { key: "verifiedOpgwFiber", label: "Verified OPGW Fiber", note: "Only routes explicitly marked as as-built verified.", badges: ["Verified only"] },
+  { key: "publicTransmissionLines", label: "Public Transmission Lines", note: "Public HIFLD reference corridors only; not proof of OPGW.", badges: ["Public", "Read-only"] },
+  { key: "publicSubstations", label: "Verified-Owner Substations", note: "Public substation points with verified open-source owner buckets.", badges: ["Public"] },
+  { key: "transmissionStructures", label: "Transmission Structures", note: "Synthetic structure points used to define OPGW spans.", badges: ["Synthetic", "Structures"] },
+  { key: "assumedOpgwRoutes", label: "Synthetic OPGW Assumptions", note: "Synthetic assumptions generated from transmission corridors.", badges: ["Synthetic", "Assumed"] },
+  { key: "opgwRoutes", label: "OPGW Routes", note: "High-level OPGW route records associated with transmission corridors.", badges: ["Route"] },
+  { key: "opgwCableSections", label: "Planned OPGW Cable Sections", note: "Continuous cable sections from splice point to splice point.", badges: ["Cable sections"] },
+  { key: "verifiedOpgwFiber", label: "Verified OPGW Cable Sections", note: "Only sections explicitly marked as as-built verified.", badges: ["Verified only"] },
+  { key: "opgwSpanSegments", label: "OPGW Span Segments", note: "Structure-to-structure span segments linked to parent cable sections.", badges: ["Spans"] },
+  { key: "opgwSplicePoints", label: "Splice Points", note: "Synthetic splice, transition, tap, and substation termination points.", badges: ["Splice points"] },
   { key: "spliceClosures", label: "Splice Closures", note: "Synthetic closures at terminal and junction structures.", badges: ["Synthetic", "Splices"] },
   { key: "patchPanels", label: "Patch Panels", note: "Synthetic termination panels at structures and nodes.", badges: ["Synthetic", "Panels"] },
-  { key: "availableStrandCapacity", label: "Available Strand Capacity", note: "Capacity coloring from synthetic strand records.", badges: ["Strands"] },
+  { key: "fiberStrandsLayer", label: "Fiber Strands", note: "Strand records belong to cable sections in this engineering view.", badges: ["Strands"] },
+  { key: "fiberAssignments", label: "Fiber Assignments", note: "Synthetic service assignments on OPGW cable sections.", badges: ["Assignments"] },
+  { key: "availableStrandCapacity", label: "Available Strand Capacity", note: "Capacity coloring from synthetic strand records.", badges: ["Capacity"] },
   { key: "criticalRidingCircuits", label: "Critical Riding Circuits", note: "Synthetic SEL ICON, C37.94, DTT, Protection, and SCADA assignments.", badges: ["Critical"] },
-  { key: "opgwOutageImpact", label: "Outage Impact", note: "Synthetic high-risk routes with critical assignments and low confidence or low spare capacity.", badges: ["Planning"] },
+  { key: "opgwOutageImpact", label: "Outage Impact", note: "Synthetic high-risk routes, sections, and spans.", badges: ["Impact"] },
+  { key: "opgwOpenWorkOrders", label: "Open Work Orders", note: "Synthetic work-order indicators tied to OPGW spans.", badges: ["Work"] },
+  { key: "opgwSpanInspectionIssues", label: "Span Inspection Issues", note: "Synthetic span inspection or midspan issue highlights.", badges: ["Inspection"] },
 ];
 
 export function MapLayerControlPanel({
@@ -87,10 +101,15 @@ export function MapLayerControlPanel({
   assumedOpgwRouteCount = 0,
   plannedOpgwRouteCount = 0,
   verifiedOpgwRouteCount = 0,
+  opgwCableSectionCount = 0,
+  opgwSpanSegmentCount = 0,
+  opgwSplicePointCount = 0,
   patchPanelCount = 0,
   availableStrandCount = 0,
   criticalRidingCircuitCount = 0,
   outageImpactCount = 0,
+  openOpgwWorkOrderCount = 0,
+  spanInspectionIssueCount = 0,
   dataWarnings,
   transmissionLineOwnerCounts = [],
   visibleTransmissionLineOwners = {},
@@ -236,14 +255,21 @@ export function MapLayerControlPanel({
                 {layer.label}
                 <em>{opgwCountForLayer(layer.key, {
                   publicLineCount,
+                  publicSubstationCount,
                   assumedOpgwRouteCount,
                   plannedOpgwRouteCount,
                   verifiedOpgwRouteCount,
+                  opgwCableSectionCount,
+                  opgwSpanSegmentCount,
+                  opgwSplicePointCount,
+                  structureCount,
                   spliceClosureCount,
                   patchPanelCount,
                   availableStrandCount,
                   criticalRidingCircuitCount,
                   outageImpactCount,
+                  openOpgwWorkOrderCount,
+                  spanInspectionIssueCount,
                 })}</em>
               </strong>
               <small>{dataWarningForLayer(layer.key, dataWarnings) || layer.note}</small>
@@ -369,25 +395,42 @@ function opgwCountForLayer(
   layer: StreetMapLayerKey,
   counts: {
     publicLineCount: number;
+    publicSubstationCount: number;
     assumedOpgwRouteCount: number;
     plannedOpgwRouteCount: number;
     verifiedOpgwRouteCount: number;
+    opgwCableSectionCount: number;
+    opgwSpanSegmentCount: number;
+    opgwSplicePointCount: number;
+    structureCount: number;
     spliceClosureCount: number;
     patchPanelCount: number;
     availableStrandCount: number;
     criticalRidingCircuitCount: number;
     outageImpactCount: number;
+    openOpgwWorkOrderCount: number;
+    spanInspectionIssueCount: number;
   },
 ) {
   if (layer === "publicTransmissionLines") return counts.publicLineCount;
+  if (layer === "publicSubstations") return counts.publicSubstationCount;
+  if (layer === "transmissionStructures") return counts.structureCount;
   if (layer === "assumedOpgwRoutes") return counts.assumedOpgwRouteCount;
+  if (layer === "opgwRoutes") return counts.assumedOpgwRouteCount + counts.plannedOpgwRouteCount + counts.verifiedOpgwRouteCount;
   if (layer === "plannedOpgwFiber") return counts.plannedOpgwRouteCount;
   if (layer === "verifiedOpgwFiber") return counts.verifiedOpgwRouteCount;
+  if (layer === "opgwCableSections") return counts.opgwCableSectionCount;
+  if (layer === "opgwSpanSegments") return counts.opgwSpanSegmentCount;
+  if (layer === "opgwSplicePoints") return counts.opgwSplicePointCount;
   if (layer === "spliceClosures") return counts.spliceClosureCount;
   if (layer === "patchPanels") return counts.patchPanelCount;
+  if (layer === "fiberStrandsLayer") return counts.availableStrandCount;
+  if (layer === "fiberAssignments") return counts.criticalRidingCircuitCount;
   if (layer === "availableStrandCapacity") return counts.availableStrandCount;
   if (layer === "criticalRidingCircuits") return counts.criticalRidingCircuitCount;
   if (layer === "opgwOutageImpact") return counts.outageImpactCount;
+  if (layer === "opgwOpenWorkOrders") return counts.openOpgwWorkOrderCount;
+  if (layer === "opgwSpanInspectionIssues") return counts.spanInspectionIssueCount;
   return 0;
 }
 
@@ -397,7 +440,7 @@ function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string,
   if (layer === "fccUtilityTowers") return warnings?.fccUtilityTowers;
   if (layer === "fccMicrowaveLinks") return warnings?.fccMicrowaveLinks;
   if (layer === "transmissionStructures") return warnings?.structures;
-  if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact") return warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments;
+  if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "fiberStrandsLayer" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   if (layer === "patchPanels") return warnings?.patchPanels;
   if (layer === "criticalRidingCircuits") return warnings?.fiberAssignments;

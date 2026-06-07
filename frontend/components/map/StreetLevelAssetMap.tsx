@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
@@ -15,6 +15,10 @@ export type StreetMapSelection =
   | { kind: "synthetic_substation"; id: string; label: string; record: SyntheticSubstationFeature }
   | { kind: "transmission_structure"; id: string; label: string; record: TransmissionStructureFeature }
   | { kind: "opgw_cable"; id: string; label: string; record: OpgwCableFeature }
+  | { kind: "opgw_route"; id: string; label: string; record: OpgwRouteFeature }
+  | { kind: "opgw_cable_section"; id: string; label: string; record: OpgwCableSectionFeature }
+  | { kind: "opgw_span_segment"; id: string; label: string; record: OpgwSpanSegmentFeature }
+  | { kind: "opgw_splice_point"; id: string; label: string; record: OpgwSplicePointFeature }
   | { kind: "splice_closure"; id: string; label: string; record: SpliceClosureFeature }
   | { kind: "fiber_assignment"; id: string; label: string; record: FiberAssignment }
   | { kind: "patch_panel"; id: string; label: string; record: PatchPanel }
@@ -39,6 +43,10 @@ type StreetLevelAssetMapProps = {
   syntheticSubstations: SyntheticSubstationFeature[];
   transmissionStructures: TransmissionStructureFeature[];
   opgwCables: OpgwCableFeature[];
+  opgwRoutes: OpgwRouteFeature[];
+  opgwCableSections: OpgwCableSectionFeature[];
+  opgwSpanSegments: OpgwSpanSegmentFeature[];
+  opgwSplicePoints: OpgwSplicePointFeature[];
   spliceClosures: SpliceClosureFeature[];
   fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
@@ -71,6 +79,10 @@ export function StreetLevelAssetMap({
   syntheticSubstations,
   transmissionStructures,
   opgwCables,
+  opgwRoutes,
+  opgwCableSections,
+  opgwSpanSegments,
+  opgwSplicePoints,
   spliceClosures,
   fiberStrands,
   fiberAssignments,
@@ -100,6 +112,10 @@ export function StreetLevelAssetMap({
           syntheticSubstations={syntheticSubstations}
           transmissionStructures={transmissionStructures}
           opgwCables={opgwCables}
+          opgwRoutes={opgwRoutes}
+          opgwCableSections={opgwCableSections}
+          opgwSpanSegments={opgwSpanSegments}
+          opgwSplicePoints={opgwSplicePoints}
           spliceClosures={spliceClosures}
           fiberStrands={fiberStrands}
           fiberAssignments={fiberAssignments}
