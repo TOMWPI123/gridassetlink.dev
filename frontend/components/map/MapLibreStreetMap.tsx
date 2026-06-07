@@ -341,20 +341,23 @@ export function MapLibreStreetMap({
     <div className="maplibre-street-map" data-testid="street-level-map">
       <div className="maplibre-map-root" ref={containerRef} aria-label={`${activeMap.name} MapLibre street-level planning map`} />
       <div className="maplibre-legend" aria-hidden="true">
-        {layers.publicTransmissionLines ? <span><i className="legend-line" />HIFLD transmission lines</span> : null}
-        {layers.publicSubstations ? <span><i className="legend-substation" />Public substations by owner</span> : null}
-        {layers.fccUtilityTowers ? <span><i className="legend-node" />FCC utility towers</span> : null}
-        {layers.fccMicrowaveLinks ? <span><i className="legend-line" />FCC microwave links</span> : null}
-        {layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.opgwCableSections || layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW planning</span> : null}
-        {layers.opgwSpanSegments ? <span><i className="legend-opgw-span" />OPGW spans</span> : null}
-        {layers.opgwSplicePoints ? <span><i className="legend-splice-point" />Splice points</span> : null}
-        {layers.availableStrandCapacity ? <span><i className="legend-opgw-capacity" />Available strands</span> : null}
-        {layers.criticalRidingCircuits ? <span><i className="legend-critical-route" />Critical riding circuits</span> : null}
-        {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
-        {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
-        {layers.substations ? <span><i className="legend-substation" />Substations</span> : null}
-        {layers.selIconNodes || layers.telecomNodes || layers.circuitEndpoints ? <span><i className="legend-node" />SEL ICON / telecom</span> : null}
-        {layers.workOrderLocations ? <span><i className="legend-work-order" />Work orders</span> : null}
+        <div className="maplibre-legend-title">Active Map Layers</div>
+        <div className="maplibre-legend-list">
+          {layers.publicTransmissionLines ? <span><i className="legend-line" />HIFLD transmission lines</span> : null}
+          {layers.publicSubstations ? <span><i className="legend-substation" />Public substations by owner</span> : null}
+          {layers.fccUtilityTowers ? <span><i className="legend-node" />FCC utility towers</span> : null}
+          {layers.fccMicrowaveLinks ? <span><i className="legend-line" />FCC microwave links</span> : null}
+          {layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.opgwCableSections || layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW planning</span> : null}
+          {layers.opgwSpanSegments ? <span><i className="legend-opgw-span" />OPGW spans</span> : null}
+          {layers.opgwSplicePoints ? <span><i className="legend-splice-point" />Splice points</span> : null}
+          {layers.availableStrandCapacity ? <span><i className="legend-opgw-capacity" />Available strands</span> : null}
+          {layers.criticalRidingCircuits ? <span><i className="legend-critical-route" />Critical riding circuits</span> : null}
+          {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
+          {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
+          {layers.substations ? <span><i className="legend-substation" />Substations</span> : null}
+          {layers.selIconNodes || layers.telecomNodes || layers.circuitEndpoints ? <span><i className="legend-node" />SEL ICON / telecom</span> : null}
+          {layers.workOrderLocations ? <span><i className="legend-work-order" />Work orders</span> : null}
+        </div>
       </div>
       {errorMessage ? (
         <div className="maplibre-map-error-state">
