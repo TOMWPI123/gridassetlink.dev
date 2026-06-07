@@ -465,8 +465,8 @@ export function DashboardPage() {
   );
 
   const summaryCards = useMemo(
-    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleFccUtilityTowers, visibleFccMicrowaveLinks, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels, mapStatus),
-    [mapStatus, visibleFccMicrowaveLinks, visibleFccUtilityTowers, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
+    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleFccUtilityTowers, visibleFccMicrowaveLinks, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels),
+    [visibleFccMicrowaveLinks, visibleFccUtilityTowers, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
   );
   const ownerOptions = useMemo(
     () => buildOwnerOptions(visiblePublicSubstations, visiblePublicTransmissionLines, visibleFccUtilityTowers, visibleFccMicrowaveLinks),
@@ -895,10 +895,6 @@ export function DashboardPage() {
               )) : <p>No matching map assets in {searchLayerLabel(searchLayerFilter)}.</p>}
             </div>
           ) : null}
-        </div>
-        <div className={`dashboard-map-status-pill ${mapStatus}`}>
-          <RadioTower size={15} />
-          <span>{mapStatus === "active" ? "MapLibre active" : mapStatus === "error" ? "MapLibre error" : "MapLibre loading"}</span>
         </div>
       </div>
 
@@ -1925,7 +1921,6 @@ function buildSummaryCards(
   closures: SpliceClosureFeature[],
   assignments: FiberAssignment[],
   panels: PatchPanel[],
-  mapStatus: MapStatus,
 ) {
   const stateCount = new Set(publicLines.flatMap((line) => line.properties.states)).size;
   const voltageClassCount = new Set(publicLines.map((line) => line.properties.voltageClass || "unknown")).size;
@@ -1944,7 +1939,6 @@ function buildSummaryCards(
     { label: "Splice Closures", value: closures.length, note: "synthetic demo closures", Icon: Cable },
     { label: "States Covered", value: stateCount, note: "ISO New England states", Icon: MapPin },
     { label: "Voltage Classes", value: voltageClassCount, note: "HIFLD normalized classes", Icon: Gauge },
-    { label: "MapLibre", value: mapStatus === "active" ? "Active" : mapStatus === "error" ? "Error" : "Loading", note: mapStatus === "active" ? "MapLibre active" : mapStatus === "error" ? "clear failure state" : "waiting for load", Icon: RadioTower },
   ];
 }
 

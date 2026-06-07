@@ -4,9 +4,6 @@ import { AlertTriangle, ExternalLink, ShieldAlert, TableProperties, X } from "lu
 import { useEffect, useMemo, useRef, useState } from "react";
 import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
 
-const ACKNOWLEDGED_KEY = "gridassetlink_demo_disclaimer_acknowledged";
-const ACKNOWLEDGED_AT_KEY = "gridassetlink_demo_disclaimer_acknowledged_at";
-
 type DemoDisclaimerGateProps = {
   children: React.ReactNode;
 };
@@ -18,10 +15,8 @@ export function DemoDisclaimerGate({ children }: DemoDisclaimerGateProps) {
   const [showSources, setShowSources] = useState(false);
 
   useEffect(() => {
-    const storedValue = window.localStorage.getItem(ACKNOWLEDGED_KEY);
-    const hasAcknowledged = storedValue === "true";
-    setAcknowledged(hasAcknowledged);
-    setShowDisclaimer(!hasAcknowledged);
+    setAcknowledged(false);
+    setShowDisclaimer(true);
     setLoaded(true);
 
     function handleOpenDisclaimer() {
@@ -50,8 +45,6 @@ export function DemoDisclaimerGate({ children }: DemoDisclaimerGateProps) {
   }, [loaded, showDisclaimer]);
 
   function acknowledge() {
-    window.localStorage.setItem(ACKNOWLEDGED_KEY, "true");
-    window.localStorage.setItem(ACKNOWLEDGED_AT_KEY, new Date().toISOString());
     setAcknowledged(true);
     setShowDisclaimer(false);
   }
