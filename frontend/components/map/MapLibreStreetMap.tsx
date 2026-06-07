@@ -2,9 +2,10 @@
 
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
+import { buildClosureToSplicePointId, buildSpliceNodeMetrics } from "@/lib/opgw/continuityEngine";
 
 type MapLibreStreetMapProps = {
   activeMap: TransmissionMap;
@@ -23,8 +24,10 @@ type MapLibreStreetMapProps = {
   opgwSpanSegments: OpgwSpanSegmentFeature[];
   opgwSplicePoints: OpgwSplicePointFeature[];
   spliceClosures: SpliceClosureFeature[];
+  fiberSplices: FiberSplice[];
   fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
+  syntheticServices: SyntheticService[];
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
@@ -136,8 +139,10 @@ export function MapLibreStreetMap({
   opgwSpanSegments,
   opgwSplicePoints,
   spliceClosures,
+  fiberSplices,
   fiberStrands,
   fiberAssignments,
+  syntheticServices,
   patchPanels,
   planningRegions,
   layers,
@@ -161,8 +166,8 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberStrands, fiberAssignments, patchPanels, planningRegions, layers),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberStrands, fiberAssignments, patchPanels, planningRegions, layers],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, patchPanels, planningRegions, layers),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, patchPanels, planningRegions, layers],
   );
   const lookup = useMemo(
     () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, patchPanels, planningRegions),
@@ -322,9 +327,12 @@ export function MapLibreStreetMap({
     const selection = lookupRef.current[`${kind}:${id}`];
     if (!selection) return;
     onSelectRef.current(selection);
+    const popupHtml = kind === "opgw_splice_point" || kind === "splice_closure"
+      ? renderSplicePopupHtml(feature.properties)
+      : renderPopupHtml(feature.properties.label || selection.label, kind, feature.properties.status || "synthetic", feature.properties.warning);
     popupRef.current
       ?.setLngLat(event.lngLat)
-      .setHTML(renderPopupHtml(feature.properties.label || selection.label, kind, feature.properties.status || "synthetic", feature.properties.warning))
+      .setHTML(popupHtml)
       .addTo(event.target);
   }
 
@@ -350,6 +358,8 @@ export function MapLibreStreetMap({
           {layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.opgwCableSections || layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW planning</span> : null}
           {layers.opgwSpanSegments ? <span><i className="legend-opgw-span" />OPGW spans</span> : null}
           {layers.opgwSplicePoints ? <span><i className="legend-splice-point" />Splice points</span> : null}
+          {layers.existingFiberSplices ? <span><i className="legend-existing-splice" />Existing fiber splices</span> : null}
+          {layers.proposedFiberSplices ? <span><i className="legend-proposed-splice" />Proposed fiber splices</span> : null}
           {layers.availableStrandCapacity ? <span><i className="legend-opgw-capacity" />Available strands</span> : null}
           {layers.criticalRidingCircuits ? <span><i className="legend-critical-route" />Critical riding circuits</span> : null}
           {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
@@ -1163,8 +1173,10 @@ function buildDatasets(
   opgwSpanSegments: OpgwSpanSegmentFeature[],
   opgwSplicePoints: OpgwSplicePointFeature[],
   spliceClosures: SpliceClosureFeature[],
+  fiberSplices: FiberSplice[],
   fiberStrands: FiberStrand[],
   fiberAssignments: FiberAssignment[],
+  syntheticServices: SyntheticService[],
   patchPanels: PatchPanel[],
   planningRegions: PlanningRegion[],
   layers: Record<StreetMapLayerKey, boolean>,
@@ -1176,6 +1188,18 @@ function buildDatasets(
   const assignmentStatsByCable = buildCableAssignmentStats(fiberAssignments);
   const spliceClosureCountByCable = buildCableSpliceClosureCounts(spliceClosures);
   const patchPanelCountByCable = buildCablePatchPanelCounts(patchPanels);
+  const spliceMetricsByPoint = buildSpliceNodeMetrics({
+    opgwCables,
+    opgwCableSections,
+    opgwSpanSegments,
+    opgwSplicePoints,
+    spliceClosures,
+    fiberSplices,
+    fiberAssignments,
+    syntheticServices,
+    patchPanels,
+  });
+  const closureToSplicePointId = buildClosureToSplicePointId(opgwSplicePoints);
   return {
     regions: layers.planningRegions ? collection(planningRegions.map((region) => ({
       type: "Feature",
@@ -1409,21 +1433,39 @@ function buildDatasets(
         geometry: feature.geometry,
       }];
     })) : emptyCollection,
-    opgwSplicePoints: layers.opgwSplicePoints ? collection(opgwSplicePoints.map((feature) => ({
+    opgwSplicePoints: layers.opgwSplicePoints || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers ? collection(opgwSplicePoints.flatMap((feature) => {
+      const metrics = spliceMetricsByPoint.get(feature.properties.splicePointId);
+      const hasExisting = (metrics?.activeSyntheticServices || 0) > 0 || feature.properties.status === "synthetic_assumption" || feature.properties.status === "verified";
+      const hasProposed = (metrics?.proposedSyntheticServices || 0) > 0 || feature.properties.status === "planned";
+      if (layers.existingFiberSplices && !layers.opgwSplicePoints && !layers.compareSpliceLayers && !hasExisting) return [];
+      if (layers.proposedFiberSplices && !layers.opgwSplicePoints && !layers.compareSpliceLayers && !hasProposed) return [];
+      return [{
       type: "Feature",
       properties: {
         kind: "opgw_splice_point",
         id: feature.properties.splicePointId,
         label: feature.properties.splicePointId,
-        status: feature.properties.status,
+        status: spliceMetricsByPoint.get(feature.properties.splicePointId)?.status || feature.properties.status,
         spliceType: feature.properties.spliceType,
+        locationType: spliceMetricsByPoint.get(feature.properties.splicePointId)?.locationType || feature.properties.spliceType,
+        structureId: feature.properties.structureId,
         structureNumber: feature.properties.structureNumber,
         closureId: feature.properties.closureId || null,
+        splicePointId: feature.properties.splicePointId,
+        transmissionLineId: feature.properties.transmissionLineId,
+        opgwRouteId: feature.properties.opgwRouteId,
+        fiberCount: spliceMetricsByPoint.get(feature.properties.splicePointId)?.fiberCount || 0,
+        incomingCableSections: spliceMetricsByPoint.get(feature.properties.splicePointId)?.incomingCableSections || 0,
+        outgoingCableSections: spliceMetricsByPoint.get(feature.properties.splicePointId)?.outgoingCableSections || 0,
+        activeSyntheticServices: spliceMetricsByPoint.get(feature.properties.splicePointId)?.activeSyntheticServices || 0,
+        proposedSyntheticServices: spliceMetricsByPoint.get(feature.properties.splicePointId)?.proposedSyntheticServices || 0,
         associatedCableSections: feature.properties.associatedCableSectionIds.length,
+        warning: "Synthetic splice point only. Not proof of real OPGW, SCADA, relay, protection, or private telecom routing.",
         synthetic: true,
       },
       geometry: feature.geometry,
-    }))) : emptyCollection,
+      }];
+    })) : emptyCollection,
     opgwCables: collection(opgwCables.flatMap((feature) => {
       const status = opgwPlanningStatus(feature);
       const confidenceLevel = opgwConfidenceLevel(feature);
@@ -1480,20 +1522,40 @@ function buildDatasets(
         geometry: feature.geometry,
       }];
     })),
-    spliceClosures: layers.spliceClosures ? collection(spliceClosures.map((feature) => ({
+    spliceClosures: layers.spliceClosures || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers ? collection(spliceClosures.flatMap((feature) => {
+      const pointId = closureToSplicePointId.get(feature.properties.id) || "";
+      const metrics = spliceMetricsByPoint.get(pointId);
+      const hasExisting = feature.properties.status === "existing" || (metrics?.activeSyntheticServices || 0) > 0;
+      const hasProposed = feature.properties.status === "planned" || feature.properties.status === "proposed" || (metrics?.proposedSyntheticServices || 0) > 0;
+      if (layers.existingFiberSplices && !layers.spliceClosures && !layers.compareSpliceLayers && !hasExisting) return [];
+      if (layers.proposedFiberSplices && !layers.spliceClosures && !layers.compareSpliceLayers && !hasProposed) return [];
+      return [{
       type: "Feature",
       properties: {
         kind: "splice_closure",
         id: feature.properties.id,
         label: feature.properties.name,
-        status: feature.properties.status,
+        status: feature.properties.status === "existing" ? "synthetic_existing" : feature.properties.status,
+        splicePointId: closureToSplicePointId.get(feature.properties.id) || feature.properties.id,
+        closureId: feature.properties.id,
+        structureId: feature.properties.structureId,
+        locationType: feature.properties.installType === "terminal" ? "patch panel entrance" : "transmission structure",
+        transmissionLineId: opgwSplicePoints.find((point) => point.properties.closureId === feature.properties.id)?.properties.transmissionLineId || null,
+        opgwRouteId: opgwSplicePoints.find((point) => point.properties.closureId === feature.properties.id)?.properties.opgwRouteId || null,
+        fiberCount: Math.max(...feature.properties.cableIds.map((cableId) => cableById.get(cableId)?.properties.fiberCount || 0), 0),
+        incomingCableSections: spliceMetricsByPoint.get(closureToSplicePointId.get(feature.properties.id) || "")?.incomingCableSections || 0,
+        outgoingCableSections: spliceMetricsByPoint.get(closureToSplicePointId.get(feature.properties.id) || "")?.outgoingCableSections || 0,
+        activeSyntheticServices: spliceMetricsByPoint.get(closureToSplicePointId.get(feature.properties.id) || "")?.activeSyntheticServices || 0,
+        proposedSyntheticServices: spliceMetricsByPoint.get(closureToSplicePointId.get(feature.properties.id) || "")?.proposedSyntheticServices || 0,
         closureType: feature.properties.closureType,
         structureNumber: feature.properties.structureNumber,
         spliceCount: feature.properties.spliceCount,
+        warning: "Synthetic splice closure only. Existing/proposed rows are demo planning records.",
         synthetic: true,
       },
       geometry: feature.geometry,
-    }))) : emptyCollection,
+      }];
+    })) : emptyCollection,
     fiberAssignments: layers.fiberAssignments || layers.criticalRidingCircuits ? collection(fiberAssignments.flatMap((assignment) => {
       if (layers.criticalRidingCircuits && !layers.fiberAssignments && !isCriticalFiberAssignment(assignment)) return [];
       const coordinates = assignment.cableIds
@@ -1810,6 +1872,45 @@ function setCursor(map: MapLibreMap, cursor: string) {
 function renderPopupHtml(label: unknown, kind: string, status: unknown, warning?: unknown) {
   const warningHtml = warning ? `<small>${escapeHtml(String(warning))}</small>` : "";
   return `<div class="maplibre-popup-card"><strong>${escapeHtml(String(label))}</strong><span>${escapeHtml(kind.replaceAll("_", " "))} / ${escapeHtml(String(status))}</span>${warningHtml}</div>`;
+}
+
+function renderSplicePopupHtml(properties: Record<string, unknown>) {
+  const splicePointId = String(properties.splicePointId || properties.id || "");
+  const closureId = String(properties.closureId || "");
+  const managerHref = `/opgw/splices/${encodeURIComponent(splicePointId)}`;
+  const continuityHref = `/fiber-trace?splicePoint=${encodeURIComponent(splicePointId)}`;
+  const existingHref = `${managerHref}?layer=existing`;
+  const proposedHref = `${managerHref}?layer=proposed`;
+  const outageHref = `/outage-impact?splicePoint=${encodeURIComponent(splicePointId)}`;
+  const workOrderHref = `/work-orders/new?splicePoint=${encodeURIComponent(splicePointId)}`;
+  return `
+    <div class="maplibre-popup-card splice-popup-card">
+      <strong>${escapeHtml(String(properties.label || splicePointId))}</strong>
+      <span>${escapeHtml(String(properties.kind || "splice node").replaceAll("_", " "))} / ${escapeHtml(String(properties.status || "synthetic_existing"))}</span>
+      <dl>
+        <div><dt>Splice point</dt><dd>${escapeHtml(splicePointId)}</dd></div>
+        <div><dt>Closure</dt><dd>${escapeHtml(closureId || "-")}</dd></div>
+        <div><dt>Structure</dt><dd>${escapeHtml(String(properties.structureId || properties.structureNumber || "-"))}</dd></div>
+        <div><dt>Line</dt><dd>${escapeHtml(String(properties.transmissionLineId || "-"))}</dd></div>
+        <div><dt>Route</dt><dd>${escapeHtml(String(properties.opgwRouteId || "-"))}</dd></div>
+        <div><dt>Location</dt><dd>${escapeHtml(String(properties.locationType || "transmission structure"))}</dd></div>
+        <div><dt>Fiber count</dt><dd>${escapeHtml(String(properties.fiberCount || 0))}</dd></div>
+        <div><dt>Incoming</dt><dd>${escapeHtml(String(properties.incomingCableSections || 0))}</dd></div>
+        <div><dt>Outgoing</dt><dd>${escapeHtml(String(properties.outgoingCableSections || 0))}</dd></div>
+        <div><dt>Active services</dt><dd>${escapeHtml(String(properties.activeSyntheticServices || 0))}</dd></div>
+        <div><dt>Proposed services</dt><dd>${escapeHtml(String(properties.proposedSyntheticServices || 0))}</dd></div>
+      </dl>
+      <small>${escapeHtml(String(properties.warning || "Synthetic demo splice data only."))}</small>
+      <nav aria-label="Splice node actions">
+        <a href="${managerHref}">Open Splice Manager</a>
+        <a href="${continuityHref}">View Fiber Continuity</a>
+        <a href="${existingHref}">View Existing Splices</a>
+        <a href="${proposedHref}">View Proposed Splices</a>
+        <a href="${outageHref}">Analyze Outage Impact</a>
+        <a href="${workOrderHref}">Create Work Order</a>
+      </nav>
+    </div>
+  `;
 }
 
 function escapeHtml(value: string) {

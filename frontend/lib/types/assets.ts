@@ -705,6 +705,88 @@ export type FiberSplice = {
   notes?: string;
 };
 
+export type SyntheticServiceType =
+  | "SCADA synthetic demo"
+  | "Relay/protection synthetic demo"
+  | "SEL ICON synthetic demo"
+  | "Microwave backhaul synthetic demo"
+  | "Substation LAN synthetic demo"
+  | "EMS/RTU synthetic demo"
+  | "Dark fiber synthetic demo"
+  | "Leased fiber synthetic demo"
+  | "DERMS communications synthetic demo"
+  | "Voice operations synthetic demo";
+
+export type SyntheticService = {
+  serviceId: string;
+  serviceName: string;
+  serviceType: SyntheticServiceType;
+  serviceDescription: string;
+  fromSiteId: string;
+  fromSiteName: string;
+  toSiteId: string;
+  toSiteName: string;
+  endpointAPatchPanelId?: string;
+  endpointAPort?: string;
+  endpointZPatchPanelId?: string;
+  endpointZPort?: string;
+  primaryPathAssignmentId?: string;
+  backupPathAssignmentId?: string;
+  criticality: "low" | "medium" | "high" | "critical";
+  protectionLevel: "none" | "single_path" | "diverse_path" | "ring_protected" | "backup_available";
+  latencyClass: "best_effort" | "normal" | "low_latency" | "protection_grade";
+  operationalStatus: "active_synthetic" | "planned" | "proposed" | "broken_demo" | "retired";
+  layerType: "existing" | "proposed" | "compare";
+  syntheticFlag: true;
+  continuityCableIds?: string[];
+  continuitySplicePointIds?: string[];
+  continuitySpliceClosureIds?: string[];
+  continuityStatus?: "complete" | "broken" | "proposed_fix" | "proposed_change";
+  notes: string;
+};
+
+export type FiberContinuityPathSegment = {
+  pathSegmentId: string;
+  continuityPathId: string;
+  sequenceNumber: number;
+  objectType: "patch_panel" | "cable_section" | "span_segment" | "splice_point" | "splice_connection" | "service";
+  objectId: string;
+  transmissionLineId?: string;
+  opgwRouteId?: string;
+  cableSectionId?: string;
+  spanSegmentId?: string;
+  splicePointId?: string;
+  spliceConnectionId?: string;
+  patchPanelId?: string;
+  strandNumber?: number;
+  segmentStatus: "existing" | "planned" | "proposed" | "broken" | "warning";
+  estimatedLossDb?: number;
+  notes?: string;
+};
+
+export type FiberContinuityPath = {
+  continuityPathId: string;
+  serviceId: string;
+  assignmentId?: string;
+  layerType: "existing" | "proposed" | "compare";
+  endpointASiteId: string;
+  endpointZSiteId: string;
+  pathStatus: "complete" | "broken" | "proposed" | "warning";
+  totalRouteMiles: number;
+  totalCableSections: number;
+  totalTransmissionLines: number;
+  totalSplicePoints: number;
+  totalPatchPanels: number;
+  totalEstimatedLossDb: number;
+  hasBrokenContinuity: boolean;
+  hasFaultedSection: boolean;
+  hasProposedChanges: boolean;
+  syntheticFlag: true;
+  warningSummary: string[];
+  segments: FiberContinuityPathSegment[];
+  notes: string;
+};
+
 export type FiberAssignment = {
   id: string;
   assignmentName: string;
@@ -885,6 +967,9 @@ export type StreetMapLayerKey =
   | "opgwCableSections"
   | "opgwSpanSegments"
   | "opgwSplicePoints"
+  | "existingFiberSplices"
+  | "proposedFiberSplices"
+  | "compareSpliceLayers"
   | "fiberStrandsLayer"
   | "spliceClosures"
   | "fiberAssignments"

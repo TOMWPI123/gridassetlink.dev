@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
@@ -48,8 +48,10 @@ type StreetLevelAssetMapProps = {
   opgwSpanSegments: OpgwSpanSegmentFeature[];
   opgwSplicePoints: OpgwSplicePointFeature[];
   spliceClosures: SpliceClosureFeature[];
+  fiberSplices: FiberSplice[];
   fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
+  syntheticServices: SyntheticService[];
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
@@ -84,8 +86,10 @@ export function StreetLevelAssetMap({
   opgwSpanSegments,
   opgwSplicePoints,
   spliceClosures,
+  fiberSplices,
   fiberStrands,
   fiberAssignments,
+  syntheticServices,
   patchPanels,
   planningRegions,
   layers,
@@ -117,8 +121,10 @@ export function StreetLevelAssetMap({
           opgwSpanSegments={opgwSpanSegments}
           opgwSplicePoints={opgwSplicePoints}
           spliceClosures={spliceClosures}
+          fiberSplices={fiberSplices}
           fiberStrands={fiberStrands}
           fiberAssignments={fiberAssignments}
+          syntheticServices={syntheticServices}
           patchPanels={patchPanels}
           planningRegions={planningRegions}
           layers={layers}

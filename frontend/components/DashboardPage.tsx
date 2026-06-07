@@ -19,7 +19,7 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
@@ -35,6 +35,9 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   opgwCableSections: false,
   opgwSpanSegments: false,
   opgwSplicePoints: false,
+  existingFiberSplices: false,
+  proposedFiberSplices: false,
+  compareSpliceLayers: false,
   fiberStrandsLayer: false,
   spliceClosures: true,
   fiberAssignments: false,
@@ -72,6 +75,9 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   opgwCableSections: true,
   opgwSpanSegments: true,
   opgwSplicePoints: true,
+  existingFiberSplices: true,
+  proposedFiberSplices: true,
+  compareSpliceLayers: false,
   spliceClosures: true,
   availableStrandCapacity: true,
 };
@@ -185,6 +191,7 @@ export function DashboardPage() {
   const [fiberSplices, setFiberSplices] = useState<FiberSplice[]>([]);
   const [patchPanels, setPatchPanels] = useState<PatchPanel[]>([]);
   const [fiberAssignments, setFiberAssignments] = useState<FiberAssignment[]>([]);
+  const [syntheticServices, setSyntheticServices] = useState<SyntheticService[]>([]);
   const [mapDataWarnings, setMapDataWarnings] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -249,6 +256,10 @@ export function DashboardPage() {
         warnings.splices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
         return [] as FiberSplice[];
       });
+      const services = await fetchGeoJson<SyntheticService[]>("/data/iso-ne-synthetic-services.json").catch((error) => {
+        warnings.syntheticServices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+        return [] as SyntheticService[];
+      });
       if (cancelled) return;
       setPublicTransmissionLines(publicLines);
       setPublicSubstations(publicSubstationRecords);
@@ -261,6 +272,7 @@ export function DashboardPage() {
       setFccUtilityTowers(fccTowers);
       setFccMicrowaveLinks(fccLinks);
       setFiberSplices(splices);
+      setSyntheticServices(services);
       setMapDataWarnings(warnings);
     }
     void loadStaticMapData();
@@ -460,8 +472,8 @@ export function DashboardPage() {
     [streetLayers.transmissionStructures, visibleTransmissionStructures],
   );
   const layerFilteredSpliceClosures = useMemo(
-    () => streetLayers.spliceClosures ? visibleSpliceClosures : [],
-    [streetLayers.spliceClosures, visibleSpliceClosures],
+    () => streetLayers.spliceClosures || streetLayers.existingFiberSplices || streetLayers.proposedFiberSplices || streetLayers.compareSpliceLayers ? visibleSpliceClosures : [],
+    [streetLayers.compareSpliceLayers, streetLayers.existingFiberSplices, streetLayers.proposedFiberSplices, streetLayers.spliceClosures, visibleSpliceClosures],
   );
 
   const summaryCards = useMemo(
@@ -821,8 +833,10 @@ export function DashboardPage() {
         opgwSpanSegments={visibleOpgwSpanSegments}
         opgwSplicePoints={visibleOpgwSplicePoints}
         spliceClosures={layerFilteredSpliceClosures}
+        fiberSplices={fiberSplices}
         fiberStrands={fiberStrands}
         fiberAssignments={visibleFiberAssignments}
+        syntheticServices={syntheticServices}
         patchPanels={visiblePatchPanels}
         planningRegions={visiblePlanningRegions}
         layers={streetLayers}
@@ -1082,6 +1096,9 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
       opgwCableSections: false,
       opgwSpanSegments: false,
       opgwSplicePoints: false,
+      existingFiberSplices: false,
+      proposedFiberSplices: false,
+      compareSpliceLayers: false,
       spliceClosures: false,
       patchPanels: false,
       fiberAssignments: false,
@@ -1105,6 +1122,9 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
       opgwCableSections: true,
       opgwSpanSegments: false,
       opgwSplicePoints: true,
+      existingFiberSplices: true,
+      proposedFiberSplices: true,
+      compareSpliceLayers: false,
       spliceClosures: true,
       patchPanels: true,
       fiberAssignments: true,
@@ -1122,6 +1142,9 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
     opgwCableSections: true,
     opgwSpanSegments: true,
     opgwSplicePoints: true,
+    existingFiberSplices: true,
+    proposedFiberSplices: true,
+    compareSpliceLayers: false,
     spliceClosures: true,
     patchPanels: true,
     fiberAssignments: true,
@@ -2281,6 +2304,9 @@ function publicLayerSet(layers: Record<StreetMapLayerKey, boolean>) {
     c3794Nodes: false,
     fiberRoutes: false,
     opgwRoutes: false,
+    existingFiberSplices: false,
+    proposedFiberSplices: false,
+    compareSpliceLayers: false,
     distributionFiberRoutes: false,
     circuitEndpoints: false,
     workOrderLocations: false,

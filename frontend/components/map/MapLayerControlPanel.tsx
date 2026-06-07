@@ -72,6 +72,9 @@ const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string
   { key: "verifiedOpgwFiber", label: "Verified OPGW Cable Sections", note: "Only sections explicitly marked as as-built verified.", badges: ["Verified only"] },
   { key: "opgwSpanSegments", label: "OPGW Span Segments", note: "Structure-to-structure span segments linked to parent cable sections.", badges: ["Spans"] },
   { key: "opgwSplicePoints", label: "Splice Points", note: "Synthetic splice, transition, tap, and substation termination points.", badges: ["Splice points"] },
+  { key: "existingFiberSplices", label: "Existing Fiber Splices", note: "Read-only synthetic-existing or verified splice continuity nodes.", badges: ["Existing", "Read-only"] },
+  { key: "proposedFiberSplices", label: "Proposed Fiber Splices", note: "Editable proposed splice layer for engineering preview.", badges: ["Proposed", "Editable"] },
+  { key: "compareSpliceLayers", label: "Compare Existing vs Proposed", note: "Shows existing and proposed splice layers together for review.", badges: ["Compare"] },
   { key: "spliceClosures", label: "Splice Closures", note: "Synthetic closures at terminal and junction structures.", badges: ["Synthetic", "Splices"] },
   { key: "patchPanels", label: "Patch Panels", note: "Synthetic termination panels at structures and nodes.", badges: ["Synthetic", "Panels"] },
   { key: "fiberStrandsLayer", label: "Fiber Strands", note: "Strand records belong to cable sections in this engineering view.", badges: ["Strands"] },
@@ -422,6 +425,9 @@ function opgwCountForLayer(
   if (layer === "opgwCableSections") return counts.opgwCableSectionCount;
   if (layer === "opgwSpanSegments") return counts.opgwSpanSegmentCount;
   if (layer === "opgwSplicePoints") return counts.opgwSplicePointCount;
+  if (layer === "existingFiberSplices") return counts.opgwSplicePointCount;
+  if (layer === "proposedFiberSplices") return counts.opgwSplicePointCount;
+  if (layer === "compareSpliceLayers") return counts.opgwSplicePointCount;
   if (layer === "spliceClosures") return counts.spliceClosureCount;
   if (layer === "patchPanels") return counts.patchPanelCount;
   if (layer === "fiberStrandsLayer") return counts.availableStrandCount;
@@ -440,7 +446,7 @@ function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string,
   if (layer === "fccUtilityTowers") return warnings?.fccUtilityTowers;
   if (layer === "fccMicrowaveLinks") return warnings?.fccMicrowaveLinks;
   if (layer === "transmissionStructures") return warnings?.structures;
-  if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "fiberStrandsLayer" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments;
+  if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "existingFiberSplices" || layer === "proposedFiberSplices" || layer === "compareSpliceLayers" || layer === "fiberStrandsLayer" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments || warnings?.syntheticServices;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   if (layer === "patchPanels") return warnings?.patchPanels;
   if (layer === "criticalRidingCircuits") return warnings?.fiberAssignments;

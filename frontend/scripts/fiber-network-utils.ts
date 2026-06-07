@@ -14,6 +14,7 @@ export const SPLICE_CLOSURES_META_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic
 export const FIBER_SPLICES_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-fiber-splices.json");
 export const PATCH_PANELS_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-patch-panels.json");
 export const FIBER_ASSIGNMENTS_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-fiber-assignments.json");
+export const SYNTHETIC_SERVICES_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-services.json");
 
 export const SYNTHETIC_DISCLAIMER = "Synthetic demo/planning data. Not a real utility asset or verified utility telecom record.";
 
