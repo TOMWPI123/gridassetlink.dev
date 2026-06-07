@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
@@ -40,6 +40,7 @@ type StreetLevelAssetMapProps = {
   transmissionStructures: TransmissionStructureFeature[];
   opgwCables: OpgwCableFeature[];
   spliceClosures: SpliceClosureFeature[];
+  fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
@@ -71,6 +72,7 @@ export function StreetLevelAssetMap({
   transmissionStructures,
   opgwCables,
   spliceClosures,
+  fiberStrands,
   fiberAssignments,
   patchPanels,
   planningRegions,
@@ -99,6 +101,7 @@ export function StreetLevelAssetMap({
           transmissionStructures={transmissionStructures}
           opgwCables={opgwCables}
           spliceClosures={spliceClosures}
+          fiberStrands={fiberStrands}
           fiberAssignments={fiberAssignments}
           patchPanels={patchPanels}
           planningRegions={planningRegions}

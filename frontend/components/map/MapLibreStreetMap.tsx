@@ -2,7 +2,7 @@
 
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 
@@ -19,6 +19,7 @@ type MapLibreStreetMapProps = {
   transmissionStructures: TransmissionStructureFeature[];
   opgwCables: OpgwCableFeature[];
   spliceClosures: SpliceClosureFeature[];
+  fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
@@ -73,6 +74,8 @@ const clickableLayerIds = [
   "fcc-utility-microwave-links",
   "fcc-utility-towers",
   "synthetic-opgw-cables",
+  "synthetic-opgw-capacity",
+  "synthetic-opgw-outage-impact",
   "synthetic-fiber-assignments",
   "synthetic-transmission-structures",
   "synthetic-splice-closures",
@@ -117,6 +120,7 @@ export function MapLibreStreetMap({
   transmissionStructures,
   opgwCables,
   spliceClosures,
+  fiberStrands,
   fiberAssignments,
   patchPanels,
   planningRegions,
@@ -141,8 +145,8 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions, layers),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions, layers],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberStrands, fiberAssignments, patchPanels, planningRegions, layers),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberStrands, fiberAssignments, patchPanels, planningRegions, layers],
   );
   const lookup = useMemo(
     () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, spliceClosures, fiberAssignments, patchPanels, planningRegions),
@@ -300,7 +304,7 @@ export function MapLibreStreetMap({
     onSelectRef.current(selection);
     popupRef.current
       ?.setLngLat(event.lngLat)
-      .setHTML(renderPopupHtml(feature.properties.label || selection.label, kind, feature.properties.status || "synthetic"))
+      .setHTML(renderPopupHtml(feature.properties.label || selection.label, kind, feature.properties.status || "synthetic", feature.properties.warning))
       .addTo(event.target);
   }
 
@@ -321,7 +325,9 @@ export function MapLibreStreetMap({
         {layers.publicSubstations ? <span><i className="legend-substation" />Public substations by owner</span> : null}
         {layers.fccUtilityTowers ? <span><i className="legend-node" />FCC utility towers</span> : null}
         {layers.fccMicrowaveLinks ? <span><i className="legend-line" />FCC microwave links</span> : null}
-        {layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW</span> : null}
+        {layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.syntheticOpgwCables ? <span><i className="legend-opgw" />Synthetic OPGW planning</span> : null}
+        {layers.availableStrandCapacity ? <span><i className="legend-opgw-capacity" />Available strands</span> : null}
+        {layers.criticalRidingCircuits ? <span><i className="legend-critical-route" />Critical riding circuits</span> : null}
         {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
         {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
         {layers.substations ? <span><i className="legend-substation" />Substations</span> : null}
@@ -384,17 +390,17 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     id: "public-transmission-lines-casing",
     type: "line",
     source: sourceIds.publicLines,
-    paint: { "line-color": "#020708", "line-width": ["match", ["get", "voltageClass"], "735+", 9, "500-734", 8, "345-499", 7, "230-344", 6, "115-229", 5, 4], "line-opacity": 0.72 },
+    paint: { "line-color": "#020708", "line-width": ["match", ["get", "voltageClass"], "735+", 5, "500-734", 4.6, "345-499", 4.2, "230-344", 3.8, "115-229", 3.3, 3], "line-opacity": 0.62 },
   });
   map.addLayer({
     id: "public-transmission-lines",
     type: "line",
     source: sourceIds.publicLines,
     paint: {
-      "line-color": voltageClassColorExpression() as never,
-      "line-width": voltageClassWidthExpression() as never,
-      "line-opacity": ["match", ["get", "voltageClass"], "unknown", 0.56, 0.84],
-      "line-dasharray": ["match", ["get", "voltageClass"], "unknown", ["literal", [2, 2]], ["literal", [1, 0]]],
+      "line-color": "#8f9aa0",
+      "line-width": ["match", ["get", "voltageClass"], "735+", 2.6, "500-734", 2.4, "345-499", 2.2, "230-344", 2, "115-229", 1.7, 1.4],
+      "line-opacity": ["match", ["get", "voltageClass"], "unknown", 0.46, 0.68],
+      "line-dasharray": ["literal", [1, 0]],
     },
   });
   map.addLayer({
@@ -487,10 +493,38 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     type: "line",
     source: sourceIds.opgwCables,
     paint: {
-      "line-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#28e6c0"],
-      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 2.2, 10, 4.8],
-      "line-opacity": 0.9,
-      "line-dasharray": ["literal", [1.6, 1.2]],
+      "line-color": opgwStatusColorExpression() as never,
+      "line-width": opgwFiberCountWidthExpression() as never,
+      "line-opacity": 0.88,
+      "line-dasharray": opgwStatusDashExpression() as never,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-opgw-capacity",
+    type: "line",
+    source: sourceIds.opgwCables,
+    filter: ["==", ["get", "showCapacity"], true],
+    paint: {
+      "line-color": [
+        "case",
+        ["<=", ["to-number", ["get", "availableStrands"]], 2], "#ff6b6b",
+        ["<=", ["to-number", ["get", "availableStrands"]], 12], "#efc95f",
+        "#6ee7b7",
+      ],
+      "line-width": ["+", opgwFiberCountWidthExpression() as never, 2],
+      "line-opacity": 0.58,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-opgw-outage-impact",
+    type: "line",
+    source: sourceIds.opgwCables,
+    filter: ["==", ["get", "showOutageImpact"], true],
+    paint: {
+      "line-color": "#ff5b5b",
+      "line-width": ["+", opgwFiberCountWidthExpression() as never, 3.4],
+      "line-opacity": 0.7,
+      "line-dasharray": ["literal", [1, 0.8]],
     },
   });
   map.addLayer({
@@ -498,9 +532,10 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     type: "line",
     source: sourceIds.fiberAssignments,
     paint: {
-      "line-color": ["match", ["get", "status"], "active", "#6effff", "reserved", "#efc95f", "planned", "#ffd85f", "proposed", "#ff4fd8", "#9bd6ff"],
-      "line-width": ["interpolate", ["linear"], ["zoom"], 5, 4, 10, 8],
-      "line-opacity": ["match", ["get", "status"], "reserved", 0.82, 0.72],
+      "line-color": ["case", ["get", "isCritical"], "#ff5b5b", ["match", ["get", "status"], "active", "#6effff", "reserved", "#efc95f", "planned", "#ffd85f", "proposed", "#ff4fd8", "#9bd6ff"]],
+      "line-width": ["case", ["get", "isCritical"], ["interpolate", ["linear"], ["zoom"], 5, 5.5, 10, 9.5], ["interpolate", ["linear"], ["zoom"], 5, 3.4, 10, 7]],
+      "line-opacity": ["case", ["get", "isCritical"], 0.86, ["match", ["get", "status"], "reserved", 0.82, 0.68]],
+      "line-dasharray": ["case", ["get", "isCritical"], ["literal", [1.4, 0.8]], ["literal", [1, 0]]],
     },
   });
   map.addLayer({
@@ -727,6 +762,49 @@ function voltageClassWidthExpression() {
   ];
 }
 
+function opgwStatusColorExpression() {
+  return [
+    "match",
+    ["get", "opgwStatus"],
+    "synthetic_assumption", "#7c7cff",
+    "engineer_reviewed", "#9b7cff",
+    "proposed", "#f5a524",
+    "planned", "#2f8cff",
+    "design", "#f5a524",
+    "work_order_issued", "#38bdf8",
+    "in_service_synthetic", "#28e6c0",
+    "as_built_verified", "#28c76f",
+    "retired", "#ff4d4f",
+    "#8fd8ff",
+  ];
+}
+
+function opgwStatusDashExpression() {
+  return [
+    "match",
+    ["get", "opgwStatus"],
+    "synthetic_assumption", ["literal", [1.6, 1.2]],
+    "engineer_reviewed", ["literal", [2.4, 1.2]],
+    "proposed", ["literal", [1.1, 0.95]],
+    "design", ["literal", [1.1, 0.95]],
+    "retired", ["literal", [1, 0.9]],
+    ["literal", [1, 0]],
+  ];
+}
+
+function opgwFiberCountWidthExpression() {
+  return [
+    "interpolate",
+    ["linear"],
+    ["to-number", ["get", "fiberCount"]],
+    24, 2.2,
+    48, 2.9,
+    72, 3.6,
+    96, 4.4,
+    144, 5.5,
+  ];
+}
+
 function publicSubstationOwnerColorExpression() {
   return [
     "match",
@@ -795,6 +873,139 @@ function fccFrequencyBandLabel(frequencyMhz?: number | null) {
   return "below 2 GHz";
 }
 
+type OpgwPlanningStatus =
+  | "public_reference_line"
+  | "synthetic_assumption"
+  | "engineer_reviewed"
+  | "planned"
+  | "design"
+  | "work_order_issued"
+  | "in_service_synthetic"
+  | "as_built_verified"
+  | "retired";
+
+type CableStrandStats = {
+  total: number;
+  available: number;
+  assigned: number;
+  reserved: number;
+  dark: number;
+  spare: number;
+  faulted: number;
+};
+
+type CableAssignmentStats = {
+  assignments: number;
+  criticalCircuits: number;
+  openWorkOrders: number;
+};
+
+function opgwPlanningStatus(feature: OpgwCableFeature): OpgwPlanningStatus {
+  if (feature.properties.status === "planned") return "planned";
+  if (feature.properties.status === "proposed") return "design";
+  return "synthetic_assumption";
+}
+
+function isAssumedOpgwStatus(status: OpgwPlanningStatus) {
+  return status === "synthetic_assumption" || status === "engineer_reviewed";
+}
+
+function isPlannedOpgwStatus(status: OpgwPlanningStatus) {
+  return status === "planned" || status === "design" || status === "work_order_issued" || status === "in_service_synthetic";
+}
+
+function isVerifiedOpgwStatus(status: OpgwPlanningStatus) {
+  return status === "as_built_verified";
+}
+
+function opgwConfidenceLevel(feature: OpgwCableFeature) {
+  if (feature.properties.status === "planned") return "high";
+  if (feature.properties.status === "proposed") return "medium";
+  const score = deterministicScore(feature.properties.id);
+  if (score > 0.76) return "medium";
+  return "low";
+}
+
+function deterministicScore(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+function buildCableStrandStats(cables: OpgwCableFeature[], strands: FiberStrand[]) {
+  const stats = new Map<string, CableStrandStats>();
+  cables.forEach((feature) => {
+    stats.set(feature.properties.id, fallbackStrandStats(feature.properties.fiberCount));
+  });
+  if (!strands.length) return stats;
+  stats.clear();
+  strands.forEach((strand) => {
+    const current = stats.get(strand.cableId) || fallbackStrandStats(0);
+    current.total += 1;
+    if (strand.status === "available") current.available += 1;
+    if (strand.status === "assigned") current.assigned += 1;
+    if (strand.status === "reserved") current.reserved += 1;
+    if (strand.status === "dark") current.dark += 1;
+    if (strand.status === "spare") current.spare += 1;
+    if (strand.status === "faulted" || strand.status === "retired") current.faulted += 1;
+    stats.set(strand.cableId, current);
+  });
+  cables.forEach((feature) => {
+    if (!stats.has(feature.properties.id)) stats.set(feature.properties.id, fallbackStrandStats(feature.properties.fiberCount));
+  });
+  return stats;
+}
+
+function fallbackStrandStats(fiberCount: number): CableStrandStats {
+  return { total: fiberCount, available: fiberCount, assigned: 0, reserved: 0, dark: 0, spare: 0, faulted: 0 };
+}
+
+function buildCableAssignmentStats(assignments: FiberAssignment[]) {
+  const stats = new Map<string, CableAssignmentStats>();
+  assignments.forEach((assignment) => {
+    const cableIds = new Set(assignment.cableIds);
+    cableIds.forEach((cableId) => {
+      const current = stats.get(cableId) || emptyAssignmentStats();
+      current.assignments += 1;
+      if (isCriticalFiberAssignment(assignment)) current.criticalCircuits += 1;
+      if (assignment.status === "planned" || assignment.status === "proposed" || assignment.status === "reserved") current.openWorkOrders += 1;
+      stats.set(cableId, current);
+    });
+  });
+  return stats;
+}
+
+function emptyAssignmentStats(): CableAssignmentStats {
+  return { assignments: 0, criticalCircuits: 0, openWorkOrders: 0 };
+}
+
+function buildCableSpliceClosureCounts(closures: SpliceClosureFeature[]) {
+  const counts = new Map<string, number>();
+  closures.forEach((closure) => {
+    closure.properties.cableIds.forEach((cableId) => counts.set(cableId, (counts.get(cableId) || 0) + 1));
+  });
+  return counts;
+}
+
+function buildCablePatchPanelCounts(panels: PatchPanel[]) {
+  const counts = new Map<string, number>();
+  panels.forEach((panel) => {
+    panel.fiberCableIds.forEach((cableId) => counts.set(cableId, (counts.get(cableId) || 0) + 1));
+  });
+  return counts;
+}
+
+function isCriticalFiberAssignment(assignment: FiberAssignment) {
+  return assignment.serviceType === "SEL_ICON"
+    || assignment.serviceType === "C37_94"
+    || assignment.serviceType === "Protection"
+    || assignment.serviceType === "DTT"
+    || assignment.serviceType === "SCADA";
+}
+
 function buildDatasets(
   substations: Substation[],
   nodes: MapNode[],
@@ -807,6 +1018,7 @@ function buildDatasets(
   transmissionStructures: TransmissionStructureFeature[],
   opgwCables: OpgwCableFeature[],
   spliceClosures: SpliceClosureFeature[],
+  fiberStrands: FiberStrand[],
   fiberAssignments: FiberAssignment[],
   patchPanels: PatchPanel[],
   planningRegions: PlanningRegion[],
@@ -814,6 +1026,11 @@ function buildDatasets(
 ) {
   const structureById = new Map(transmissionStructures.map((feature) => [feature.properties.id, feature]));
   const cableById = new Map(opgwCables.map((feature) => [feature.properties.id, feature]));
+  const publicLineById = new Map(publicTransmissionLines.map((feature) => [feature.properties.id, feature]));
+  const strandStatsByCable = buildCableStrandStats(opgwCables, fiberStrands);
+  const assignmentStatsByCable = buildCableAssignmentStats(fiberAssignments);
+  const spliceClosureCountByCable = buildCableSpliceClosureCounts(spliceClosures);
+  const patchPanelCountByCable = buildCablePatchPanelCounts(patchPanels);
   return {
     regions: layers.planningRegions ? collection(planningRegions.map((region) => ({
       type: "Feature",
@@ -950,19 +1167,62 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    opgwCables: layers.syntheticOpgwCables ? collection(opgwCables.map((feature) => ({
-      type: "Feature",
-      properties: {
-        kind: "opgw_cable",
-        id: feature.properties.id,
-        label: feature.properties.cableName,
-        status: feature.properties.status,
-        fiberCount: feature.properties.fiberCount,
-        routeMiles: feature.properties.routeMiles,
-        synthetic: true,
-      },
-      geometry: feature.geometry,
-    }))) : emptyCollection,
+    opgwCables: collection(opgwCables.flatMap((feature) => {
+      const status = opgwPlanningStatus(feature);
+      const confidenceLevel = opgwConfidenceLevel(feature);
+      const strandStats = strandStatsByCable.get(feature.properties.id) || fallbackStrandStats(feature.properties.fiberCount);
+      const assignmentStats = assignmentStatsByCable.get(feature.properties.id) || emptyAssignmentStats();
+      const spliceClosureCount = feature.properties.connectedSpliceClosureIds.length || spliceClosureCountByCable.get(feature.properties.id) || 0;
+      const patchPanelCount = patchPanelCountByCable.get(feature.properties.id) || 0;
+      const hasOutageImpact = assignmentStats.criticalCircuits > 0 && (confidenceLevel === "low" || strandStats.available <= Math.max(2, Math.floor(feature.properties.fiberCount * 0.12)));
+      const routeLayerVisible =
+        layers.syntheticOpgwCables
+        || (layers.assumedOpgwRoutes && isAssumedOpgwStatus(status))
+        || (layers.plannedOpgwFiber && isPlannedOpgwStatus(status))
+        || (layers.verifiedOpgwFiber && isVerifiedOpgwStatus(status));
+      const capacityLayerVisible = layers.availableStrandCapacity;
+      const outageLayerVisible = layers.opgwOutageImpact && hasOutageImpact;
+      if (!routeLayerVisible && !capacityLayerVisible && !outageLayerVisible) return [];
+      const startStructure = structureById.get(feature.properties.startStructureId)?.properties;
+      const endStructure = structureById.get(feature.properties.endStructureId)?.properties;
+      const line = publicLineById.get(feature.properties.lineId)?.properties;
+      return [{
+        type: "Feature" as const,
+        properties: {
+          kind: "opgw_cable",
+          id: feature.properties.id,
+          label: feature.properties.cableName,
+          routeName: feature.properties.cableName,
+          routeId: feature.properties.id,
+          status,
+          opgwStatus: status,
+          sourceStatus: feature.properties.status,
+          fromSubstation: startStructure?.structureNumber || feature.properties.startStructureId,
+          toSubstation: endStructure?.structureNumber || feature.properties.endStructureId,
+          transmissionLine: feature.properties.lineName || feature.properties.lineId,
+          corridor: feature.properties.lineName || feature.properties.lineId,
+          voltageClass: line?.voltageClass || "unknown",
+          routeMiles: feature.properties.routeMiles,
+          fiberCount: feature.properties.fiberCount,
+          cableId: feature.properties.id,
+          confidenceLevel,
+          availableStrands: strandStats.available,
+          assignedStrands: strandStats.assigned,
+          reservedStrands: strandStats.reserved,
+          totalStrands: strandStats.total,
+          criticalCircuits: assignmentStats.criticalCircuits,
+          spliceClosures: spliceClosureCount,
+          patchPanels: patchPanelCount,
+          hasOpenWorkOrder: assignmentStats.openWorkOrders > 0 || status === "work_order_issued",
+          hasOutageImpact,
+          showCapacity: capacityLayerVisible,
+          showOutageImpact: outageLayerVisible,
+          synthetic: true,
+          warning: "Synthetic planning assumption only. Not active fiber. Requires engineer/as-built verification.",
+        },
+        geometry: feature.geometry,
+      }];
+    })),
     spliceClosures: layers.spliceClosures ? collection(spliceClosures.map((feature) => ({
       type: "Feature",
       properties: {
@@ -977,7 +1237,8 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    fiberAssignments: layers.fiberAssignments ? collection(fiberAssignments.flatMap((assignment) => {
+    fiberAssignments: layers.fiberAssignments || layers.criticalRidingCircuits ? collection(fiberAssignments.flatMap((assignment) => {
+      if (layers.criticalRidingCircuits && !layers.fiberAssignments && !isCriticalFiberAssignment(assignment)) return [];
       const coordinates = assignment.cableIds
         .map((cableId) => cableById.get(cableId))
         .filter(Boolean)
@@ -991,6 +1252,7 @@ function buildDatasets(
           label: assignment.assignmentName,
           status: assignment.status,
           serviceType: assignment.serviceType,
+          isCritical: isCriticalFiberAssignment(assignment),
           estimatedLossDb: assignment.estimatedLossDb || 0,
           synthetic: true,
         },
@@ -1248,8 +1510,9 @@ function setCursor(map: MapLibreMap, cursor: string) {
   map.getCanvas().style.cursor = cursor;
 }
 
-function renderPopupHtml(label: unknown, kind: string, status: unknown) {
-  return `<div class="maplibre-popup-card"><strong>${escapeHtml(String(label))}</strong><span>${escapeHtml(kind.replaceAll("_", " "))} / ${escapeHtml(String(status))}</span></div>`;
+function renderPopupHtml(label: unknown, kind: string, status: unknown, warning?: unknown) {
+  const warningHtml = warning ? `<small>${escapeHtml(String(warning))}</small>` : "";
+  return `<div class="maplibre-popup-card"><strong>${escapeHtml(String(label))}</strong><span>${escapeHtml(kind.replaceAll("_", " "))} / ${escapeHtml(String(status))}</span>${warningHtml}</div>`;
 }
 
 function escapeHtml(value: string) {

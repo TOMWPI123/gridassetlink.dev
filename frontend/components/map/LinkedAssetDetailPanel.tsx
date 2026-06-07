@@ -56,7 +56,15 @@ export function LinkedAssetDetailPanel({ selection, onClose }: LinkedAssetDetail
           <pre>{JSON.stringify(nodeParameters, null, 2)}</pre>
         </details>
       ) : null}
-      {selection.kind === "synthetic_substation" || selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure" ? (
+      {selection.kind === "opgw_cable" ? (
+        <div className="linked-asset-actions">
+          <a href={`/fiber-trace?cable=${encodeURIComponent(selection.id)}`}>Open Fiber Trace</a>
+          <a href={`/outage-impact?cable=${encodeURIComponent(selection.id)}`}>Open Outage Impact</a>
+          <button type="button">Convert assumption to planned fiber</button>
+          <button type="button">Create work order</button>
+        </div>
+      ) : null}
+      {selection.kind === "synthetic_substation" || selection.kind === "transmission_structure" || selection.kind === "splice_closure" ? (
         <div className="linked-asset-actions">
           <button type="button">Add splice closure</button>
           <button type="button">Add patch panel</button>
@@ -101,7 +109,32 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
   if (selection.kind === "synthetic_substation") {
     return selection.record.properties as unknown as Record<string, unknown>;
   }
-  if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "splice_closure") {
+  if (selection.kind === "opgw_cable") {
+    return {
+      routeName: selection.record.properties.cableName,
+      routeId: selection.record.properties.id,
+      fromSubstation: selection.record.properties.startStructureId,
+      toSubstation: selection.record.properties.endStructureId,
+      transmissionLineCorridor: selection.record.properties.lineName || selection.record.properties.lineId,
+      routeMiles: selection.record.properties.routeMiles,
+      fiberCount: selection.record.properties.fiberCount,
+      cableId: selection.record.properties.id,
+      status: opgwPlanningStatus(selection.record.properties.status),
+      sourceStatus: selection.record.properties.status,
+      confidenceLevel: opgwConfidenceLevel(selection.record.properties.id, selection.record.properties.status),
+      availableStrands: "See Available Strand Capacity layer / Fiber Strand Table",
+      assignedStrands: "See Fiber Strand Table",
+      criticalCircuits: "See Critical Riding Circuits layer",
+      spliceClosures: selection.record.properties.connectedSpliceClosureIds.length,
+      patchPanels: "See Patch Panels layer",
+      conversionWorkflow: "synthetic assumption -> planned OPGW -> designed -> work order -> as-built verified",
+      synthetic: true,
+      source: selection.record.properties.source,
+      warning: "Synthetic planning assumption only. Not active fiber. Requires engineer/as-built verification.",
+      geometryType: selection.record.geometry.type,
+    };
+  }
+  if (selection.kind === "transmission_structure" || selection.kind === "splice_closure") {
     return {
       ...selection.record.properties,
       geometryType: selection.record.geometry.type,
@@ -134,11 +167,23 @@ function detailNoticeForSelection(selection: StreetMapSelection) {
   if (selection.kind === "fcc_microwave_link") return "Public FCC ULS microwave path reference. Endpoint, frequency, EIRP, path, and owner fields come from public FCC license tables only. Do not treat this as private utility routing or an operational circuit.";
   if (selection.kind === "synthetic_substation") return "Synthetic demo/planning substation. Not a real utility asset.";
   if (selection.kind === "transmission_structure") return "Synthetic transmission structure point generated from public line geometry. It is not a real pole, tower, or utility structure location.";
-  if (selection.kind === "opgw_cable") return "Synthetic OPGW planning route. Do not treat this as verified fiber or an operational telecom path.";
+  if (selection.kind === "opgw_cable") return "Synthetic planning assumption only. Not active fiber. Requires engineer/as-built verification.";
   if (selection.kind === "splice_closure") return "Synthetic splice closure at a synthetic structure point. It is for demo splicing workflows only.";
   if (selection.kind === "fiber_assignment") return "Synthetic fiber assignment for planning demonstration. It is not an actual circuit path.";
   if (selection.kind === "patch_panel") return "Synthetic patch panel and termination ports for demo planning.";
   return "";
+}
+
+function opgwPlanningStatus(status: string) {
+  if (status === "planned") return "planned";
+  if (status === "proposed") return "design";
+  return "synthetic_assumption";
+}
+
+function opgwConfidenceLevel(id: string, status: string) {
+  if (status === "planned") return "high";
+  if (status === "proposed") return "medium";
+  return Number(id.replace(/\D/g, "").slice(-4) || 0) % 5 === 0 ? "medium" : "low";
 }
 
 function formatLabel(value: string) {
