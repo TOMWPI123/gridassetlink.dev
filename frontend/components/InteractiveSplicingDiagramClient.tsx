@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Cable, GitCompareArrows, Plus, Trash2, Workflow, Zap } from "lucide-react";
+import { AlertTriangle, Cable, GitCompareArrows, Plus, Trash2, Workflow, X, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { FiberSplice } from "@/lib/types/assets";
 import type { SpliceManagerViewModel } from "@/lib/opgw/continuityEngine";
@@ -36,6 +36,7 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
   const [query, setQuery] = useState("");
   const [spliceRows, setSpliceRows] = useState<FiberSplice[]>(() => [...view.existingSplices, ...view.proposedSplices]);
   const [selectedSpliceId, setSelectedSpliceId] = useState(spliceRows[0]?.id || "");
+  const [nodeMenuOpen, setNodeMenuOpen] = useState(false);
   const [validationMessage, setValidationMessage] = useState("Click a splice connection to inspect strand continuity.");
 
   const incomingSections = view.connectedCableSections.filter((section) => section.direction === "incoming");
@@ -113,6 +114,12 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
     );
   }
 
+  function selectSpliceNode(splice: FiberSplice) {
+    setSelectedSpliceId(splice.id);
+    setNodeMenuOpen(true);
+    setValidationMessage(`${splice.id} selected for inspection.`);
+  }
+
   return (
     <main className="splicing-diagram-page">
       <header className="splicing-diagram-hero">
@@ -180,14 +187,11 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
                     role="button"
                     tabIndex={0}
                     aria-label={`Select splice ${splice.id}`}
-                    onClick={() => {
-                      setSelectedSpliceId(splice.id);
-                      setValidationMessage(`${splice.id} selected for inspection.`);
-                    }}
+                    onClick={() => selectSpliceNode(splice)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        setSelectedSpliceId(splice.id);
+                        selectSpliceNode(splice);
                       }
                     }}
                   >
@@ -211,6 +215,39 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
               )}
             </svg>
           </div>
+
+          {nodeMenuOpen && selectedSplice ? (
+            <section className="splicing-node-menu" aria-label="Splice node action menu">
+              <button className="splicing-node-menu-close" type="button" onClick={() => setNodeMenuOpen(false)} aria-label="Close splice node menu">
+                <X size={16} />
+              </button>
+              <strong>{view.splicePoint.properties.structureNumber} {view.closure?.properties.closureType?.replaceAll("_", " ") || "splice node"}</strong>
+              <span>Splice Closure / {selectedSplice.status === "existing" ? "Existing" : "Proposed"}</span>
+              <dl>
+                <div><dt>Splice Point</dt><dd>{selectedPointId}</dd></div>
+                <div><dt>Closure</dt><dd>{closureId}</dd></div>
+                <div><dt>Structure</dt><dd>{view.splicePoint.properties.structureId}</dd></div>
+                <div><dt>Line</dt><dd>{view.splicePoint.properties.transmissionLineId}</dd></div>
+                <div><dt>Route</dt><dd>{view.splicePoint.properties.opgwRouteId}</dd></div>
+                <div><dt>Location</dt><dd>{view.splicePoint.properties.spliceType.replaceAll("_", " ")}</dd></div>
+                <div><dt>Fiber Count</dt><dd>{Math.max(24, ...view.connectedCableSections.map((section) => section.fiberCount))}</dd></div>
+                <div><dt>Incoming</dt><dd>{incomingSections.length}</dd></div>
+                <div><dt>Outgoing</dt><dd>{outgoingSections.length}</dd></div>
+                <div><dt>Active Services</dt><dd>{view.services.filter((service) => service.layerType === "existing").length}</dd></div>
+                <div><dt>Proposed Services</dt><dd>{view.services.filter((service) => service.layerType === "proposed").length}</dd></div>
+              </dl>
+              <small>Synthetic splice closure only. Existing/proposed rows are demo planning records.</small>
+              <nav aria-label="Splice node menu actions">
+                <Link className="primary" href={`/opgw/splices/${encodeURIComponent(selectedPointId)}/diagram`}>Interactive Splicing Diagram</Link>
+                <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}`}>Open Splice Manager</Link>
+                <Link href={`/fiber-trace?splicePoint=${encodeURIComponent(selectedPointId)}`}>View Fiber Continuity</Link>
+                <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}?layer=existing`}>View Existing Splices</Link>
+                <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}?layer=proposed`}>View Proposed Splices</Link>
+                <Link href={`/outage-impact?splicePoint=${encodeURIComponent(selectedPointId)}`}>Analyze Outage Impact</Link>
+                <Link href={`/work-orders/new?splicePoint=${encodeURIComponent(selectedPointId)}`}>Create Work Order</Link>
+              </nav>
+            </section>
+          ) : null}
         </div>
 
         <aside className="splicing-diagram-side">
@@ -230,6 +267,7 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
                 <div className="splicing-diagram-actions">
                   <button type="button" onClick={validateDiagram}>Validate continuity</button>
                   <button type="button" onClick={deleteSelectedProposed} disabled={selectedSplice.status === "existing"}><Trash2 size={14} />Delete proposed</button>
+                  <button type="button" onClick={() => setNodeMenuOpen(true)}>Open node menu</button>
                 </div>
               </>
             ) : (

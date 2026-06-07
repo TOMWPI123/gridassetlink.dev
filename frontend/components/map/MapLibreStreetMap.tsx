@@ -87,12 +87,14 @@ const clickableLayerIds = [
   "synthetic-opgw-routes",
   "synthetic-opgw-cable-sections",
   "synthetic-opgw-span-segments",
+  "synthetic-opgw-splice-points-hit",
   "synthetic-opgw-splice-points",
   "synthetic-opgw-cables",
   "synthetic-opgw-capacity",
   "synthetic-opgw-outage-impact",
   "synthetic-fiber-assignments",
   "synthetic-transmission-structures",
+  "synthetic-splice-closures-hit",
   "synthetic-splice-closures",
   "synthetic-patch-panels",
   "regional-transmission-lines",
@@ -577,6 +579,17 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     },
   });
   map.addLayer({
+    id: "synthetic-opgw-splice-points-hit",
+    type: "circle",
+    source: sourceIds.opgwSplicePoints,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 14, 10, 18, 13, 22],
+      "circle-color": "rgba(255, 255, 255, 0.01)",
+      "circle-stroke-opacity": 0,
+    },
+  });
+  map.addLayer({
     id: "synthetic-opgw-splice-point-labels",
     type: "symbol",
     source: sourceIds.opgwSplicePoints,
@@ -754,6 +767,17 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
       "circle-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#ffb84d"],
       "circle-stroke-color": "#fff6d4",
       "circle-stroke-width": 1.4,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-splice-closures-hit",
+    type: "circle",
+    source: sourceIds.spliceClosures,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 15, 10, 20, 13, 24],
+      "circle-color": "rgba(255, 255, 255, 0.01)",
+      "circle-stroke-opacity": 0,
     },
   });
   map.addLayer({

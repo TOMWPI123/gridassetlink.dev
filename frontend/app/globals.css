@@ -697,6 +697,10 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   min-width: 0;
 }
 
+.splicing-diagram-main {
+  position: relative;
+}
+
 .splicing-diagram-toolbar {
   display: grid;
   grid-template-columns: minmax(150px, 210px) minmax(220px, 1fr) auto auto;
@@ -913,8 +917,119 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 
 .splicing-diagram-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
+}
+
+.splicing-node-menu {
+  position: absolute;
+  top: 86px;
+  left: 18px;
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  width: min(318px, calc(100vw - 40px));
+  max-height: min(660px, calc(100vh - 190px));
+  overflow: auto;
+  padding: 14px 12px;
+  border: 1px solid rgba(15, 23, 42, .12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .94);
+  color: #10191d;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, .26);
+  backdrop-filter: blur(10px);
+}
+
+.splicing-node-menu-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cbd5df;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+}
+
+.splicing-node-menu > strong {
+  padding-right: 34px;
+  color: #10191d;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.splicing-node-menu > span {
+  color: #4f6268;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.splicing-node-menu dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 8px;
+  margin: 0;
+}
+
+.splicing-node-menu dl div {
+  min-width: 0;
+}
+
+.splicing-node-menu dt {
+  color: #66747a;
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.splicing-node-menu dd {
+  margin: 1px 0 0;
+  color: #10191d;
+  font-size: 11px;
+  font-weight: 780;
+  overflow-wrap: anywhere;
+}
+
+.splicing-node-menu small {
+  color: #8d5b00;
+  font-size: 10px;
+  font-weight: 780;
+  line-height: 1.25;
+}
+
+.splicing-node-menu nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.splicing-node-menu nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px solid #c7d8df;
+  border-radius: 7px;
+  background: #f4fbfd;
+  color: #0b4f52;
+  font-size: 10.5px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.splicing-node-menu nav a.primary {
+  grid-column: 1 / -1;
+  min-height: 32px;
+  border-color: #116466;
+  background: #116466;
+  color: #fff;
 }
 
 .splicing-diagram-section-list {
@@ -980,6 +1095,13 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 
   .splicing-diagram-actions {
     grid-template-columns: 1fr;
+  }
+
+  .splicing-node-menu {
+    position: fixed;
+    inset: auto 12px 18px;
+    width: auto;
+    max-height: 72vh;
   }
 }
 
@@ -2658,8 +2780,16 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 }
 
 .splice-popup-card {
-  min-width: 290px;
+  width: min(318px, calc(100vw - 40px));
+  max-height: min(660px, calc(100vh - 96px));
+  overflow: auto;
   gap: 8px;
+}
+
+.splice-popup-card > strong {
+  padding-right: 34px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .splice-popup-card dl {
@@ -2698,19 +2828,21 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
+  min-height: 32px;
   padding: 5px 7px;
   border: 1px solid #c7d8df;
   border-radius: 7px;
   background: #f4fbfd;
   color: #0b4f52;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 850;
+  line-height: 1.2;
   text-align: center;
 }
 
 .splice-popup-card nav a:first-child {
   grid-column: 1 / -1;
+  min-height: 32px;
   border-color: #116466;
   background: #116466;
   color: #fff;
@@ -2724,15 +2856,15 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 }
 
 .maplibregl-popup-close-button {
-  top: 6px;
-  right: 6px;
+  top: 7px;
+  right: 7px;
   display: inline-grid;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   place-items: center;
-  border: 1px solid rgba(16,25,29,.12);
-  border-radius: 7px;
-  background: rgba(16,25,29,.06);
+  border: 1px solid #cbd5df;
+  border-radius: 999px;
+  background: #fff;
   color: #10191d;
   font-size: 18px;
   line-height: 1;
