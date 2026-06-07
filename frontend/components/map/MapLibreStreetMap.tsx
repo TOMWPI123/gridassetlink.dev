@@ -175,7 +175,7 @@ export function MapLibreStreetMap({
       });
 
       mapRef.current = map;
-      popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14 });
+      popupRef.current = new maplibregl.Popup({ closeButton: true, closeOnClick: false, offset: 14 });
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-left");
       map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
 

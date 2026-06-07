@@ -1806,8 +1806,32 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 }
 
 .maplibregl-popup-content {
+  min-width: 230px;
+  padding-right: 38px;
   border-radius: 8px;
   box-shadow: 0 16px 36px rgba(0,0,0,.24);
+}
+
+.maplibregl-popup-close-button {
+  top: 6px;
+  right: 6px;
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgba(16,25,29,.12);
+  border-radius: 7px;
+  background: rgba(16,25,29,.06);
+  color: #10191d;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.maplibregl-popup-close-button:hover,
+.maplibregl-popup-close-button:focus-visible {
+  background: rgba(17,100,102,.12);
+  color: #0b383a;
+  outline: 0;
 }
 
 .street-level-svg {
