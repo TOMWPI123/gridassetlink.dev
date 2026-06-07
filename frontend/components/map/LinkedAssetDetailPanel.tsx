@@ -1,17 +1,18 @@
 "use client";
 
-import { Link2 } from "lucide-react";
+import { Link2, X } from "lucide-react";
 import type { StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 
 type LinkedAssetDetailPanelProps = {
   selection: StreetMapSelection | null;
+  onClose?: () => void;
 };
 
-export function LinkedAssetDetailPanel({ selection }: LinkedAssetDetailPanelProps) {
+export function LinkedAssetDetailPanel({ selection, onClose }: LinkedAssetDetailPanelProps) {
   if (!selection) {
     return (
       <section className="linked-asset-detail-panel" aria-label="Linked asset detail panel">
-        <div className="street-panel-title"><Link2 size={16} />Asset Detail Panel</div>
+        <div className="street-panel-title"><span className="linked-asset-title-text"><Link2 size={16} />Asset Detail Panel</span></div>
         <p>Select a street-level asset, diagram annotation, transmission line, substation, node, or work order marker to inspect linked planning fields.</p>
       </section>
     );
@@ -25,7 +26,12 @@ export function LinkedAssetDetailPanel({ selection }: LinkedAssetDetailPanelProp
 
   return (
     <section className="linked-asset-detail-panel" aria-label="Linked asset detail panel">
-      <div className="street-panel-title"><Link2 size={16} />Asset Detail Panel</div>
+      <div className="street-panel-title">
+        <span className="linked-asset-title-text"><Link2 size={16} />Asset Detail Panel</span>
+        <button className="linked-asset-close-button" type="button" onClick={onClose} aria-label={`Close details for ${selection.label}`}>
+          <X size={15} />
+        </button>
+      </div>
       <div className="linked-asset-heading">
         <span>{selection.kind.replaceAll("_", " ")}</span>
         <strong>{selection.label}</strong>

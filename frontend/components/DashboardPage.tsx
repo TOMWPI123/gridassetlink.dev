@@ -551,6 +551,13 @@ export function DashboardPage() {
     setRightCollapsed(false);
   }
 
+  function handleCloseAssetDetail() {
+    setSelectedAsset(null);
+    setRightMode("summary");
+    setRightCollapsed(true);
+    showToast("Closed asset details.");
+  }
+
   function handleStreetLayerChange(layer: StreetMapLayerKey, enabled: boolean) {
     setStreetLayers((current) => ({ ...current, [layer]: enabled }));
   }
@@ -873,7 +880,7 @@ export function DashboardPage() {
                 </div>
               ) : null}
               {rightMode === "sources" ? <DashboardDataSourcesPanel /> : null}
-              {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} /> : null}
+              {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} onClose={handleCloseAssetDetail} /> : null}
               {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} onUpdateStrands={updateFiberStrands} /> : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
               {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}

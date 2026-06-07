@@ -2224,6 +2224,32 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   line-height: 1.45;
 }
 
+.linked-asset-title-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.linked-asset-close-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(238,252,251,.14);
+  border-radius: 8px;
+  background: rgba(238,252,251,.055);
+  color: var(--dash-text);
+  cursor: pointer;
+}
+
+.linked-asset-close-button:hover,
+.linked-asset-close-button:focus-visible {
+  border-color: rgba(105,215,228,.44);
+  background: rgba(105,215,228,.14);
+  outline: 0;
+}
+
 .linked-asset-heading {
   display: grid;
   gap: 4px;
