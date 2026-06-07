@@ -1878,6 +1878,7 @@ function renderSplicePopupHtml(properties: Record<string, unknown>) {
   const splicePointId = String(properties.splicePointId || properties.id || "");
   const closureId = String(properties.closureId || "");
   const managerHref = `/opgw/splices/${encodeURIComponent(splicePointId)}`;
+  const diagramHref = `${managerHref}/diagram`;
   const continuityHref = `/fiber-trace?splicePoint=${encodeURIComponent(splicePointId)}`;
   const existingHref = `${managerHref}?layer=existing`;
   const proposedHref = `${managerHref}?layer=proposed`;
@@ -1902,6 +1903,7 @@ function renderSplicePopupHtml(properties: Record<string, unknown>) {
       </dl>
       <small>${escapeHtml(String(properties.warning || "Synthetic demo splice data only."))}</small>
       <nav aria-label="Splice node actions">
+        <a href="${diagramHref}">Interactive Splicing Diagram</a>
         <a href="${managerHref}">Open Splice Manager</a>
         <a href="${continuityHref}">View Fiber Continuity</a>
         <a href="${existingHref}">View Existing Splices</a>

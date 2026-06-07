@@ -258,6 +258,7 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
 
           <Panel title="Work Orders" icon={<ClipboardList size={17} />}>
             <div className="splice-action-stack">
+              <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}/diagram`}>Open interactive splicing diagram</Link>
               <Link href={`/work-orders/new?splicePoint=${encodeURIComponent(selectedPointId)}`}>Create work order</Link>
               <Link href={`/outage-impact?splicePoint=${encodeURIComponent(selectedPointId)}`}>Analyze outage impact</Link>
               <Link href={`/fiber-trace?splicePoint=${encodeURIComponent(selectedPointId)}`}>Open fiber trace</Link>
