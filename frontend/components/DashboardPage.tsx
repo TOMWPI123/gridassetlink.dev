@@ -86,6 +86,17 @@ type MapStatus = "loading" | "active" | "error";
 type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
 type DashboardOperatingMode = "reference" | "planning" | "opgw_engineering";
+type DashboardLayerSummary = {
+  key: StreetMapLayerKey;
+  label: string;
+  category: "Public reference" | "Synthetic OPGW Fiber" | "Planning assets" | "Analysis overlays";
+  source: string;
+  total: number;
+  visible: number;
+  enabled: boolean;
+  moduleHref: string;
+  safety: string;
+};
 
 const availableDeviceIds = ["NODE-WBS-ICON", "NODE-AUB-ICON", "NODE-BOS-OTN", "NODE-RI-RTR", "NODE-NH-MW"];
 const availableCircuitIds = ["87L-MA-WBS-AUB-001", "87L-MA-WBS-AUB-002", "DTT-MA-AUB-MIL-001", "SCADA-MA-BOS-RI-001", "DWDM-ME-BOS-001"];
@@ -139,6 +150,36 @@ const searchLayerOptions: Array<{ value: DashboardSearchLayer; label: string; ki
   { value: "syntheticSubstations", label: "Synthetic substations", kinds: ["synthetic_substation"] },
   { value: "editablePlanning", label: "Editable planning assets", kinds: ["substation", "node", "transmission_line", "work_order"] },
 ];
+
+const moduleLayerCoverage: Record<string, StreetMapLayerKey[]> = {
+  "/dashboard": ["publicTransmissionLines", "publicSubstations", "transmissionStructures", "assumedOpgwRoutes", "spliceClosures"],
+  "/regional-grid": ["publicTransmissionLines", "publicSubstations", "fccUtilityTowers", "fccMicrowaveLinks"],
+  "/substations": ["publicSubstations", "syntheticSubstations"],
+  "/devices": ["telecomNodes", "selIconNodes", "fccUtilityTowers"],
+  "/device-ports": ["selIconNodes", "patchPanels", "fiberAssignments"],
+  "/circuits": ["criticalRidingCircuits", "fiberAssignments", "fccMicrowaveLinks"],
+  "/work-orders": ["opgwOpenWorkOrders", "workOrderLocations", "opgwSpanInspectionIssues"],
+  "/transmission-lines": ["publicTransmissionLines", "assumedOpgwRoutes", "plannedOpgwFiber"],
+  "/transmission-structures": ["transmissionStructures", "opgwSpanSegments", "spliceClosures"],
+  "/opgw": ["assumedOpgwRoutes", "plannedOpgwFiber", "verifiedOpgwFiber"],
+  "/opgw-cables": ["syntheticOpgwCables", "opgwCableSections", "availableStrandCapacity"],
+  "/distribution-fiber": ["distributionFiberRoutes", "fiberAssignments"],
+  "/fiber-cables": ["syntheticOpgwCables", "opgwCableSections"],
+  "/fiber-strands": ["fiberStrandsLayer", "availableStrandCapacity"],
+  "/fiber-assignments": ["fiberAssignments", "criticalRidingCircuits", "availableStrandCapacity"],
+  "/splice-closures": ["spliceClosures", "existingFiberSplices", "proposedFiberSplices"],
+  "/splice-points": ["opgwSplicePoints", "existingFiberSplices", "proposedFiberSplices"],
+  "/patch-panels": ["patchPanels", "spliceClosures"],
+  "/deviceops/change-requests": ["proposedChanges", "plannedOpgwFiber", "opgwOpenWorkOrders"],
+  "/fiber-trace": ["fiberAssignments", "opgwCableSections", "opgwSpanSegments"],
+  "/outage-impact": ["opgwOutageImpact", "criticalRidingCircuits", "opgwSpanInspectionIssues"],
+  "/splice-matrix": ["existingFiberSplices", "proposedFiberSplices", "compareSpliceLayers"],
+  "/fiber-strand-table": ["fiberStrandsLayer", "availableStrandCapacity"],
+  "/fiber-assignment-planner": ["fiberAssignments", "availableStrandCapacity", "criticalRidingCircuits"],
+  "/import-export": ["publicTransmissionLines", "publicSubstations", "syntheticOpgwCables"],
+  "/data-sources": ["publicTransmissionLines", "publicSubstations", "fccUtilityTowers", "fccMicrowaveLinks"],
+  "/sql-reports": ["publicTransmissionLines", "publicSubstations", "opgwOutageImpact", "availableStrandCapacity"],
+};
 
 export function DashboardPage() {
   const pathname = usePathname();
@@ -474,6 +515,44 @@ export function DashboardPage() {
   const layerFilteredSpliceClosures = useMemo(
     () => streetLayers.spliceClosures || streetLayers.existingFiberSplices || streetLayers.proposedFiberSplices || streetLayers.compareSpliceLayers ? visibleSpliceClosures : [],
     [streetLayers.compareSpliceLayers, streetLayers.existingFiberSplices, streetLayers.proposedFiberSplices, streetLayers.spliceClosures, visibleSpliceClosures],
+  );
+  const dashboardLayerSummaries = useMemo(
+    () => buildDashboardLayerSummaries({
+      layers: streetLayers,
+      publicLineCount: visiblePublicTransmissionLines.length,
+      visiblePublicLineCount: layerFilteredPublicTransmissionLines.length,
+      publicSubstationCount: visiblePublicSubstations.length,
+      visiblePublicSubstationCount: layerFilteredPublicSubstations.length,
+      fccTowerCount: visibleFccUtilityTowers.length,
+      visibleFccTowerCount: layerFilteredFccUtilityTowers.length,
+      fccLinkCount: visibleFccMicrowaveLinks.length,
+      visibleFccLinkCount: layerFilteredFccMicrowaveLinks.length,
+      syntheticSubstationCount: visibleSyntheticSubstations.length,
+      structureCount: visibleTransmissionStructures.length,
+      visibleStructureCount: layerFilteredTransmissionStructures.length,
+      opgwCableCount: visibleOpgwCables.length,
+      opgwRouteCount: visibleOpgwRoutes.length,
+      assumedOpgwRouteCount: opgwPlanningMetrics.assumedRouteCount,
+      plannedOpgwRouteCount: opgwPlanningMetrics.plannedRouteCount,
+      verifiedOpgwRouteCount: opgwPlanningMetrics.verifiedRouteCount,
+      opgwCableSectionCount: visibleOpgwCableSections.length,
+      opgwSpanSegmentCount: visibleOpgwSpanSegments.length,
+      opgwSplicePointCount: visibleOpgwSplicePoints.length,
+      spliceClosureCount: visibleSpliceClosures.length,
+      visibleSpliceClosureCount: layerFilteredSpliceClosures.length,
+      patchPanelCount: visiblePatchPanels.length,
+      fiberStrandCount: fiberStrands.length,
+      availableStrandCount: opgwPlanningMetrics.availableStrands,
+      fiberAssignmentCount: visibleFiberAssignments.length,
+      criticalRidingCircuitCount: opgwPlanningMetrics.criticalRidingCircuits,
+      outageImpactCount: opgwPlanningMetrics.outageImpactCount,
+      openOpgwWorkOrderCount: opgwPlanningMetrics.openWorkOrders,
+      spanInspectionIssueCount: opgwPlanningMetrics.spanInspectionIssues,
+      nodeCount: visibleNodes.length,
+      transmissionLineCount: visibleTransmissionLines.length,
+      workOrderLocationCount: availableWorkOrderIds.length,
+    }),
+    [fiberStrands.length, layerFilteredFccMicrowaveLinks.length, layerFilteredFccUtilityTowers.length, layerFilteredPublicSubstations.length, layerFilteredPublicTransmissionLines.length, layerFilteredSpliceClosures.length, layerFilteredTransmissionStructures.length, opgwPlanningMetrics.assumedRouteCount, opgwPlanningMetrics.availableStrands, opgwPlanningMetrics.criticalRidingCircuits, opgwPlanningMetrics.openWorkOrders, opgwPlanningMetrics.outageImpactCount, opgwPlanningMetrics.plannedRouteCount, opgwPlanningMetrics.spanInspectionIssues, opgwPlanningMetrics.verifiedRouteCount, streetLayers, visibleFccMicrowaveLinks.length, visibleFccUtilityTowers.length, visibleFiberAssignments.length, visibleNodes.length, visibleOpgwCableSections.length, visibleOpgwCables.length, visibleOpgwRoutes.length, visibleOpgwSpanSegments.length, visibleOpgwSplicePoints.length, visiblePatchPanels.length, visiblePublicSubstations.length, visiblePublicTransmissionLines.length, visibleSpliceClosures.length, visibleSyntheticSubstations.length, visibleTransmissionLines.length, visibleTransmissionStructures.length],
   );
 
   const summaryCards = useMemo(
@@ -933,8 +1012,8 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
             </div>
             <div className="dashboard-drawer-body">
-              {rightMode === "modules" ? <ModulesDrawer pathname={pathname} /> : null}
-              {rightMode === "summary" ? <SummaryDrawer cards={summaryCards} publicOnly={publicOnly} mapStatusMessage={mapStatusMessage} opgwMetrics={opgwPlanningMetrics} /> : null}
+              {rightMode === "modules" ? <ModulesDrawer pathname={pathname} layerSummaries={dashboardLayerSummaries} /> : null}
+              {rightMode === "summary" ? <SummaryDrawer cards={summaryCards} publicOnly={publicOnly} mapStatusMessage={mapStatusMessage} opgwMetrics={opgwPlanningMetrics} layerSummaries={dashboardLayerSummaries} /> : null}
               {rightMode === "filters" ? (
                 <FiltersResultsDrawer
                   publicOnly={publicOnly}
@@ -1192,7 +1271,7 @@ function DashboardDataSourcesPanel() {
   );
 }
 
-function ModulesDrawer({ pathname }: { pathname: string }) {
+function ModulesDrawer({ pathname, layerSummaries }: { pathname: string; layerSummaries: DashboardLayerSummary[] }) {
   return (
     <section className="dashboard-module-drawer" aria-label="Application modules">
       <div className="dashboard-panel-heading">
@@ -1202,22 +1281,68 @@ function ModulesDrawer({ pathname }: { pathname: string }) {
           <span>No-account synthetic planning modules</span>
         </div>
       </div>
+      <LayerSummaryDigest layerSummaries={layerSummaries} />
       <div className="dashboard-module-sections">
         {appNavGroups.map((group) => (
           <section className="dashboard-module-section" key={group.title}>
             <div className="dashboard-module-section-title">{group.title}</div>
             <div className="dashboard-module-link-grid">
-              {group.items.map(([href, label, Icon]) => (
-                <Link className={`dashboard-module-link ${isActiveModule(pathname, href) ? "active" : ""}`} href={href} key={href}>
-                  <Icon size={15} />
-                  <span>{label}</span>
-                </Link>
-              ))}
+              {group.items.map(([href, label, Icon]) => {
+                const moduleLayers = layersForModule(href, layerSummaries);
+                const visibleFeatureCount = moduleLayers.reduce((sum, layer) => sum + layer.visible, 0);
+                return (
+                  <Link className={`dashboard-module-link ${isActiveModule(pathname, href) ? "active" : ""}`} href={href} key={href}>
+                    <Icon size={15} />
+                    <span className="dashboard-module-link-copy">
+                      <span>{label}</span>
+                      {moduleLayers.length ? (
+                        <small>{moduleLayers.slice(0, 2).map((layer) => layer.label).join(" + ")}{moduleLayers.length > 2 ? ` +${moduleLayers.length - 2}` : ""}</small>
+                      ) : <small>Module data tables</small>}
+                    </span>
+                    <span className="dashboard-module-layer-count">
+                      {formatCompactCount(visibleFeatureCount)}
+                      <small>visible</small>
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         ))}
       </div>
     </section>
+  );
+}
+
+function LayerSummaryDigest({ layerSummaries, compact = false }: { layerSummaries: DashboardLayerSummary[]; compact?: boolean }) {
+  const activeLayers = layerSummaries.filter((layer) => layer.enabled);
+  const visibleFeatures = activeLayers.reduce((sum, layer) => sum + layer.visible, 0);
+  const publicLayers = activeLayers.filter((layer) => layer.category === "Public reference");
+  const syntheticLayers = activeLayers.filter((layer) => layer.category !== "Public reference");
+  const topLayers = [...activeLayers].sort((a, b) => b.visible - a.visible).slice(0, compact ? 6 : 8);
+  return (
+    <article className={`dashboard-layer-digest ${compact ? "compact" : ""}`}>
+      <div className="dashboard-layer-digest-title">
+        <Layers size={15} />
+        <span>
+          <strong>Layer information</strong>
+          <small>{activeLayers.length} active map layers / {formatCompactCount(visibleFeatures)} visible features</small>
+        </span>
+      </div>
+      <dl>
+        <div><dt>Public reference</dt><dd>{publicLayers.length}</dd></div>
+        <div><dt>Synthetic planning</dt><dd>{syntheticLayers.length}</dd></div>
+        <div><dt>Layer catalog</dt><dd>{layerSummaries.length}</dd></div>
+      </dl>
+      <div className="dashboard-layer-chip-list">
+        {topLayers.map((layer) => (
+          <Link href={layer.moduleHref} className={`dashboard-layer-chip ${layer.enabled ? "active" : ""}`} title={`${layer.source}. ${layer.safety}`} key={layer.key}>
+            <span>{layer.label}</span>
+            <strong>{formatCompactCount(layer.visible)}</strong>
+          </Link>
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -1307,7 +1432,7 @@ function isActiveModule(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function SummaryDrawer({ cards, publicOnly, mapStatusMessage, opgwMetrics }: { cards: ReturnType<typeof buildSummaryCards>; publicOnly: boolean; mapStatusMessage: string; opgwMetrics: ReturnType<typeof buildOpgwPlanningMetrics> }) {
+function SummaryDrawer({ cards, publicOnly, mapStatusMessage, opgwMetrics, layerSummaries }: { cards: ReturnType<typeof buildSummaryCards>; publicOnly: boolean; mapStatusMessage: string; opgwMetrics: ReturnType<typeof buildOpgwPlanningMetrics>; layerSummaries: DashboardLayerSummary[] }) {
   return (
     <section className="dashboard-floating-summary">
       <div className="dashboard-panel-heading">
@@ -1317,6 +1442,7 @@ function SummaryDrawer({ cards, publicOnly, mapStatusMessage, opgwMetrics }: { c
           <span>{publicOnly ? "Public ISO-NE reference mode" : "No-account synthetic planning workspace"}</span>
         </div>
       </div>
+      <LayerSummaryDigest layerSummaries={layerSummaries} compact />
       <article className="opgw-planning-card">
         <div>
           <Cable size={16} />
@@ -1923,6 +2049,144 @@ function isDashboardCriticalAssignment(assignment: FiberAssignment) {
 
 function formatMiles(value: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} mi`;
+}
+
+function formatCompactCount(value: number) {
+  if (value >= 1000000) return `${(value / 1000000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M`;
+  if (value >= 1000) return `${(value / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k`;
+  return value.toLocaleString();
+}
+
+function layersForModule(href: string, layerSummaries: DashboardLayerSummary[]) {
+  const layerByKey = new Map(layerSummaries.map((layer) => [layer.key, layer]));
+  return (moduleLayerCoverage[href] || []).map((key) => layerByKey.get(key)).filter((layer): layer is DashboardLayerSummary => Boolean(layer));
+}
+
+function buildDashboardLayerSummaries({
+  layers,
+  publicLineCount,
+  visiblePublicLineCount,
+  publicSubstationCount,
+  visiblePublicSubstationCount,
+  fccTowerCount,
+  visibleFccTowerCount,
+  fccLinkCount,
+  visibleFccLinkCount,
+  syntheticSubstationCount,
+  structureCount,
+  visibleStructureCount,
+  opgwCableCount,
+  opgwRouteCount,
+  assumedOpgwRouteCount,
+  plannedOpgwRouteCount,
+  verifiedOpgwRouteCount,
+  opgwCableSectionCount,
+  opgwSpanSegmentCount,
+  opgwSplicePointCount,
+  spliceClosureCount,
+  visibleSpliceClosureCount,
+  patchPanelCount,
+  fiberStrandCount,
+  availableStrandCount,
+  fiberAssignmentCount,
+  criticalRidingCircuitCount,
+  outageImpactCount,
+  openOpgwWorkOrderCount,
+  spanInspectionIssueCount,
+  nodeCount,
+  transmissionLineCount,
+  workOrderLocationCount,
+}: {
+  layers: Record<StreetMapLayerKey, boolean>;
+  publicLineCount: number;
+  visiblePublicLineCount: number;
+  publicSubstationCount: number;
+  visiblePublicSubstationCount: number;
+  fccTowerCount: number;
+  visibleFccTowerCount: number;
+  fccLinkCount: number;
+  visibleFccLinkCount: number;
+  syntheticSubstationCount: number;
+  structureCount: number;
+  visibleStructureCount: number;
+  opgwCableCount: number;
+  opgwRouteCount: number;
+  assumedOpgwRouteCount: number;
+  plannedOpgwRouteCount: number;
+  verifiedOpgwRouteCount: number;
+  opgwCableSectionCount: number;
+  opgwSpanSegmentCount: number;
+  opgwSplicePointCount: number;
+  spliceClosureCount: number;
+  visibleSpliceClosureCount: number;
+  patchPanelCount: number;
+  fiberStrandCount: number;
+  availableStrandCount: number;
+  fiberAssignmentCount: number;
+  criticalRidingCircuitCount: number;
+  outageImpactCount: number;
+  openOpgwWorkOrderCount: number;
+  spanInspectionIssueCount: number;
+  nodeCount: number;
+  transmissionLineCount: number;
+  workOrderLocationCount: number;
+}): DashboardLayerSummary[] {
+  const layer = (
+    key: StreetMapLayerKey,
+    label: string,
+    category: DashboardLayerSummary["category"],
+    total: number,
+    visible: number,
+    moduleHref: string,
+    source: string,
+    safety: string,
+  ): DashboardLayerSummary => ({
+    key,
+    label,
+    category,
+    source,
+    total,
+    visible: layers[key] ? visible : 0,
+    enabled: Boolean(layers[key]),
+    moduleHref,
+    safety,
+  });
+
+  return [
+    layer("publicTransmissionLines", "HIFLD transmission lines", "Public reference", publicLineCount, visiblePublicLineCount, "/transmission-lines", "HIFLD public transmission-line references with open owner buckets", "Read-only public reference; not evidence of private telecom or OPGW."),
+    layer("publicSubstations", "Verified-owner substations", "Public reference", publicSubstationCount, visiblePublicSubstationCount, "/substations", "Open public substation references with verified utility-owner fields or open-source matches", "Public reference only; unknown-owner nodes are excluded from this layer."),
+    layer("fccUtilityTowers", "FCC utility tower nodes", "Public reference", fccTowerCount, visibleFccTowerCount, "/data-sources", "FCC ULS public utility license/site records", "Public FCC license reference only; not operational telecom routing."),
+    layer("fccMicrowaveLinks", "FCC microwave paths", "Public reference", fccLinkCount, visibleFccLinkCount, "/data-sources", "FCC ULS public microwave path records grouped by owner and frequency", "Public FCC license reference only; do not infer active utility operations."),
+    layer("syntheticSubstations", "Synthetic substations", "Planning assets", syntheticSubstationCount, syntheticSubstationCount, "/regional-grid", "Synthetic/demo planning nodes", "Synthetic/demo records only."),
+    layer("transmissionStructures", "Transmission structures", "Synthetic OPGW Fiber", structureCount, visibleStructureCount, "/transmission-structures", "Synthetic structure points sampled from public line geometry", "Synthetic structure locations only; not real tower/pole locations."),
+    layer("syntheticOpgwCables", "Synthetic OPGW cables", "Synthetic OPGW Fiber", opgwCableCount, opgwCableCount, "/opgw-cables", "Generated synthetic OPGW cable records", "Synthetic/demo planning only; not active fiber."),
+    layer("assumedOpgwRoutes", "Assumed OPGW routes", "Synthetic OPGW Fiber", assumedOpgwRouteCount, assumedOpgwRouteCount, "/opgw", "Generated synthetic assumptions on public corridors", "Synthetic planning assumption only; requires engineer/as-built verification."),
+    layer("plannedOpgwFiber", "Planned OPGW fiber", "Synthetic OPGW Fiber", plannedOpgwRouteCount, plannedOpgwRouteCount, "/opgw", "Synthetic planned OPGW records", "Planning/demo layer; conversion workflow required before as-built status."),
+    layer("verifiedOpgwFiber", "Verified OPGW fiber", "Synthetic OPGW Fiber", verifiedOpgwRouteCount, verifiedOpgwRouteCount, "/opgw", "Demo records explicitly marked as verified", "Verification is demo metadata unless imported from approved records."),
+    layer("opgwRoutes", "OPGW route records", "Synthetic OPGW Fiber", opgwRouteCount, opgwRouteCount, "/opgw", "Route model built from synthetic cables, structures, and splice points", "Demo route model only."),
+    layer("opgwCableSections", "OPGW cable sections", "Synthetic OPGW Fiber", opgwCableSectionCount, opgwCableSectionCount, "/opgw-cables", "Synthetic splice-to-splice cable section model", "Synthetic cable section records only."),
+    layer("opgwSpanSegments", "OPGW span segments", "Synthetic OPGW Fiber", opgwSpanSegmentCount, opgwSpanSegmentCount, "/transmission-structures", "Synthetic structure-to-structure OPGW spans", "Synthetic spans for planning and outage demos."),
+    layer("opgwSplicePoints", "OPGW splice points", "Synthetic OPGW Fiber", opgwSplicePointCount, opgwSplicePointCount, "/splice-points", "Synthetic splice, tap, transition, and termination points", "Synthetic splice point records only."),
+    layer("existingFiberSplices", "Existing fiber splices", "Synthetic OPGW Fiber", opgwSplicePointCount, opgwSplicePointCount, "/splice-matrix", "Synthetic existing splice continuity rows", "Read-only demo splice records."),
+    layer("proposedFiberSplices", "Proposed fiber splices", "Synthetic OPGW Fiber", opgwSplicePointCount, opgwSplicePointCount, "/splice-matrix", "Editable proposed splice layer for planning", "Proposed/demo changes only."),
+    layer("compareSpliceLayers", "Splice compare", "Analysis overlays", opgwSplicePointCount, opgwSplicePointCount, "/splice-matrix", "Existing-versus-proposed synthetic splice comparison", "Demo comparison layer only."),
+    layer("spliceClosures", "Splice closures", "Synthetic OPGW Fiber", spliceClosureCount, visibleSpliceClosureCount, "/splice-closures", "Synthetic closures mounted on synthetic structure points", "Synthetic/demo splice closure records only."),
+    layer("patchPanels", "Patch panels", "Synthetic OPGW Fiber", patchPanelCount, patchPanelCount, "/patch-panels", "Synthetic termination panels at demo structures and nodes", "Synthetic/demo patch panel records only."),
+    layer("fiberStrandsLayer", "Fiber strands", "Synthetic OPGW Fiber", fiberStrandCount, fiberStrandCount, "/fiber-strand-table", "Synthetic strand records generated from OPGW fiber counts", "Synthetic/demo strand inventory only."),
+    layer("availableStrandCapacity", "Available strand capacity", "Analysis overlays", availableStrandCount, availableStrandCount, "/fiber-strand-table", "Capacity overlay calculated from synthetic strand statuses", "Capacity is demo planning data only."),
+    layer("fiberAssignments", "Fiber assignments", "Planning assets", fiberAssignmentCount, fiberAssignmentCount, "/fiber-assignments", "Synthetic service-to-strand assignment model", "Synthetic/demo assignments only."),
+    layer("criticalRidingCircuits", "Critical riding circuits", "Analysis overlays", criticalRidingCircuitCount, criticalRidingCircuitCount, "/outage-impact", "Synthetic critical service assignments riding OPGW paths", "Fictional circuits only; not operational routing."),
+    layer("opgwOutageImpact", "Outage impact", "Analysis overlays", outageImpactCount, outageImpactCount, "/outage-impact", "Synthetic outage-risk overlay from route capacity and assignment flags", "Demo impact analysis only."),
+    layer("opgwOpenWorkOrders", "Open OPGW work orders", "Planning assets", openOpgwWorkOrderCount, openOpgwWorkOrderCount, "/work-orders", "Synthetic OPGW work-order indicators", "Demo work orders only."),
+    layer("opgwSpanInspectionIssues", "Span inspection issues", "Analysis overlays", spanInspectionIssueCount, spanInspectionIssueCount, "/outage-impact", "Synthetic inspection and midspan issue highlights", "Demo inspection flags only."),
+    layer("telecomNodes", "Telecom nodes", "Planning assets", nodeCount, nodeCount, "/devices", "Local synthetic telecom/device nodes", "Synthetic/demo device planning data."),
+    layer("selIconNodes", "SEL ICON nodes", "Planning assets", nodeCount, nodeCount, "/deviceops/icon", "Local synthetic SEL ICON node layer", "Synthetic/demo ICON planning data."),
+    layer("c3794Nodes", "C37.94 endpoints", "Planning assets", nodeCount, nodeCount, "/circuits", "Local synthetic protection endpoint layer", "Fictional relay/protection endpoint data."),
+    layer("transmissionLines", "Editable transmission lines", "Planning assets", transmissionLineCount, transmissionLineCount, "/transmission-lines", "Local planning line records", "Demo planning records only."),
+    layer("workOrderLocations", "Work order locations", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/work-orders", "Synthetic work-order markers", "Demo work orders only."),
+    layer("proposedChanges", "Proposed changes", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/deviceops/change-requests", "Synthetic proposed planning changes", "Proposed/demo records only."),
+    layer("distributionFiberRoutes", "Distribution fiber routes", "Planning assets", fiberAssignmentCount, fiberAssignmentCount, "/distribution-fiber", "Synthetic distribution fiber planning routes", "Synthetic/demo fiber routes only."),
+  ];
 }
 
 function buildSummaryCards(
