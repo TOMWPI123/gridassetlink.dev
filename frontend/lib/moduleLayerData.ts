@@ -63,10 +63,22 @@ export async function loadModuleLayerData(key: string): Promise<ModuleLayerData 
 }
 
 async function loadSubstations(): Promise<ModuleLayerData> {
-  const [publicSubstations, syntheticSubstations] = await Promise.all([
+  const [publicSubstations, syntheticSubstations, opgw, patchPanels, assignments] = await Promise.all([
     fetchJson<PublicSubstationCollection>("/data/iso-ne-public-substations.geojson"),
     fetchJson<SyntheticSubstationCollection>("/data/iso-ne-synthetic-substations.geojson"),
+    fetchJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson"),
+    fetchJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json"),
+    fetchJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json"),
   ]);
+  const cableIdsByLineId = new Map<string, string[]>();
+  for (const feature of opgw.features) {
+    const properties = feature.properties;
+    const existing = cableIdsByLineId.get(properties.lineId) || [];
+    existing.push(properties.id);
+    cableIdsByLineId.set(properties.lineId, existing);
+  }
+  const patchPanelsByCableId = groupPatchPanelsByCable(patchPanels);
+  const assignmentsByCableId = groupAssignmentsByCable(assignments);
   const verifiedPublic = publicSubstations.features.filter((feature) => {
     const owner = clean(feature.properties.utilityOwner);
     return owner && owner.toLowerCase() !== "unknown" && feature.properties.ownerSource !== "unknown";
@@ -92,6 +104,9 @@ async function loadSubstations(): Promise<ModuleLayerData> {
       latitude,
       longitude,
       status: properties.status || "existing",
+      patch_panel_count: 0,
+      fiber_assignment_count: 0,
+      fiber_cable_count: 0,
       layer: "Public substations by verified utility owner",
       source: properties.source,
       source_type: properties.sourceType,
@@ -103,6 +118,15 @@ async function loadSubstations(): Promise<ModuleLayerData> {
   const syntheticRows = syntheticSubstations.features.map<JsonRecord>((feature) => {
     const properties = feature.properties;
     const [longitude, latitude] = feature.geometry.coordinates;
+    const relatedCableIds = uniqueStrings([
+      ...properties.connectedFiberIds,
+      ...properties.connectedTransmissionLineIds.flatMap((lineId) => cableIdsByLineId.get(lineId) || []),
+    ]);
+    const relatedPatchPanels = uniqueById(relatedCableIds.flatMap((cableId) => patchPanelsByCableId.get(cableId) || []));
+    const relatedAssignments = uniqueById(relatedCableIds.flatMap((cableId) => assignmentsByCableId.get(cableId) || []));
+    const availablePorts = sum(relatedPatchPanels.map((panel) => panel.ports.filter((port) => port.status === "available").length));
+    const reservedPorts = sum(relatedPatchPanels.map((panel) => panel.ports.filter((port) => port.status === "reserved").length));
+    const assignedPorts = sum(relatedPatchPanels.map((panel) => panel.ports.filter((port) => port.status === "assigned").length));
     return {
       id: properties.id,
       substation_code: properties.id,
@@ -121,6 +145,19 @@ async function loadSubstations(): Promise<ModuleLayerData> {
       connected_devices: properties.connectedDeviceIds.length,
       connected_circuits: properties.connectedCircuitIds.length,
       connected_fibers: properties.connectedFiberIds.length,
+      fiber_cable_count: relatedCableIds.length,
+      patch_panel_count: relatedPatchPanels.length,
+      patch_panel_ids: relatedPatchPanels.map((panel) => panel.id).join(", "),
+      patch_panel_ports: sum(relatedPatchPanels.map((panel) => panel.portCount)),
+      available_patch_panel_ports: availablePorts,
+      reserved_patch_panel_ports: reservedPorts,
+      assigned_patch_panel_ports: assignedPorts,
+      fiber_assignment_count: relatedAssignments.length,
+      fiber_assignment_ids: relatedAssignments.map((assignment) => assignment.id).join(", "),
+      fiber_assignment_services: uniqueStrings(relatedAssignments.map((assignment) => assignment.serviceType)).join(", "),
+      fiber_cable_ids: relatedCableIds.join(", "),
+      view_patch_panels: `/patch-panels?substation=${encodeURIComponent(properties.id)}`,
+      view_fiber_assignments: `/fiber-assignments?substation=${encodeURIComponent(properties.id)}`,
       latitude,
       longitude,
       status: properties.status,
@@ -133,15 +170,19 @@ async function loadSubstations(): Promise<ModuleLayerData> {
     };
   });
   const rows = [...publicRows, ...syntheticRows];
+  const substationPatchPanelCount = sum(syntheticRows.map((row) => toNumber(row.patch_panel_count)));
+  const substationAssignmentCount = sum(syntheticRows.map((row) => toNumber(row.fiber_assignment_count)));
   return {
     title: "Layer-backed substation inventory",
     notice:
-      "This module now includes verified-owner public substation reference points plus clearly labeled synthetic planning substations. Public records are read-only references; synthetic rows are demo data.",
+      "This module now includes verified-owner public substation reference points plus clearly labeled synthetic planning substations, with synthetic OPGW patch panels and fiber assignments joined into substation nodes.",
     rows,
     disableDetailLinks: true,
     metrics: [
       metric("Verified public substations", publicRows.length, "Only public records with a supported owner/operator source are included.", "HIFLD/OpenStreetMap public layers", "Reference only"),
       metric("Synthetic substations", syntheticRows.length, "Demo planning points remain labeled synthetic.", "Synthetic demo layer", "Not real assets"),
+      metric("Substation patch panels", substationPatchPanelCount, "Synthetic OPGW terminal panels connected to synthetic substation nodes.", "Synthetic patch panel layer", "Planning/demo only"),
+      metric("Substation assignments", substationAssignmentCount, "Synthetic strand assignments carried by OPGW cables associated to substation nodes.", "Synthetic assignment layer", "Not real services"),
       metric("Utility owners", uniqueCount(publicRows.map((row) => row.utility_owner)), "Owner sublayer values available in the module filter.", "Verified public owner fields", "No private ownership inference"),
       metric("ISO-NE states", uniqueCount(rows.map((row) => row.state)), "Records span the New England state layer set.", "Public and synthetic layer files", DATA_BOUNDARY),
     ],
@@ -684,6 +725,14 @@ function splitList(value: unknown): string[] {
   return clean(value).split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.map(clean).filter(Boolean)));
+}
+
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  return Array.from(new Map(items.map((item) => [item.id, item])).values());
+}
+
 function uniqueCount(values: unknown[]): number {
   return new Set(values.map(clean).filter(Boolean)).size;
 }
@@ -723,12 +772,36 @@ function countByCable(assignments: FiberAssignment[]): Map<string, number> {
   return counts;
 }
 
+function groupAssignmentsByCable(assignments: FiberAssignment[]): Map<string, FiberAssignment[]> {
+  const groups = new Map<string, FiberAssignment[]>();
+  for (const assignment of assignments) {
+    for (const cableId of assignment.cableIds) {
+      const existing = groups.get(cableId) || [];
+      existing.push(assignment);
+      groups.set(cableId, existing);
+    }
+  }
+  return groups;
+}
+
 function countPatchPanelsByCable(panels: PatchPanel[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const panel of panels) {
     for (const cableId of panel.fiberCableIds) counts.set(cableId, (counts.get(cableId) || 0) + 1);
   }
   return counts;
+}
+
+function groupPatchPanelsByCable(panels: PatchPanel[]): Map<string, PatchPanel[]> {
+  const groups = new Map<string, PatchPanel[]>();
+  for (const panel of panels) {
+    for (const cableId of panel.fiberCableIds) {
+      const existing = groups.get(cableId) || [];
+      existing.push(panel);
+      groups.set(cableId, existing);
+    }
+  }
+  return groups;
 }
 
 function countClosuresByCable(closures: Array<{ cableIds: string[] }>): Map<string, number> {

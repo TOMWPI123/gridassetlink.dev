@@ -7,6 +7,7 @@ import { loadModuleLayerData, type ModuleLayerData } from "@/lib/moduleLayerData
 import type { EntityConfig, JsonRecord } from "@/types";
 import { DataTable } from "@/components/DataTable";
 import { OpgwCableMenu } from "@/components/OpgwCableMenu";
+import { SubstationFiberSection } from "@/components/SubstationFiberSection";
 
 export function EntityListPage({ config }: { config?: EntityConfig }) {
   if (!config) return <div className="panel panel-body">Unsupported entity view.</div>;
@@ -51,6 +52,7 @@ function ConfiguredEntityListPage({ config }: { config: EntityConfig }) {
       {showCreate && writable ? <QuickCreate config={config} onCreated={load} /> : null}
       {error ? <div className="badge red">{error}</div> : null}
       {moduleLayerData ? <ModuleLayerSummary data={moduleLayerData} backendCount={rows.length - moduleLayerData.rows.length} totalCount={visibleRows.length} /> : null}
+      {config.key === "substations" && !busy ? <SubstationFiberSection rows={visibleRows} /> : null}
       {config.key === "opgw" && !busy ? <OpgwCableMenu rows={visibleRows} /> : null}
       {busy ? <div className="panel panel-body">Loading {config.title.toLowerCase()}...</div> : <DataTable rows={visibleRows} columns={config.columns} detailBase={moduleLayerData?.disableDetailLinks ? undefined : detailBaseFor(config.key, config.detailBase)} filterField={config.filterField} onExport={exportRows} />}
     </>
