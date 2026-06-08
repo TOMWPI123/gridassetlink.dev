@@ -3,6 +3,7 @@ import type {
   FiberContinuityPath,
   FiberContinuityPathSegment,
   FiberSplice,
+  FiberStrand,
   OpgwCableFeature,
   OpgwCableSectionFeature,
   OpgwSpanSegmentFeature,
@@ -20,6 +21,7 @@ export type FiberContinuityData = {
   opgwSplicePoints: OpgwSplicePointFeature[];
   spliceClosures: SpliceClosureFeature[];
   fiberSplices: FiberSplice[];
+  fiberStrands?: FiberStrand[];
   fiberAssignments: FiberAssignment[];
   patchPanels: PatchPanel[];
   syntheticServices: SyntheticService[];

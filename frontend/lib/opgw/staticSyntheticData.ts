@@ -56,6 +56,7 @@ export async function loadSyntheticFiberContinuityData(): Promise<FiberContinuit
     opgwSplicePoints: engineeringModel.splicePoints,
     spliceClosures: spliceClosures.features,
     fiberSplices,
+    fiberStrands,
     fiberAssignments,
     patchPanels,
     syntheticServices,

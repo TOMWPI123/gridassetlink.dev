@@ -112,6 +112,17 @@ a { color: inherit; text-decoration: none; }
 .module-layer-card strong { color: #0b4f52; font-size: 24px; line-height: 1; }
 .module-layer-card small { color: #34495c; font-size: 12px; line-height: 1.35; }
 .module-layer-card em { margin-top: auto; color: var(--muted); font-size: 10px; line-height: 1.35; font-style: normal; }
+.opgw-cable-menu { margin-bottom: 16px; }
+.opgw-cable-menu-body { display: grid; gap: 12px; }
+.opgw-cable-picker { display: grid; gap: 7px; }
+.opgw-cable-picker span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 820; text-transform: uppercase; }
+.opgw-cable-picker select { width: 100%; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--foreground); padding: 8px 10px; }
+.opgw-cable-menu-stats { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 8px; }
+.opgw-cable-menu-stats div, .opgw-side-stat-grid div { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #f8fbfd; }
+.opgw-cable-menu-stats span, .opgw-side-stat-grid span { display: block; color: var(--muted); font-size: 10px; font-weight: 820; text-transform: uppercase; }
+.opgw-cable-menu-stats strong, .opgw-side-stat-grid strong { display: block; margin-top: 6px; color: #0b4f52; font-size: 18px; line-height: 1.1; overflow-wrap: anywhere; }
+.opgw-cable-menu-actions, .opgw-inline-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.opgw-cable-menu-actions a, .opgw-inline-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; border: 1px solid #bcd6d4; border-radius: 8px; background: #e9f7f3; color: #0b4f52; padding: 0 10px; font-size: 12px; font-weight: 820; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .button, .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--foreground); font-size: 13px; font-weight: 650; cursor: pointer; }
 .button { padding: 0 12px; }
@@ -620,6 +631,124 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   color: #6b4707;
   font-size: 11px;
   line-height: 1.35;
+}
+
+.splice-warning-list.vertical {
+  display: grid;
+}
+
+.opgw-continuity-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 230px);
+  gap: 9px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.opgw-continuity-node {
+  display: grid;
+  gap: 6px;
+  min-height: 150px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfd;
+}
+
+.opgw-continuity-node span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #14202d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.opgw-continuity-node strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.opgw-continuity-node small,
+.opgw-continuity-node em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.opgw-continuity-node a {
+  align-self: end;
+  width: fit-content;
+  color: #0b4f52;
+  font-size: 12px;
+  font-weight: 820;
+}
+
+.opgw-closure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(230px,1fr));
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.opgw-closure-grid article {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfd;
+}
+
+.opgw-closure-grid strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.opgw-closure-grid span {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.opgw-closure-grid dl {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.opgw-closure-grid dl div {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #e3eaf0;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.opgw-closure-grid dt {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.opgw-closure-grid dd {
+  margin: 3px 0 0;
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.opgw-side-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
 }
 
 .service-carried-list article div {
