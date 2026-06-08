@@ -13,6 +13,7 @@ export function DemoDisclaimerGate({ children }: DemoDisclaimerGateProps) {
   const [acknowledged, setAcknowledged] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [showFooter, setShowFooter] = useState(true);
 
   useEffect(() => {
     setAcknowledged(false);
@@ -55,7 +56,7 @@ export function DemoDisclaimerGate({ children }: DemoDisclaimerGateProps) {
     <>
       <div aria-hidden={gateActive ? "true" : undefined} className={gateActive ? "demo-disclaimer-page-blocked" : undefined}>
         {children}
-        <DemoDisclaimerFooter />
+        {showFooter ? <DemoDisclaimerFooter onDismiss={() => setShowFooter(false)} /> : null}
       </div>
       {loaded && showDisclaimer ? (
         <DemoDisclaimerModal
@@ -70,12 +71,16 @@ export function DemoDisclaimerGate({ children }: DemoDisclaimerGateProps) {
   );
 }
 
-export function DemoDisclaimerFooter() {
+export function DemoDisclaimerFooter({ onDismiss }: { onDismiss: () => void }) {
   return (
     <footer className="demo-disclaimer-footer" aria-label="GridAssetLink demo safety links">
       <span>Demo planning data only. Public reference layers and synthetic records are not authoritative and must not be used for real utility, telecom, SCADA, relay, protection, outage, or engineering decisions.</span>
       <button type="button" onClick={() => openDemoDisclaimer("disclaimer")}>Demo Disclaimer</button>
       <button type="button" onClick={() => openDemoDisclaimer("sources")}>Open-Source Data Sources</button>
+      <button className="demo-footer-close" type="button" aria-label="Close demo disclaimer footer" onClick={onDismiss}>
+        <X size={14} />
+        Close
+      </button>
     </footer>
   );
 }
