@@ -3,6 +3,7 @@
 import type { UserSession } from "@/types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "/backend" : "http://localhost:8000");
+const AUTH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AUTH === "true";
 
 export function getSession(): UserSession | null {
   if (typeof window === "undefined") return null;
@@ -17,21 +18,53 @@ export function currentRole(): string { return getSession()?.user.role || "demo_
 export function canWrite(): boolean { return true; }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const session = getSession();
   const headers = new Headers(init.headers);
   headers.set("Content-Type", headers.get("Content-Type") || "application/json");
-  if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
+  maybeAttachAuth(headers);
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers, cache: "no-store" });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) {
+    const detail = await response.text();
+    if (isExpiredTokenResponse(response, detail)) {
+      clearSession();
+      headers.delete("Authorization");
+      const retry = await fetch(`${API_BASE}${path}`, { ...init, headers, cache: "no-store" });
+      if (!retry.ok) throw new Error(await retry.text());
+      return retry.json() as Promise<T>;
+    }
+    throw new Error(detail);
+  }
   return response.json() as Promise<T>;
 }
 
 export async function apiDownload(path: string, filename: string) {
-  const session = getSession();
   const headers = new Headers();
-  if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
+  maybeAttachAuth(headers);
   const response = await fetch(`${API_BASE}${path}`, { headers });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) {
+    const detail = await response.text();
+    if (isExpiredTokenResponse(response, detail)) {
+      clearSession();
+      headers.delete("Authorization");
+      const retry = await fetch(`${API_BASE}${path}`, { headers });
+      if (!retry.ok) throw new Error(await retry.text());
+      return downloadResponse(retry, filename);
+    }
+    throw new Error(detail);
+  }
+  return downloadResponse(response, filename);
+}
+
+function maybeAttachAuth(headers: Headers) {
+  if (!AUTH_ENABLED) return;
+  const session = getSession();
+  if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
+}
+
+function isExpiredTokenResponse(response: Response, detail: string) {
+  return response.status === 401 && detail.toLowerCase().includes("token expired");
+}
+
+async function downloadResponse(response: Response, filename: string) {
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement("a");
