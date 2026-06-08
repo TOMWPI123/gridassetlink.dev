@@ -85,7 +85,7 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
 type MapStatus = "loading" | "active" | "error";
 type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
-type DashboardOperatingMode = "reference" | "planning" | "opgw_engineering";
+type DashboardOperatingMode = "in_service" | "planned";
 type DashboardLayerSummary = {
   key: StreetMapLayerKey;
   label: string;
@@ -184,7 +184,7 @@ const moduleLayerCoverage: Record<string, StreetMapLayerKey[]> = {
 export function DashboardPage() {
   const pathname = usePathname();
   const [mode, setMode] = useState<DashboardMapMode>("street-level");
-  const [operatingMode, setOperatingMode] = useState<DashboardOperatingMode>("opgw_engineering");
+  const [operatingMode, setOperatingMode] = useState<DashboardOperatingMode>("planned");
   const [transmissionMaps, setTransmissionMaps] = useState(seedTransmissionMaps);
   const [activeMapId, setActiveMapId] = useState(seedTransmissionMaps[0].id);
   const [showMapEditor, setShowMapEditor] = useState(false);
@@ -739,14 +739,12 @@ export function DashboardPage() {
   function handleOperatingModeChange(nextMode: DashboardOperatingMode) {
     setOperatingMode(nextMode);
     setStreetLayers((current) => layerStateForOperatingMode(nextMode, current));
-    if (nextMode === "opgw_engineering") {
+    if (nextMode === "planned") {
       setRightMode("layers");
       setRightCollapsed(false);
-      showToast("OPGW Engineering Mode enabled: routes, cable sections, spans, splice points, and capacity layers are visible.");
-    } else if (nextMode === "planning") {
-      showToast("Planning Mode enabled: synthetic planning assets are visible.");
+      showToast("Planned view enabled: OPGW routes, cable sections, spans, splice points, and capacity layers are visible.");
     } else {
-      showToast("Reference Mode enabled: public HIFLD, verified-owner substations, and FCC references are prioritized.");
+      showToast("In Service view enabled: public HIFLD, verified-owner substations, FCC references, verified OPGW, and existing splice layers are prioritized.");
     }
     issueMapCommand("resize");
   }
@@ -935,9 +933,8 @@ export function DashboardPage() {
         </div>
         <div className="dashboard-mode-toggle" aria-label="Dashboard mode">
           {[
-            ["reference", "Reference Mode"],
-            ["planning", "Planning Mode"],
-            ["opgw_engineering", "OPGW Engineering Mode"],
+            ["in_service", "In Service"],
+            ["planned", "Planned"],
           ].map(([value, label]) => (
             <button
               type="button"
@@ -1160,26 +1157,28 @@ function formatFilterOption(value: string) {
 }
 
 function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Record<StreetMapLayerKey, boolean>) {
-  if (mode === "reference") {
+  if (mode === "in_service") {
     return {
       ...current,
       publicTransmissionLines: true,
       publicSubstations: true,
       fccUtilityTowers: true,
       fccMicrowaveLinks: true,
-      transmissionStructures: false,
+      syntheticSubstations: false,
+      transmissionStructures: true,
+      syntheticOpgwCables: true,
       assumedOpgwRoutes: false,
       plannedOpgwFiber: false,
-      verifiedOpgwFiber: false,
-      opgwRoutes: false,
-      opgwCableSections: false,
+      verifiedOpgwFiber: true,
+      opgwRoutes: true,
+      opgwCableSections: true,
       opgwSpanSegments: false,
       opgwSplicePoints: false,
-      existingFiberSplices: false,
+      existingFiberSplices: true,
       proposedFiberSplices: false,
       compareSpliceLayers: false,
-      spliceClosures: false,
-      patchPanels: false,
+      spliceClosures: true,
+      patchPanels: true,
       fiberAssignments: false,
       availableStrandCapacity: false,
       criticalRidingCircuits: false,
@@ -1188,35 +1187,18 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
       opgwSpanInspectionIssues: false,
     };
   }
-  if (mode === "planning") {
-    return {
-      ...current,
-      publicTransmissionLines: true,
-      publicSubstations: true,
-      transmissionStructures: true,
-      syntheticSubstations: true,
-      assumedOpgwRoutes: true,
-      plannedOpgwFiber: true,
-      opgwRoutes: true,
-      opgwCableSections: true,
-      opgwSpanSegments: false,
-      opgwSplicePoints: true,
-      existingFiberSplices: true,
-      proposedFiberSplices: true,
-      compareSpliceLayers: false,
-      spliceClosures: true,
-      patchPanels: true,
-      fiberAssignments: true,
-      availableStrandCapacity: true,
-    };
-  }
   return {
     ...current,
     publicTransmissionLines: true,
     publicSubstations: true,
+    fccUtilityTowers: true,
+    fccMicrowaveLinks: true,
     transmissionStructures: true,
+    syntheticSubstations: true,
+    syntheticOpgwCables: true,
     assumedOpgwRoutes: true,
     plannedOpgwFiber: true,
+    verifiedOpgwFiber: true,
     opgwRoutes: true,
     opgwCableSections: true,
     opgwSpanSegments: true,
