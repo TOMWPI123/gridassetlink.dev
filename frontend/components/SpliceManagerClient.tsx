@@ -48,8 +48,8 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
     const firstSection = view.connectedCableSections[0];
     const secondSection = view.connectedCableSections[1] || firstSection;
     const nextStrand = Math.max(1, (spliceRows.length % Math.max(12, derivedFiberCapacity || 48)) + 1);
-    const fromCable = firstSection?.cableSectionId || closure?.cableIds[0] || "DEMO-CABLE-A";
-    const toCable = secondSection?.cableSectionId || closure?.cableIds[1] || fromCable;
+    const fromCable = firstSection?.cableId || closure?.cableIds[0] || "DEMO-CABLE-A";
+    const toCable = secondSection?.cableId || closure?.cableIds[1] || fromCable;
     setSpliceRows((current) => [
       {
         id: `PROP-${selectedPointId}-${Date.now().toString(36).toUpperCase()}`,
@@ -114,8 +114,8 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
                 </thead>
                 <tbody>
                   {view.connectedCableSections.map((section) => (
-                    <tr key={section.cableSectionId}>
-                      <td>{section.cableSectionId}</td>
+                    <tr key={section.cableId}>
+                      <td>{section.cableId}</td>
                       <td>{section.transmissionLineId}</td>
                       <td><StatusPill value={section.direction} /></td>
                       <td>{section.fiberCount}F</td>

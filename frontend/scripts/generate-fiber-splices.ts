@@ -1,5 +1,5 @@
 import type { FiberSplice } from "../lib/types/assets";
-import { FIBER_SPLICES_PATH, SPLICE_CLOSURES_PATH, createSeededRandom, readOpgwCables, readSpliceClosures, round, writeJson, writeSpliceClosures } from "./fiber-network-utils";
+import { FIBER_SPLICES_PATH, SPLICE_CLOSURES_PATH, createSeededRandom, deriveSpliceBoundedCableSections, readOpgwCables, readSpliceClosures, readStructures, round, writeJson, writeSpliceClosures } from "./fiber-network-utils";
 
 const SEED = "gridassetlink-splices-v1-matrix";
 
@@ -7,7 +7,9 @@ async function main() {
   const rng = createSeededRandom(SEED);
   const closures = await readSpliceClosures();
   const cables = await readOpgwCables();
-  const cableById = new Map(cables.features.map((cable) => [cable.properties.id, cable.properties]));
+  const structures = await readStructures();
+  const cableSections = deriveSpliceBoundedCableSections(cables.features, structures.features, closures.features);
+  const cableById = new Map(cableSections.map((section) => [section.id, section]));
   const splices: FiberSplice[] = [];
 
   closures.features.forEach((closure) => {

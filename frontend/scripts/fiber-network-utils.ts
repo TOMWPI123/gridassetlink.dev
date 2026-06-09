@@ -1,6 +1,15 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Coordinate, OpgwCableCollection, PublicTransmissionLineCollection, SpliceClosureCollection, TransmissionStructureCollection } from "../lib/types/assets";
+import type {
+  Coordinate,
+  OpgwCableCollection,
+  OpgwCableFeature,
+  PublicTransmissionLineCollection,
+  SpliceClosureCollection,
+  SpliceClosureFeature,
+  TransmissionStructureCollection,
+  TransmissionStructureFeature,
+} from "../lib/types/assets";
 
 export const OUTPUT_DIR = path.join(process.cwd(), "public", "data");
 export const PUBLIC_LINES_PATH = path.join(OUTPUT_DIR, "iso-ne-public-transmission-lines.geojson");
@@ -163,6 +172,98 @@ export function lineCodeFor(feature: PublicTransmissionLineCollection["features"
     .replace(/^-|-$/g, "")
     .slice(0, 24);
   return code || `TL-${String(index + 1).padStart(3, "0")}`;
+}
+
+export type DerivedOpgwCableSection = {
+  id: string;
+  name: string;
+  parentRouteCableId: string;
+  lineId: string;
+  lineName?: string;
+  fiberCount: OpgwCableFeature["properties"]["fiberCount"];
+  status: OpgwCableFeature["properties"]["status"];
+  startStructureId: string;
+  endStructureId: string;
+  startStructureNumber: string;
+  endStructureNumber: string;
+  fromSplicePointId: string;
+  toSplicePointId: string;
+  structureIds: string[];
+  routeMiles: number;
+};
+
+export function lineCodeForId(lineId: string) {
+  return lineId.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "TL-DEMO";
+}
+
+export function cableSectionIdForLine(lineId: string, sequenceNumber: number) {
+  return `OPGW-${lineCodeForId(lineId)}-CS-${String(sequenceNumber).padStart(3, "0")}`;
+}
+
+export function splicePointIdForStructure(lineId: string, structureNumber: string) {
+  const structureToken = structureNumber.replace(/[^A-Za-z0-9]+/g, "-");
+  return `SP-${lineCodeForId(lineId)}-${structureToken}`;
+}
+
+export function deriveSpliceBoundedCableSections(
+  cables: OpgwCableFeature[],
+  structures: TransmissionStructureFeature[],
+  closures: SpliceClosureFeature[],
+) {
+  const structureById = new Map(structures.map((feature) => [feature.properties.id, feature]));
+  const closuresByStructureId = new Map<string, SpliceClosureFeature[]>();
+  closures.forEach((closure) => {
+    const current = closuresByStructureId.get(closure.properties.structureId) || [];
+    current.push(closure);
+    closuresByStructureId.set(closure.properties.structureId, current);
+  });
+
+  const sections: DerivedOpgwCableSection[] = [];
+  cables.forEach((cable) => {
+    const cableStructures = cable.properties.structureIds
+      .map((structureId) => structureById.get(structureId))
+      .filter((feature): feature is TransmissionStructureFeature => Boolean(feature))
+      .sort((a, b) => a.properties.sequenceIndex - b.properties.sequenceIndex);
+    if (cableStructures.length < 2) return;
+
+    const boundaryByStructureId = new Map<string, TransmissionStructureFeature>();
+    boundaryByStructureId.set(cableStructures[0].properties.id, cableStructures[0]);
+    boundaryByStructureId.set(cableStructures[cableStructures.length - 1].properties.id, cableStructures[cableStructures.length - 1]);
+    cableStructures.forEach((structure) => {
+      if (closuresByStructureId.has(structure.properties.id)) boundaryByStructureId.set(structure.properties.id, structure);
+    });
+
+    const boundaries = [...boundaryByStructureId.values()].sort((a, b) => a.properties.sequenceIndex - b.properties.sequenceIndex);
+    for (let index = 0; index < boundaries.length - 1; index += 1) {
+      const start = boundaries[index];
+      const end = boundaries[index + 1];
+      const startIndex = cableStructures.findIndex((structure) => structure.properties.id === start.properties.id);
+      const endIndex = cableStructures.findIndex((structure) => structure.properties.id === end.properties.id);
+      if (startIndex < 0 || endIndex <= startIndex) continue;
+      const sectionStructures = cableStructures.slice(startIndex, endIndex + 1);
+      const sectionId = cableSectionIdForLine(cable.properties.lineId, index + 1);
+      const fromSplicePointId = splicePointIdForStructure(cable.properties.lineId, start.properties.structureNumber);
+      const toSplicePointId = splicePointIdForStructure(cable.properties.lineId, end.properties.structureNumber);
+      sections.push({
+        id: sectionId,
+        name: `${sectionId}: ${fromSplicePointId} to ${toSplicePointId}`,
+        parentRouteCableId: cable.properties.id,
+        lineId: cable.properties.lineId,
+        lineName: cable.properties.lineName,
+        fiberCount: cable.properties.fiberCount,
+        status: cable.properties.status,
+        startStructureId: start.properties.id,
+        endStructureId: end.properties.id,
+        startStructureNumber: start.properties.structureNumber,
+        endStructureNumber: end.properties.structureNumber,
+        fromSplicePointId,
+        toSplicePointId,
+        structureIds: sectionStructures.map((structure) => structure.properties.id),
+        routeMiles: round(lineLengthMiles(sectionStructures.map((structure) => structure.geometry.coordinates)), 3),
+      });
+    }
+  });
+  return sections;
 }
 
 export function roundCoordinate([longitude, latitude]: Coordinate): Coordinate {

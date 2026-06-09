@@ -140,7 +140,7 @@ const searchLayerOptions: Array<{ value: DashboardSearchLayer; label: string; ki
   { value: "fccMicrowaveLinks", label: "FCC microwave links", kinds: ["fcc_microwave_link"] },
   { value: "transmissionStructures", label: "Transmission structures", kinds: ["transmission_structure"] },
   { value: "spliceClosures", label: "Splice closures", kinds: ["splice_closure"] },
-  { value: "syntheticOpgwCables", label: "Synthetic OPGW cables", kinds: ["opgw_cable"] },
+  { value: "syntheticOpgwCables", label: "OPGW route source records", kinds: ["opgw_cable"] },
   { value: "opgwRoutes", label: "OPGW routes", kinds: ["opgw_route"] },
   { value: "opgwCableSections", label: "OPGW cable sections", kinds: ["opgw_cable_section"] },
   { value: "opgwSpanSegments", label: "OPGW span segments", kinds: ["opgw_span_segment"] },
@@ -471,11 +471,18 @@ export function DashboardPage() {
   );
   const mapOpgwSplicePoints = useMemo(
     () => {
+      if (isolatedOpgwSection) {
+        const endpointIds = new Set([
+          isolatedOpgwSection.properties.fromSplicePointId,
+          isolatedOpgwSection.properties.toSplicePointId,
+        ]);
+        return visibleOpgwSplicePoints.filter((splicePoint) => endpointIds.has(splicePoint.properties.splicePointId));
+      }
       if (isolatedOpgwSplicePointId) return visibleOpgwSplicePoints.filter((splicePoint) => splicePoint.properties.splicePointId === isolatedOpgwSplicePointId);
       if (activeIsolatedOpgwRouteId) return visibleOpgwSplicePoints.filter((splicePoint) => splicePoint.properties.opgwRouteId === activeIsolatedOpgwRouteId);
       return visibleOpgwSplicePoints;
     },
-    [activeIsolatedOpgwRouteId, isolatedOpgwSplicePointId, visibleOpgwSplicePoints],
+    [activeIsolatedOpgwRouteId, isolatedOpgwSection, isolatedOpgwSplicePointId, visibleOpgwSplicePoints],
   );
   const opgwPlanningMetrics = useMemo(
     () => buildOpgwPlanningMetrics(visibleOpgwCables, fiberStrands, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints),
@@ -793,16 +800,16 @@ export function DashboardPage() {
       showToast("That OPGW cable section is not available in the current layer set.");
       return;
     }
-    const selection: StreetMapSelection = { kind: "opgw_cable_section", id: section.properties.cableSectionId, label: section.properties.cableSectionId, record: section };
+    const selection: StreetMapSelection = { kind: "opgw_cable_section", id: section.properties.cableId, label: section.properties.cableId, record: section };
     setIsolatedOpgwRouteId(section.properties.opgwRouteId);
     setIsolatedOpgwSectionId(section.properties.cableSectionId);
     setIsolatedOpgwSplicePointId(null);
     setSelectedAsset(selection);
     setFocusRequest({ selection, sequence: Date.now() });
-    setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwCableSections"));
+    setStreetLayers((current) => isolatedOpgwLayerState(current, ["opgwCableSections", "opgwSplicePoints"]));
     setRightMode("layers");
     setRightCollapsed(false);
-    showToast(`Showing only cable section ${section.properties.cableSectionId}.`);
+    showToast(`Showing cable ID ${section.properties.cableId} with its A/Z splice points: ${section.properties.fromSplicePointId} and ${section.properties.toSplicePointId}.`);
   }
 
   function focusOpgwSplicePointLayer(splicePointId: string) {
@@ -1204,9 +1211,9 @@ export function DashboardPage() {
               ) : null}
               {rightMode === "sources" ? <DashboardDataSourcesPanel /> : null}
               {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} onClose={handleCloseAssetDetail} /> : null}
-              {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} onUpdateStrands={updateFiberStrands} /> : null}
+              {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCableSections={visibleOpgwCableSections} onUpdateStrands={updateFiberStrands} /> : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
-              {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
+              {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCableSections={visibleOpgwCableSections} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
               {rightMode === "editor" ? (
                 <div className="dashboard-drawer-stack">
                   {showMapEditor ? <TransmissionMapEditor open={showMapEditor} onCancel={() => setShowMapEditor(false)} onSave={handleCreateMap} /> : null}
@@ -1657,20 +1664,20 @@ function AddAssetChooser({ publicOnly, selectedKind, onSelect, onCreateMap }: { 
 function FiberStrandTable({
   strands,
   assignments,
-  opgwCables,
+  opgwCableSections,
   onUpdateStrands,
 }: {
   strands: FiberStrand[];
   assignments: FiberAssignment[];
-  opgwCables: OpgwCableFeature[];
+  opgwCableSections: OpgwCableSectionFeature[];
   onUpdateStrands: (cableId: string, strandNumbers: number[], status: FiberStrand["status"], assignmentId?: string) => void;
 }) {
   const [cableId, setCableId] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
-  const effectiveCableId = cableId || opgwCables[0]?.properties.id || "";
-  const cable = opgwCables.find((item) => item.properties.id === effectiveCableId);
+  const effectiveCableId = cableId || opgwCableSections[0]?.properties.cableId || "";
+  const cable = opgwCableSections.find((item) => item.properties.cableId === effectiveCableId);
   const assignmentById = useMemo(() => new Map(assignments.map((assignment) => [assignment.id, assignment])), [assignments]);
   const rows = useMemo(() => strands
     .filter((strand) => strand.cableId === effectiveCableId)
@@ -1717,7 +1724,7 @@ function FiberStrandTable({
         <label>
           <span>OPGW cable</span>
           <select value={effectiveCableId} onChange={(event) => { setCableId(event.target.value); setSelected([]); }}>
-            {opgwCables.slice(0, 250).map((item) => <option key={item.properties.id} value={item.properties.id}>{item.properties.cableName}</option>)}
+            {opgwCableSections.slice(0, 250).map((item) => <option key={item.properties.cableId} value={item.properties.cableId}>{item.properties.cableName}</option>)}
           </select>
         </label>
         <label>
@@ -1733,6 +1740,7 @@ function FiberStrandTable({
       </label>
       <div className="fiber-stat-row">
         <span>{cable?.properties.fiberCount || 0}F</span>
+        <span>{cable?.properties.fromSplicePointId || "A splice"} to {cable?.properties.toSplicePointId || "Z splice"}</span>
         <span>{rows.length} shown</span>
         <span>{selectedRows.length} selected</span>
       </div>
@@ -1873,13 +1881,13 @@ function SpliceMatrix({
 
 function FiberAssignmentPlanner({
   assignments,
-  opgwCables,
+  opgwCableSections,
   structures,
   strands,
   onCreateAssignment,
 }: {
   assignments: FiberAssignment[];
-  opgwCables: OpgwCableFeature[];
+  opgwCableSections: OpgwCableSectionFeature[];
   structures: TransmissionStructureFeature[];
   strands: FiberStrand[];
   onCreateAssignment: (assignment: FiberAssignment) => void;
@@ -1888,14 +1896,14 @@ function FiberAssignmentPlanner({
   const [status, setStatus] = useState<FiberAssignment["status"]>("proposed");
   const [cableId, setCableId] = useState("");
   const [strandCount, setStrandCount] = useState(2);
-  const effectiveCableId = cableId || opgwCables[0]?.properties.id || "";
-  const cable = opgwCables.find((item) => item.properties.id === effectiveCableId);
+  const effectiveCableId = cableId || opgwCableSections[0]?.properties.cableId || "";
+  const cable = opgwCableSections.find((item) => item.properties.cableId === effectiveCableId);
   const structureById = useMemo(() => new Map(structures.map((structure) => [structure.properties.id, structure])), [structures]);
   const availableStrands = useMemo(() => strands
     .filter((strand) => strand.cableId === effectiveCableId && ["available", "spare", "dark"].includes(strand.status))
     .slice(0, strandCount), [effectiveCableId, strandCount, strands]);
-  const startStructure = cable ? structureById.get(cable.properties.startStructureId) : undefined;
-  const endStructure = cable ? structureById.get(cable.properties.endStructureId) : undefined;
+  const startStructure = cable ? structureById.get(cable.properties.fromStructureId) : undefined;
+  const endStructure = cable ? structureById.get(cable.properties.toStructureId) : undefined;
   const estimatedDistance = cable?.properties.routeMiles || 0;
   const estimatedLoss = Number((estimatedDistance * 0.25 + 1).toFixed(2));
   const canCreate = Boolean(cable && startStructure && endStructure && availableStrands.length === strandCount);
@@ -1911,9 +1919,9 @@ function FiberAssignmentPlanner({
       status,
       aEndStructureId: startStructure.properties.id,
       zEndStructureId: endStructure.properties.id,
-      cableIds: [cable.properties.id],
+      cableIds: [cable.properties.cableId],
       strandSegments: [{
-        cableId: cable.properties.id,
+        cableId: cable.properties.cableId,
         strandNumbers,
         fromStructureId: startStructure.properties.id,
         toStructureId: endStructure.properties.id,
@@ -1950,9 +1958,9 @@ function FiberAssignmentPlanner({
         </label>
       </div>
       <label className="fiber-stacked-field">
-        <span>Candidate OPGW route</span>
+        <span>Candidate OPGW cable section</span>
         <select value={effectiveCableId} onChange={(event) => setCableId(event.target.value)}>
-          {opgwCables.slice(0, 400).map((item) => <option key={item.properties.id} value={item.properties.id}>{item.properties.cableName}</option>)}
+          {opgwCableSections.slice(0, 400).map((item) => <option key={item.properties.cableId} value={item.properties.cableId}>{item.properties.cableName}</option>)}
         </select>
       </label>
       <div className="fiber-control-grid">
@@ -1967,6 +1975,7 @@ function FiberAssignmentPlanner({
       </div>
       <div className="fiber-route-card">
         <strong>{startStructure?.properties.structureNumber || "A-end"} to {endStructure?.properties.structureNumber || "Z-end"}</strong>
+        <span>{cable?.properties.fromSplicePointId || "A splice"} to {cable?.properties.toSplicePointId || "Z splice"}</span>
         <span>{estimatedDistance.toFixed(2)} miles / {estimatedLoss.toFixed(2)} dB estimated loss</span>
         <small>Loss uses 0.25 dB per mile plus 0.5 dB connector loss per end. Splice losses are estimated separately in the splice matrix.</small>
       </div>
@@ -1991,8 +2000,13 @@ async function fetchGeoJson<T>(url: string): Promise<T> {
 }
 
 function buildOpgwPlanningMetrics(opgw: OpgwCableFeature[], strands: FiberStrand[], assignments: FiberAssignment[], cableSections: OpgwCableSectionFeature[], spanSegments: OpgwSpanSegmentFeature[], splicePoints: OpgwSplicePointFeature[]) {
-  const strandStats = dashboardStrandStats(opgw, strands);
+  const strandStats = dashboardStrandStats(strands);
   const assignmentStats = dashboardAssignmentStats(assignments);
+  const sectionsByParentRouteId = new Map<string, OpgwCableSectionFeature[]>();
+  cableSections.forEach((section) => {
+    const parentRouteId = section.properties.parentRouteCableId || section.properties.opgwRouteId;
+    sectionsByParentRouteId.set(parentRouteId, [...(sectionsByParentRouteId.get(parentRouteId) || []), section]);
+  });
   let syntheticRouteMiles = 0;
   let plannedRouteMiles = 0;
   let verifiedRouteMiles = 0;
@@ -2006,8 +2020,18 @@ function buildOpgwPlanningMetrics(opgw: OpgwCableFeature[], strands: FiberStrand
   opgw.forEach((feature) => {
     const status = dashboardOpgwStatus(feature);
     const routeMiles = feature.properties.routeMiles || 0;
-    const stats = strandStats.get(feature.properties.id) || dashboardFallbackStrandStats(feature.properties.fiberCount);
-    const assignment = assignmentStats.get(feature.properties.id) || { critical: 0, openWorkOrders: 0 };
+    const routeSections = sectionsByParentRouteId.get(feature.properties.id) || [];
+    const stats = routeSections.length
+      ? { available: routeSections.reduce((sum, section) => sum + (strandStats.get(section.properties.cableId)?.available ?? section.properties.availableStrands), 0) }
+      : strandStats.get(feature.properties.id) || dashboardFallbackStrandStats(feature.properties.fiberCount);
+    const assignment = routeSections.length
+      ? routeSections.reduce((summary, section) => {
+        const sectionStats = assignmentStats.get(section.properties.cableId) || { critical: 0, openWorkOrders: 0 };
+        summary.critical += sectionStats.critical;
+        summary.openWorkOrders += sectionStats.openWorkOrders;
+        return summary;
+      }, { critical: 0, openWorkOrders: 0 })
+      : assignmentStats.get(feature.properties.id) || { critical: 0, openWorkOrders: 0 };
     syntheticRouteMiles += routeMiles;
     if (status === "synthetic_assumption" || status === "engineer_reviewed") assumedRouteCount += 1;
     if (status === "planned" || status === "design" || status === "work_order_issued") {
@@ -2080,10 +2104,12 @@ function buildOpgwPlanningMetrics(opgw: OpgwCableFeature[], strands: FiberStrand
     spansWithOpenWorkOrders,
     highRiskSpans,
     highestRiskSpan: highestRiskSpan ? `${highestRiskSpan.properties.fromStructureNumber} to ${highestRiskSpan.properties.toStructureNumber} / ${highestRiskSpan.properties.outageRiskScore}` : "None",
-    highestRiskCableSection: highestRiskSpan?.properties.cableSectionId || "None",
+    highestRiskCableSection: highestRiskSpan
+      ? cableSections.find((section) => section.properties.cableSectionId === highestRiskSpan.properties.cableSectionId)?.properties.cableId || highestRiskSpan.properties.cableSectionId
+      : "None",
     averageSpanRiskScore: spanSegments.length ? spanSegments.reduce((sum, span) => sum + span.properties.outageRiskScore, 0) / spanSegments.length : 0,
     lowSpareSections,
-    highestUtilizationSection: highestUtilizationSection?.properties.cableSectionId || "None",
+    highestUtilizationSection: highestUtilizationSection?.properties.cableId || "None",
   };
 }
 
@@ -2109,11 +2135,9 @@ function dashboardOpgwConfidence(feature: OpgwCableFeature) {
   return Number(feature.properties.id.replace(/\D/g, "").slice(-4) || 0) % 5 === 0 ? "medium" : "low";
 }
 
-function dashboardStrandStats(opgw: OpgwCableFeature[], strands: FiberStrand[]) {
+function dashboardStrandStats(strands: FiberStrand[]) {
   const stats = new Map<string, { available: number }>();
-  opgw.forEach((feature) => stats.set(feature.properties.id, dashboardFallbackStrandStats(feature.properties.fiberCount)));
   if (!strands.length) return stats;
-  stats.clear();
   strands.forEach((strand) => {
     const current = stats.get(strand.cableId) || { available: 0 };
     if (strand.status === "available" || strand.status === "spare" || strand.status === "dark") current.available += 1;
@@ -2259,7 +2283,7 @@ function buildDashboardLayerSummaries({
     layer("fccMicrowaveLinks", "FCC microwave paths", "Public reference", fccLinkCount, visibleFccLinkCount, "/data-sources", "FCC ULS public microwave path records grouped by owner and frequency", "Public FCC license reference only; do not infer active utility operations."),
     layer("syntheticSubstations", "Synthetic substations", "Planning assets", syntheticSubstationCount, syntheticSubstationCount, "/regional-grid", "Synthetic/demo planning nodes", "Synthetic/demo records only."),
     layer("transmissionStructures", "Transmission structures", "Synthetic OPGW Fiber", structureCount, visibleStructureCount, "/transmission-structures", "Synthetic structure points sampled from public line geometry", "Synthetic structure locations only; not real tower/pole locations."),
-    layer("syntheticOpgwCables", "Synthetic OPGW cables", "Synthetic OPGW Fiber", opgwCableCount, opgwCableCount, "/opgw-cables", "Generated synthetic OPGW cable records", "Synthetic/demo planning only; not active fiber."),
+    layer("syntheticOpgwCables", "OPGW route source records", "Synthetic OPGW Fiber", opgwCableCount, opgwCableCount, "/opgw-cables", "Parent route/source records used to derive splice-to-splice OPGW cable IDs", "Synthetic/demo planning only; not active fiber."),
     layer("assumedOpgwRoutes", "Assumed OPGW routes", "Synthetic OPGW Fiber", assumedOpgwRouteCount, assumedOpgwRouteCount, "/opgw", "Generated synthetic assumptions on public corridors", "Synthetic planning assumption only; requires engineer/as-built verification."),
     layer("plannedOpgwFiber", "Planned OPGW fiber", "Synthetic OPGW Fiber", plannedOpgwRouteCount, plannedOpgwRouteCount, "/opgw", "Synthetic planned OPGW records", "Planning/demo layer; conversion workflow required before as-built status."),
     layer("verifiedOpgwFiber", "Verified OPGW fiber", "Synthetic OPGW Fiber", verifiedOpgwRouteCount, verifiedOpgwRouteCount, "/opgw", "Demo records explicitly marked as verified", "Verification is demo metadata unless imported from approved records."),
@@ -2358,7 +2382,7 @@ function buildSearchResults(
     ...structures.map((record) => ({ kind: "transmission_structure" as const, id: record.properties.id, label: record.properties.structureNumber, record })),
     ...opgw.map((record) => ({ kind: "opgw_cable" as const, id: record.properties.id, label: record.properties.cableName, record })),
     ...opgwRoutes.map((record) => ({ kind: "opgw_route" as const, id: record.properties.opgwRouteId, label: record.properties.routeName, record })),
-    ...opgwCableSections.map((record) => ({ kind: "opgw_cable_section" as const, id: record.properties.cableSectionId, label: record.properties.cableSectionId, record })),
+    ...opgwCableSections.map((record) => ({ kind: "opgw_cable_section" as const, id: record.properties.cableId, label: record.properties.cableId, record })),
     ...opgwSpanSegments.map((record) => ({ kind: "opgw_span_segment" as const, id: record.properties.spanSegmentId, label: `${record.properties.fromStructureNumber} to ${record.properties.toStructureNumber}`, record })),
     ...opgwSplicePoints.map((record) => ({ kind: "opgw_splice_point" as const, id: record.properties.splicePointId, label: record.properties.splicePointId, record })),
     ...closures.map((record) => ({ kind: "splice_closure" as const, id: record.properties.id, label: record.properties.name, record })),
@@ -2607,7 +2631,7 @@ function selectionSearchText(selection: StreetMapSelection) {
   }
   if (selection.kind === "opgw_cable_section") {
     const properties = selection.record.properties;
-    return [layerLabel, selection.label, properties.cableSectionId, properties.opgwRouteId, properties.transmissionLineId, properties.fromSplicePointId, properties.toSplicePointId, properties.fromStructureNumber, properties.toStructureNumber, properties.installStatus, properties.syntheticConfidence].join(" ");
+    return [layerLabel, selection.label, properties.cableId, properties.cableName, properties.cableSectionId, properties.opgwRouteId, properties.transmissionLineId, properties.fromSplicePointId, properties.toSplicePointId, properties.fromStructureNumber, properties.toStructureNumber, properties.installStatus, properties.syntheticConfidence].join(" ");
   }
   if (selection.kind === "opgw_span_segment") {
     const properties = selection.record.properties;

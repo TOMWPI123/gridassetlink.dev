@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { DataTable } from "@/components/DataTable";
+import { buildSyntheticOpgwEngineeringModel } from "@/lib/opgw/spanModel";
 import type { FiberAssignment, FiberSplice, FiberStrand, OpgwCableCollection, PatchPanel, SpliceClosureCollection, TransmissionStructureCollection } from "@/lib/types/assets";
 import type { JsonRecord } from "@/types";
 
@@ -36,8 +37,23 @@ export function TransmissionStructuresPage() {
 
 export function OpgwCablesPage() {
   const data = useSyntheticFiberData();
-  const rows = data.opgw.map((feature) => ({ ...feature.properties, structureCount: feature.properties.structureIds.length, spliceClosureCount: feature.properties.connectedSpliceClosureIds.length }) as unknown as JsonRecord);
-  return <SyntheticPage title="OPGW Cables" subtitle="Synthetic OPGW planning cables randomly assigned to public transmission lines." error={data.error}><DataTable rows={rows} columns={["cableName", "lineId", "status", "fiberCount", "routeMiles", "structureCount", "spliceClosureCount", "source"]} filterField="status" /></SyntheticPage>;
+  const sections = useMemo(() => buildSyntheticOpgwEngineeringModel({
+    opgwCables: data.opgw,
+    transmissionStructures: data.structures,
+    spliceClosures: data.closures,
+    fiberStrands: data.strands,
+    fiberAssignments: data.assignments,
+    patchPanels: data.panels,
+    publicTransmissionLines: [],
+  }).cableSections, [data]);
+  const rows = sections.map((feature) => ({
+    ...feature.properties,
+    cableBoundary: `${feature.properties.fromSplicePointId} to ${feature.properties.toSplicePointId}`,
+    structureCount: feature.properties.totalSpans + 1,
+    spliceClosureCount: feature.properties.associatedSpliceClosureIds.length,
+    source: "synthetic-demo",
+  }) as unknown as JsonRecord);
+  return <SyntheticPage title="OPGW Cables" subtitle="Synthetic OPGW cable IDs are scoped to one cable section between two splice points." error={data.error}><DataTable rows={rows} columns={["cableId", "cableBoundary", "transmissionLineId", "installStatus", "fiberCount", "routeMiles", "structureCount", "spliceClosureCount", "source"]} filterField="installStatus" /></SyntheticPage>;
 }
 
 export function FiberStrandTablePage() {

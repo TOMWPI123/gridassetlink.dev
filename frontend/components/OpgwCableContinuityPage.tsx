@@ -5,13 +5,19 @@ import type { OpgwCableContinuityView } from "@/lib/opgw/cableContinuity";
 
 export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityView }) {
   const cable = view.cable.properties;
+  const selectedSection = view.selectedCableSection?.properties;
+  const pageTitle = selectedSection?.cableId || cable.cableName;
+  const continuityCableId = selectedSection?.cableId || cable.id;
+  const pageSubtitle = selectedSection
+    ? `${selectedSection.fromSplicePointId} to ${selectedSection.toSplicePointId} / ${view.routeId} / ${cable.lineName || cable.lineId}`
+    : `${cable.id} / ${view.routeId} / ${cable.lineName || cable.lineId}`;
   return (
     <main className="splice-manager-page opgw-cable-page">
       <header className="splice-manager-hero">
         <div>
           <Link className="splice-manager-back" href="/opgw">Back to OPGW Fiber Planner</Link>
-          <h1>{cable.cableName}</h1>
-          <p>{cable.id} / {view.routeId} / {cable.lineName || cable.lineId}</p>
+          <h1>{pageTitle}</h1>
+          <p>{pageSubtitle}</p>
         </div>
         <div className="splice-manager-warning">
           <AlertTriangle size={18} />
@@ -46,9 +52,11 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
               <table className="splice-manager-table">
                 <thead>
                   <tr>
-                    <th>Section</th>
+                    <th>Cable ID</th>
                     <th>From</th>
                     <th>To</th>
+                    <th>A Splice</th>
+                    <th>Z Splice</th>
                     <th>Miles</th>
                     <th>Spans</th>
                     <th>Available</th>
@@ -60,9 +68,11 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
                 <tbody>
                   {view.cableSections.map((section) => (
                     <tr key={section.properties.cableSectionId}>
-                      <td>{section.properties.cableSectionId}</td>
+                      <td>{section.properties.cableId}</td>
                       <td>{section.properties.fromStructureNumber}</td>
                       <td>{section.properties.toStructureNumber}</td>
+                      <td>{section.properties.fromSplicePointId}</td>
+                      <td>{section.properties.toSplicePointId}</td>
                       <td>{section.properties.routeMiles.toFixed(2)}</td>
                       <td>{section.properties.totalSpans}</td>
                       <td>{section.properties.availableStrands}</td>
@@ -167,8 +177,8 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
           <Panel title="Cable Menu" icon={<Cable size={17} />}>
             <div className="splice-action-stack">
               <Link href="/opgw">Open OPGW Fiber Planner</Link>
-              <Link href={`/fiber-trace?cable=${encodeURIComponent(cable.id)}`}>Open Fiber Trace</Link>
-              <Link href={`/outage-impact?cable=${encodeURIComponent(cable.id)}`}>Analyze Outage Impact</Link>
+              <Link href={`/fiber-trace?cable=${encodeURIComponent(continuityCableId)}`}>Open Fiber Trace</Link>
+              <Link href={`/outage-impact?cable=${encodeURIComponent(continuityCableId)}`}>Analyze Outage Impact</Link>
               <Link href={`/work-orders/new?cable=${encodeURIComponent(cable.id)}`}>Create Work Order</Link>
             </div>
           </Panel>

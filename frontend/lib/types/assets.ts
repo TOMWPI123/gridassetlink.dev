@@ -560,7 +560,10 @@ export type OpgwRouteFeature = {
 };
 
 export type OpgwCableSectionRecord = {
+  cableId: string;
+  cableName: string;
   cableSectionId: string;
+  parentRouteCableId?: string;
   opgwRouteId: string;
   transmissionLineId: string;
   fromSplicePointId: string;

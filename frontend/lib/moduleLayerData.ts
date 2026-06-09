@@ -10,7 +10,9 @@ import type {
   SpliceClosureCollection,
   SyntheticService,
   SyntheticSubstationCollection,
+  TransmissionStructureCollection,
 } from "@/lib/types/assets";
+import { buildSyntheticOpgwEngineeringModel } from "@/lib/opgw/spanModel";
 import type { JsonRecord } from "@/types";
 
 export type ModuleLayerMetric = {
@@ -63,19 +65,33 @@ export async function loadModuleLayerData(key: string): Promise<ModuleLayerData 
 }
 
 async function loadSubstations(): Promise<ModuleLayerData> {
-  const [publicSubstations, syntheticSubstations, opgw, patchPanels, assignments] = await Promise.all([
+  const [publicSubstations, syntheticSubstations, opgw, structures, strands, spliceClosures, patchPanels, assignments] = await Promise.all([
     fetchJson<PublicSubstationCollection>("/data/iso-ne-public-substations.geojson"),
     fetchJson<SyntheticSubstationCollection>("/data/iso-ne-synthetic-substations.geojson"),
     fetchJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson"),
+    fetchJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson"),
+    fetchJson<FiberStrand[]>("/data/iso-ne-synthetic-fiber-strands.json"),
+    fetchJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson"),
     fetchJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json"),
     fetchJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json"),
   ]);
+  const opgwModel = buildSyntheticOpgwEngineeringModel({
+    opgwCables: opgw.features,
+    transmissionStructures: structures.features || [],
+    spliceClosures: spliceClosures.features || [],
+    fiberStrands: strands,
+    fiberAssignments: assignments,
+    patchPanels,
+    publicTransmissionLines: [],
+  });
   const cableIdsByLineId = new Map<string, string[]>();
-  for (const feature of opgw.features) {
+  const sectionCableIds = new Set<string>();
+  for (const feature of opgwModel.cableSections) {
     const properties = feature.properties;
-    const existing = cableIdsByLineId.get(properties.lineId) || [];
-    existing.push(properties.id);
-    cableIdsByLineId.set(properties.lineId, existing);
+    sectionCableIds.add(properties.cableId);
+    const existing = cableIdsByLineId.get(properties.transmissionLineId) || [];
+    existing.push(properties.cableId);
+    cableIdsByLineId.set(properties.transmissionLineId, existing);
   }
   const patchPanelsByCableId = groupPatchPanelsByCable(patchPanels);
   const assignmentsByCableId = groupAssignmentsByCable(assignments);
@@ -119,7 +135,7 @@ async function loadSubstations(): Promise<ModuleLayerData> {
     const properties = feature.properties;
     const [longitude, latitude] = feature.geometry.coordinates;
     const relatedCableIds = uniqueStrings([
-      ...properties.connectedFiberIds,
+      ...properties.connectedFiberIds.filter((cableId) => sectionCableIds.has(cableId)),
       ...properties.connectedTransmissionLineIds.flatMap((lineId) => cableIdsByLineId.get(lineId) || []),
     ]);
     const relatedPatchPanels = uniqueById(relatedCableIds.flatMap((cableId) => patchPanelsByCableId.get(cableId) || []));
@@ -409,67 +425,78 @@ async function loadCircuits(): Promise<ModuleLayerData> {
 }
 
 async function loadOpgwCables(key: string): Promise<ModuleLayerData> {
-  const [opgw, strands, assignments, spliceClosures, patchPanels] = await Promise.all([
+  const [opgw, structures, publicLines, strands, assignments, spliceClosures, patchPanels] = await Promise.all([
     fetchJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson"),
+    fetchJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson"),
+    fetchJson<PublicTransmissionLineCollection>("/data/iso-ne-public-transmission-lines.geojson"),
     fetchJson<FiberStrand[]>("/data/iso-ne-synthetic-fiber-strands.json"),
     fetchJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json"),
     fetchJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson"),
     fetchJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json"),
   ]);
-  const strandCounts = countByKey(strands, "cableId");
-  const assignedCounts = countByPredicate(strands, (strand) => strand.status === "assigned");
-  const availableCounts = countByPredicate(strands, (strand) => ["available", "spare", "dark"].includes(strand.status));
-  const reservedCounts = countByPredicate(strands, (strand) => strand.status === "reserved");
-  const assignmentsByCable = countByCable(assignments);
-  const patchPanelsByCable = countPatchPanelsByCable(patchPanels);
-  const closuresByCable = countClosuresByCable(spliceClosures.features.map((feature) => feature.properties));
-  const rows = opgw.features.map<JsonRecord>((feature) => {
+  const sourceCableById = new Map(opgw.features.map((feature) => [feature.properties.id, feature.properties]));
+  const model = buildSyntheticOpgwEngineeringModel({
+    opgwCables: opgw.features,
+    transmissionStructures: structures.features || [],
+    spliceClosures: spliceClosures.features || [],
+    fiberStrands: strands,
+    fiberAssignments: assignments,
+    patchPanels,
+    publicTransmissionLines: publicLines.features || [],
+  });
+  const rows = model.cableSections.map<JsonRecord>((feature) => {
     const properties = feature.properties;
+    const sourceCable = properties.parentRouteCableId ? sourceCableById.get(properties.parentRouteCableId) : undefined;
     return {
-      id: properties.id,
-      cable_id: properties.id,
+      id: properties.cableId,
+      cable_id: properties.cableId,
+      cable_section_id: properties.cableSectionId,
       cable_name: properties.cableName,
-      cable_type: properties.fiberType,
+      source_route_cable_id: properties.parentRouteCableId,
+      route_id: properties.opgwRouteId,
+      cable_type: properties.cableType,
       fiber_count: properties.fiberCount,
-      route_name: properties.cableName,
+      route_name: sourceCable?.cableName || properties.opgwRouteId,
       route_miles: properties.routeMiles,
-      a_end_location: properties.startStructureId,
-      z_end_location: properties.endStructureId,
-      line_id: properties.lineId,
-      line_name: properties.lineName,
-      status: properties.status,
-      available_strands: availableCounts.get(properties.id) || 0,
-      assigned_strands: assignedCounts.get(properties.id) || 0,
-      reserved_strands: reservedCounts.get(properties.id) || 0,
-      strand_records: strandCounts.get(properties.id) || 0,
-      assignments: assignmentsByCable.get(properties.id) || 0,
-      services_carried: assignmentsByCable.get(properties.id) || 0,
-      splice_closures: closuresByCable.get(properties.id) || 0,
-      primary_splice_closure_id: properties.connectedSpliceClosureIds[0],
-      patch_panels: patchPanelsByCable.get(properties.id) || 0,
-      structure_count: properties.structureIds.length,
+      a_end_location: properties.fromStructureNumber,
+      z_end_location: properties.toStructureNumber,
+      a_end_splice_point_id: properties.fromSplicePointId,
+      z_end_splice_point_id: properties.toSplicePointId,
+      line_id: properties.transmissionLineId,
+      line_name: sourceCable?.lineName,
+      status: properties.installStatus,
+      available_strands: properties.availableStrands,
+      assigned_strands: properties.assignedStrands,
+      reserved_strands: properties.reservedStrands,
+      strand_records: properties.strandCount,
+      assignments: properties.assignedServices,
+      services_carried: properties.assignedServices,
+      splice_closures: properties.associatedSpliceClosureIds.length,
+      primary_splice_closure_id: properties.associatedSpliceClosureIds[0],
+      patch_panels: properties.associatedPatchPanelIds.length,
+      structure_count: properties.totalSpans + 1,
       manufacturer: properties.manufacturer,
-      cable_spec: properties.cableSpec,
-      open_href: `/opgw/cables/${encodeURIComponent(properties.id)}`,
-      open_label: "Open cable continuity",
-      splice_manager_href: properties.connectedSpliceClosureIds[0] ? `/opgw/splices/${encodeURIComponent(properties.connectedSpliceClosureIds[0])}` : undefined,
-      layer: "Synthetic OPGW fiber routes",
-      source: properties.source,
+      cable_spec: sourceCable?.cableSpec,
+      open_href: `/opgw/cables/${encodeURIComponent(properties.cableId)}`,
+      open_label: "Open splice-to-splice cable continuity",
+      splice_manager_href: `/opgw/splices/${encodeURIComponent(properties.fromSplicePointId)}`,
+      layer: "Synthetic OPGW splice-to-splice cable sections",
+      source: "synthetic-demo",
       source_type: "synthetic-planning",
       read_only: false,
       synthetic: true,
-      data_boundary: properties.notes,
+      data_boundary: `${properties.notes || "Synthetic cable section."} Cable ID is scoped from A splice point to Z splice point only.`,
     };
   });
   const totalMiles = sum(rows.map((row) => toNumber(row.route_miles)));
   return {
     title: "Layer-backed OPGW cable inventory",
-    notice: "OPGW module rows include synthetic assumed/planned OPGW cable routes, strands, splices, patch panels, and assignments from the map layer. Synthetic assumptions are not active fiber.",
+    notice: "OPGW module rows now use splice-to-splice cable IDs. Route-level synthetic OPGW records are retained only as parent/source context and are not treated as cable IDs.",
     rows,
     disableDetailLinks: key === "opgw",
     metrics: [
-      metric("Synthetic OPGW cables", rows.length, "OPGW route layer records embedded in the module.", "Synthetic OPGW layer", "Planning/demo only"),
-      metric("Route miles", totalMiles.toFixed(1), "Total synthetic OPGW miles represented by the layer.", "Synthetic OPGW layer", "Not verified active fiber"),
+      metric("Splice-to-splice cables", rows.length, "Each cable ID is bounded by two splice points.", "Synthetic OPGW layer", "Planning/demo only"),
+      metric("Cable miles", totalMiles.toFixed(1), "Total synthetic splice-to-splice cable miles represented by the layer.", "Synthetic OPGW layer", "Not verified active fiber"),
       metric("Fiber strands", strands.length, "One synthetic strand row per generated fiber.", "Synthetic fiber strand layer", "Planning/demo only"),
       metric("Assignments", assignments.length, "Synthetic service reservations and assignments riding the OPGW layer.", "Synthetic assignment layer", "Not real circuits"),
     ],
