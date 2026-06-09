@@ -324,8 +324,8 @@ export function DashboardPage() {
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
-    if (drawer === "sources") {
-      setRightMode("sources");
+    if (drawer && ["modules", "summary", "filters", "layers", "sources", "details", "strands", "splices", "assignments"].includes(drawer)) {
+      setRightMode(drawer as RightDrawerMode);
       setRightCollapsed(false);
     }
   }, []);
@@ -1048,7 +1048,7 @@ export function DashboardPage() {
                     utilityOwnerCount={new Set([...substationOwnerCounts, ...transmissionLineOwnerCounts, ...fccTowerOwnerCounts, ...fccLinkOwnerCounts].map(({ owner }) => owner)).size}
                     structureCount={visibleTransmissionStructures.length}
                     spliceClosureCount={visibleSpliceClosures.length}
-                    opgwRouteCount={visibleOpgwCables.length}
+                    opgwRouteCount={visibleOpgwRoutes.length}
                     assumedOpgwRouteCount={opgwPlanningMetrics.assumedRouteCount}
                     plannedOpgwRouteCount={opgwPlanningMetrics.plannedRouteCount}
                     verifiedOpgwRouteCount={opgwPlanningMetrics.verifiedRouteCount}
@@ -1061,6 +1061,8 @@ export function DashboardPage() {
                     outageImpactCount={opgwPlanningMetrics.outageImpactCount}
                     openOpgwWorkOrderCount={opgwPlanningMetrics.openWorkOrders}
                     spanInspectionIssueCount={opgwPlanningMetrics.spanInspectionIssues}
+                    opgwRoutes={visibleOpgwRoutes}
+                    opgwCableSections={visibleOpgwCableSections}
                     dataWarnings={mapDataWarnings}
                     transmissionLineOwnerCounts={transmissionLineOwnerCounts}
                     visibleTransmissionLineOwners={visibleTransmissionLineOwners}

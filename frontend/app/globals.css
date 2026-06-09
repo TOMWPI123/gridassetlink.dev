@@ -3341,6 +3341,12 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   padding: 0 8px 8px 32px;
 }
 
+.street-opgw-route-sublayers {
+  display: grid;
+  gap: 8px;
+  padding: 0 8px 8px 32px;
+}
+
 .street-owner-sublayer-heading {
   display: flex;
   align-items: flex-start;
@@ -3429,6 +3435,113 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   font-style: normal;
   font-weight: 820;
   text-align: center;
+}
+
+.street-opgw-route-list {
+  display: grid;
+  gap: 7px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.street-opgw-route-node {
+  border: 1px solid rgba(105,215,228,.16);
+  border-radius: 8px;
+  background: rgba(8,23,30,.46);
+}
+
+.street-opgw-route-node summary {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.street-opgw-route-node summary span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.street-opgw-route-node summary strong {
+  color: var(--dash-text);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.street-opgw-route-node summary small {
+  color: var(--dash-muted);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.street-opgw-route-node summary em {
+  align-self: start;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(105,215,228,.13);
+  color: #cffff8;
+  font-size: 9px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.street-opgw-route-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 8px 8px;
+}
+
+.street-opgw-route-meta span {
+  border: 1px solid rgba(238,252,251,.12);
+  border-radius: 999px;
+  color: #d9f9f5;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 760;
+}
+
+.street-opgw-section-heading {
+  padding: 7px 8px 4px;
+  border-top: 1px solid rgba(238,252,251,.08);
+  color: var(--dash-muted);
+  font-size: 9px;
+  font-weight: 860;
+  text-transform: uppercase;
+}
+
+.street-opgw-section-list {
+  display: grid;
+  gap: 5px;
+  padding: 0 8px 8px;
+}
+
+.street-opgw-section-node {
+  display: grid;
+  gap: 2px;
+  padding: 7px;
+  border: 1px solid rgba(238,252,251,.09);
+  border-radius: 7px;
+  background: rgba(232,241,240,.04);
+}
+
+.street-opgw-section-node strong {
+  color: #e6fffb;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.street-opgw-section-node span,
+.street-opgw-section-node small,
+.street-opgw-section-more {
+  color: var(--dash-muted);
+  font-size: 9px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .map-tool-title {

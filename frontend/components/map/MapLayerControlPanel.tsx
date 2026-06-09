@@ -1,7 +1,7 @@
 "use client";
 
 import { Layers } from "lucide-react";
-import type { StreetMapLayerKey } from "@/lib/types/assets";
+import type { OpgwCableSectionFeature, OpgwRouteFeature, StreetMapLayerKey } from "@/lib/types/assets";
 
 type MapLayerControlPanelProps = {
   layers: Record<StreetMapLayerKey, boolean>;
@@ -30,6 +30,8 @@ type MapLayerControlPanelProps = {
   outageImpactCount?: number;
   openOpgwWorkOrderCount?: number;
   spanInspectionIssueCount?: number;
+  opgwRoutes?: OpgwRouteFeature[];
+  opgwCableSections?: OpgwCableSectionFeature[];
   dataWarnings?: Record<string, string>;
   transmissionLineOwnerCounts?: Array<{ owner: string; count: number }>;
   visibleTransmissionLineOwners?: Record<string, boolean>;
@@ -113,6 +115,8 @@ export function MapLayerControlPanel({
   outageImpactCount = 0,
   openOpgwWorkOrderCount = 0,
   spanInspectionIssueCount = 0,
+  opgwRoutes = [],
+  opgwCableSections = [],
   dataWarnings,
   transmissionLineOwnerCounts = [],
   visibleTransmissionLineOwners = {},
@@ -247,40 +251,49 @@ export function MapLayerControlPanel({
       </div>
       <div className="street-layer-grid">
         {opgwLayerRows.map((layer) => (
-          <label className={`street-layer-toggle ${layers[layer.key] ? "active" : ""}`} key={layer.key}>
-            <input
-              type="checkbox"
-              checked={layers[layer.key]}
-              onChange={(event) => onLayerChange?.(layer.key, event.currentTarget.checked)}
-            />
-            <span>
-              <strong>
-                {layer.label}
-                <em>{opgwCountForLayer(layer.key, {
-                  publicLineCount,
-                  publicSubstationCount,
-                  assumedOpgwRouteCount,
-                  plannedOpgwRouteCount,
-                  verifiedOpgwRouteCount,
-                  opgwCableSectionCount,
-                  opgwSpanSegmentCount,
-                  opgwSplicePointCount,
-                  structureCount,
-                  spliceClosureCount,
-                  patchPanelCount,
-                  availableStrandCount,
-                  criticalRidingCircuitCount,
-                  outageImpactCount,
-                  openOpgwWorkOrderCount,
-                  spanInspectionIssueCount,
-                })}</em>
-              </strong>
-              <small>{dataWarningForLayer(layer.key, dataWarnings) || layer.note}</small>
-              <span className="street-layer-badges">
-                {layer.badges.map((badge) => <b key={badge}>{badge}</b>)}
+          <div className={`street-layer-group ${layers[layer.key] ? "active" : ""}`} key={layer.key}>
+            <label className={`street-layer-toggle ${layers[layer.key] ? "active" : ""}`}>
+              <input
+                type="checkbox"
+                checked={layers[layer.key]}
+                onChange={(event) => onLayerChange?.(layer.key, event.currentTarget.checked)}
+              />
+              <span>
+                <strong>
+                  {layer.label}
+                  <em>{opgwCountForLayer(layer.key, {
+                    publicLineCount,
+                    publicSubstationCount,
+                    assumedOpgwRouteCount,
+                    plannedOpgwRouteCount,
+                    verifiedOpgwRouteCount,
+                    opgwCableSectionCount,
+                    opgwSpanSegmentCount,
+                    opgwSplicePointCount,
+                    structureCount,
+                    spliceClosureCount,
+                    patchPanelCount,
+                    availableStrandCount,
+                    criticalRidingCircuitCount,
+                    outageImpactCount,
+                    openOpgwWorkOrderCount,
+                    spanInspectionIssueCount,
+                  })}</em>
+                </strong>
+                <small>{dataWarningForLayer(layer.key, dataWarnings) || layer.note}</small>
+                <span className="street-layer-badges">
+                  {layer.badges.map((badge) => <b key={badge}>{badge}</b>)}
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+            {layer.key === "opgwRoutes" ? (
+              <OpgwRouteSublayerTree
+                routes={opgwRoutes}
+                cableSections={opgwCableSections}
+                cableSectionsVisible={layers.opgwCableSections}
+              />
+            ) : null}
+          </div>
         ))}
       </div>
       <div className="street-layer-warning">
@@ -389,6 +402,77 @@ function FrequencySublayerList({
             <em>{count}</em>
           </label>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function OpgwRouteSublayerTree({
+  routes,
+  cableSections,
+  cableSectionsVisible,
+}: {
+  routes: OpgwRouteFeature[];
+  cableSections: OpgwCableSectionFeature[];
+  cableSectionsVisible: boolean;
+}) {
+  const sectionsByRoute = new Map<string, OpgwCableSectionFeature[]>();
+  for (const section of cableSections) {
+    const routeId = section.properties.opgwRouteId;
+    const existing = sectionsByRoute.get(routeId) || [];
+    existing.push(section);
+    sectionsByRoute.set(routeId, existing);
+  }
+  const routeRows = routes
+    .map((route) => ({
+      route,
+      sections: (sectionsByRoute.get(route.properties.opgwRouteId) || []).sort((a, b) => a.properties.cableSectionId.localeCompare(b.properties.cableSectionId, undefined, { numeric: true })),
+    }))
+    .sort((a, b) => b.sections.length - a.sections.length || a.route.properties.transmissionLineId.localeCompare(b.route.properties.transmissionLineId))
+    .slice(0, 12);
+
+  return (
+    <div className="street-opgw-route-sublayers" aria-label="OPGW route transmission-line and cable-section sublayers">
+      <div className="street-owner-sublayer-heading">
+        <span>
+          OPGW transmission line sublayers
+          <small>{routeRows.length} of {routes.length} route lines shown / cable sections are {cableSectionsVisible ? "visible" : "hidden"}</small>
+        </span>
+      </div>
+      <div className="street-opgw-route-list">
+        {routeRows.map(({ route, sections }, index) => {
+          const properties = route.properties;
+          return (
+            <details className="street-opgw-route-node" key={properties.opgwRouteId} open={index === 0}>
+              <summary>
+                <span>
+                  <strong>{properties.transmissionLineId}</strong>
+                  <small>{properties.routeName}</small>
+                </span>
+                <em>{sections.length} sections</em>
+              </summary>
+              <div className="street-opgw-route-meta">
+                <span>{properties.routeStatus}</span>
+                <span>{properties.routeMiles.toFixed(1)} mi</span>
+                <span>{properties.totalFiberCount}F</span>
+              </div>
+              <div className="street-opgw-section-heading">Cable sections from splice to splice</div>
+              <div className="street-opgw-section-list">
+                {sections.slice(0, 8).map((section) => {
+                  const sectionProperties = section.properties;
+                  return (
+                    <div className="street-opgw-section-node" key={sectionProperties.cableSectionId}>
+                      <strong>{sectionProperties.cableSectionId}</strong>
+                      <span>{sectionProperties.fromSplicePointId} to {sectionProperties.toSplicePointId}</span>
+                      <small>{sectionProperties.fromStructureNumber} to {sectionProperties.toStructureNumber} / {sectionProperties.routeMiles.toFixed(2)} mi / {sectionProperties.installStatus}</small>
+                    </div>
+                  );
+                })}
+                {sections.length > 8 ? <span className="street-opgw-section-more">+{sections.length - 8} more splice-to-splice sections in this route</span> : null}
+              </div>
+            </details>
+          );
+        })}
       </div>
     </div>
   );
