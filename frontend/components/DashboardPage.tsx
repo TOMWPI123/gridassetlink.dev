@@ -215,6 +215,8 @@ export function DashboardPage() {
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
   const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => dashboardStreetLayers);
+  const [isolatedOpgwRouteId, setIsolatedOpgwRouteId] = useState<string | null>(null);
+  const [isolatedOpgwSectionId, setIsolatedOpgwSectionId] = useState<string | null>(null);
   const [visibleTransmissionLineOwners, setVisibleTransmissionLineOwners] = useState<Record<string, boolean>>({});
   const [visibleSubstationOwners, setVisibleSubstationOwners] = useState<Record<string, boolean>>({});
   const [visibleFccTowerOwners, setVisibleFccTowerOwners] = useState<Record<string, boolean>>({});
@@ -444,6 +446,23 @@ export function DashboardPage() {
   const visibleOpgwCableSections = opgwEngineeringModel.cableSections;
   const visibleOpgwSpanSegments = opgwEngineeringModel.spanSegments;
   const visibleOpgwSplicePoints = opgwEngineeringModel.splicePoints;
+  const isolatedOpgwSection = useMemo(
+    () => isolatedOpgwSectionId ? visibleOpgwCableSections.find((section) => section.properties.cableSectionId === isolatedOpgwSectionId) : undefined,
+    [isolatedOpgwSectionId, visibleOpgwCableSections],
+  );
+  const activeIsolatedOpgwRouteId = isolatedOpgwSection?.properties.opgwRouteId || isolatedOpgwRouteId || "";
+  const mapOpgwRoutes = useMemo(
+    () => activeIsolatedOpgwRouteId ? visibleOpgwRoutes.filter((route) => route.properties.opgwRouteId === activeIsolatedOpgwRouteId) : visibleOpgwRoutes,
+    [activeIsolatedOpgwRouteId, visibleOpgwRoutes],
+  );
+  const mapOpgwCableSections = useMemo(
+    () => {
+      if (isolatedOpgwSectionId) return visibleOpgwCableSections.filter((section) => section.properties.cableSectionId === isolatedOpgwSectionId);
+      if (isolatedOpgwRouteId) return visibleOpgwCableSections.filter((section) => section.properties.opgwRouteId === isolatedOpgwRouteId);
+      return visibleOpgwCableSections;
+    },
+    [isolatedOpgwRouteId, isolatedOpgwSectionId, visibleOpgwCableSections],
+  );
   const opgwPlanningMetrics = useMemo(
     () => buildOpgwPlanningMetrics(visibleOpgwCables, fiberStrands, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints),
     [fiberStrands, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSpanSegments, visibleOpgwSplicePoints],
@@ -736,6 +755,47 @@ export function DashboardPage() {
     setStreetLayers((current) => ({ ...current, [layer]: enabled }));
   }
 
+  function focusOpgwRouteLayer(routeId: string) {
+    const route = visibleOpgwRoutes.find((feature) => feature.properties.opgwRouteId === routeId);
+    if (!route) {
+      showToast("That OPGW route is not available in the current layer set.");
+      return;
+    }
+    const selection: StreetMapSelection = { kind: "opgw_route", id: route.properties.opgwRouteId, label: route.properties.routeName, record: route };
+    setIsolatedOpgwRouteId(route.properties.opgwRouteId);
+    setIsolatedOpgwSectionId(null);
+    setSelectedAsset(selection);
+    setFocusRequest({ selection, sequence: Date.now() });
+    setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwRoutes"));
+    setRightMode("layers");
+    setRightCollapsed(false);
+    showToast(`Showing only OPGW transmission line ${route.properties.transmissionLineId}.`);
+  }
+
+  function focusOpgwCableSectionLayer(sectionId: string) {
+    const section = visibleOpgwCableSections.find((feature) => feature.properties.cableSectionId === sectionId);
+    if (!section) {
+      showToast("That OPGW cable section is not available in the current layer set.");
+      return;
+    }
+    const selection: StreetMapSelection = { kind: "opgw_cable_section", id: section.properties.cableSectionId, label: section.properties.cableSectionId, record: section };
+    setIsolatedOpgwRouteId(section.properties.opgwRouteId);
+    setIsolatedOpgwSectionId(section.properties.cableSectionId);
+    setSelectedAsset(selection);
+    setFocusRequest({ selection, sequence: Date.now() });
+    setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwCableSections"));
+    setRightMode("layers");
+    setRightCollapsed(false);
+    showToast(`Showing only cable section ${section.properties.cableSectionId}.`);
+  }
+
+  function clearOpgwLayerIsolation() {
+    setIsolatedOpgwRouteId(null);
+    setIsolatedOpgwSectionId(null);
+    setStreetLayers((current) => ({ ...current, opgwRoutes: true, opgwCableSections: true }));
+    showToast("OPGW route visibility filter cleared.");
+  }
+
   function handleOperatingModeChange(nextMode: DashboardOperatingMode) {
     setOperatingMode(nextMode);
     setStreetLayers((current) => layerStateForOperatingMode(nextMode, current));
@@ -905,8 +965,8 @@ export function DashboardPage() {
         syntheticSubstations={visibleSyntheticSubstations}
         transmissionStructures={layerFilteredTransmissionStructures}
         opgwCables={visibleOpgwCables}
-        opgwRoutes={visibleOpgwRoutes}
-        opgwCableSections={visibleOpgwCableSections}
+        opgwRoutes={mapOpgwRoutes}
+        opgwCableSections={mapOpgwCableSections}
         opgwSpanSegments={visibleOpgwSpanSegments}
         opgwSplicePoints={visibleOpgwSplicePoints}
         spliceClosures={layerFilteredSpliceClosures}
@@ -1063,6 +1123,8 @@ export function DashboardPage() {
                     spanInspectionIssueCount={opgwPlanningMetrics.spanInspectionIssues}
                     opgwRoutes={visibleOpgwRoutes}
                     opgwCableSections={visibleOpgwCableSections}
+                    focusedOpgwRouteId={activeIsolatedOpgwRouteId}
+                    focusedOpgwSectionId={isolatedOpgwSectionId || undefined}
                     dataWarnings={mapDataWarnings}
                     transmissionLineOwnerCounts={transmissionLineOwnerCounts}
                     visibleTransmissionLineOwners={visibleTransmissionLineOwners}
@@ -1085,6 +1147,9 @@ export function DashboardPage() {
                     onAllFccLinkOwnersChange={handleAllFccLinkOwnersChange}
                     onFccFrequencyBandChange={handleFccFrequencyBandChange}
                     onAllFccFrequencyBandsChange={handleAllFccFrequencyBandsChange}
+                    onFocusOpgwRoute={focusOpgwRouteLayer}
+                    onFocusOpgwSection={focusOpgwCableSectionLayer}
+                    onClearOpgwFocus={clearOpgwLayerIsolation}
                   />
                   {streetLayers.missingLocationAssets ? (
                     <MissingMapLocationPanel
@@ -1217,6 +1282,15 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
     opgwOpenWorkOrders: true,
     opgwSpanInspectionIssues: true,
   };
+}
+
+function isolatedOpgwLayerState(current: Record<StreetMapLayerKey, boolean>, focusedLayer: "opgwRoutes" | "opgwCableSections") {
+  const next = { ...current };
+  for (const key of Object.keys(next) as StreetMapLayerKey[]) {
+    next[key] = false;
+  }
+  next[focusedLayer] = true;
+  return next;
 }
 
 function DashboardDataSourcesPanel() {

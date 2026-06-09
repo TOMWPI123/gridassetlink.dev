@@ -32,6 +32,8 @@ type MapLayerControlPanelProps = {
   spanInspectionIssueCount?: number;
   opgwRoutes?: OpgwRouteFeature[];
   opgwCableSections?: OpgwCableSectionFeature[];
+  focusedOpgwRouteId?: string;
+  focusedOpgwSectionId?: string;
   dataWarnings?: Record<string, string>;
   transmissionLineOwnerCounts?: Array<{ owner: string; count: number }>;
   visibleTransmissionLineOwners?: Record<string, boolean>;
@@ -53,6 +55,9 @@ type MapLayerControlPanelProps = {
   onAllFccLinkOwnersChange?: (enabled: boolean) => void;
   onFccFrequencyBandChange?: (frequencyBand: string, enabled: boolean) => void;
   onAllFccFrequencyBandsChange?: (enabled: boolean) => void;
+  onFocusOpgwRoute?: (routeId: string) => void;
+  onFocusOpgwSection?: (sectionId: string) => void;
+  onClearOpgwFocus?: () => void;
 };
 
 const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges?: string[] }> = [
@@ -117,6 +122,8 @@ export function MapLayerControlPanel({
   spanInspectionIssueCount = 0,
   opgwRoutes = [],
   opgwCableSections = [],
+  focusedOpgwRouteId,
+  focusedOpgwSectionId,
   dataWarnings,
   transmissionLineOwnerCounts = [],
   visibleTransmissionLineOwners = {},
@@ -138,6 +145,9 @@ export function MapLayerControlPanel({
   onAllFccLinkOwnersChange,
   onFccFrequencyBandChange,
   onAllFccFrequencyBandsChange,
+  onFocusOpgwRoute,
+  onFocusOpgwSection,
+  onClearOpgwFocus,
 }: MapLayerControlPanelProps) {
   const counts: Partial<Record<StreetMapLayerKey, number>> = {
     publicTransmissionLines: publicLineCount,
@@ -291,6 +301,11 @@ export function MapLayerControlPanel({
                 routes={opgwRoutes}
                 cableSections={opgwCableSections}
                 cableSectionsVisible={layers.opgwCableSections}
+                focusedRouteId={focusedOpgwRouteId}
+                focusedSectionId={focusedOpgwSectionId}
+                onFocusRoute={onFocusOpgwRoute}
+                onFocusSection={onFocusOpgwSection}
+                onClearFocus={onClearOpgwFocus}
               />
             ) : null}
           </div>
@@ -411,10 +426,20 @@ function OpgwRouteSublayerTree({
   routes,
   cableSections,
   cableSectionsVisible,
+  focusedRouteId,
+  focusedSectionId,
+  onFocusRoute,
+  onFocusSection,
+  onClearFocus,
 }: {
   routes: OpgwRouteFeature[];
   cableSections: OpgwCableSectionFeature[];
   cableSectionsVisible: boolean;
+  focusedRouteId?: string;
+  focusedSectionId?: string;
+  onFocusRoute?: (routeId: string) => void;
+  onFocusSection?: (sectionId: string) => void;
+  onClearFocus?: () => void;
 }) {
   const sectionsByRoute = new Map<string, OpgwCableSectionFeature[]>();
   for (const section of cableSections) {
@@ -423,27 +448,44 @@ function OpgwRouteSublayerTree({
     existing.push(section);
     sectionsByRoute.set(routeId, existing);
   }
-  const routeRows = routes
+  const allRouteRows = routes
     .map((route) => ({
       route,
       sections: (sectionsByRoute.get(route.properties.opgwRouteId) || []).sort((a, b) => a.properties.cableSectionId.localeCompare(b.properties.cableSectionId, undefined, { numeric: true })),
     }))
-    .sort((a, b) => b.sections.length - a.sections.length || a.route.properties.transmissionLineId.localeCompare(b.route.properties.transmissionLineId))
-    .slice(0, 12);
+    .sort((a, b) => b.sections.length - a.sections.length || a.route.properties.transmissionLineId.localeCompare(b.route.properties.transmissionLineId));
+  const focusedRowIndex = focusedRouteId ? allRouteRows.findIndex(({ route }) => route.properties.opgwRouteId === focusedRouteId) : -1;
+  const routeRows = focusedRowIndex >= 12
+    ? [allRouteRows[focusedRowIndex], ...allRouteRows.slice(0, 11)]
+    : allRouteRows.slice(0, 12);
+  const hasFocus = Boolean(focusedRouteId || focusedSectionId);
 
   return (
     <div className="street-opgw-route-sublayers" aria-label="OPGW route transmission-line and cable-section sublayers">
       <div className="street-owner-sublayer-heading">
         <span>
           OPGW transmission line sublayers
-          <small>{routeRows.length} of {routes.length} route lines shown / cable sections are {cableSectionsVisible ? "visible" : "hidden"}</small>
+          <small>{routeRows.length} of {routes.length} route lines shown / cable sections are {cableSectionsVisible ? "visible" : "hidden"}{hasFocus ? " / visibility filter active" : ""}</small>
         </span>
+        {hasFocus ? (
+          <span className="street-owner-sublayer-actions">
+            <button type="button" onClick={onClearFocus}>Show all</button>
+          </span>
+        ) : null}
       </div>
       <div className="street-opgw-route-list">
         {routeRows.map(({ route, sections }, index) => {
           const properties = route.properties;
+          const isRouteFocused = focusedRouteId === properties.opgwRouteId && !focusedSectionId;
+          const isActiveRoute = focusedRouteId === properties.opgwRouteId || sections.some((section) => section.properties.cableSectionId === focusedSectionId);
+          const sectionRows = focusedSectionId && sections.findIndex((section) => section.properties.cableSectionId === focusedSectionId) >= 8
+            ? [
+                sections.find((section) => section.properties.cableSectionId === focusedSectionId),
+                ...sections.slice(0, 7),
+              ].filter((section): section is OpgwCableSectionFeature => Boolean(section))
+            : sections.slice(0, 8);
           return (
-            <details className="street-opgw-route-node" key={properties.opgwRouteId} open={index === 0}>
+            <details className={`street-opgw-route-node ${isActiveRoute ? "is-isolated" : ""}`} key={properties.opgwRouteId} open={index === 0 || isActiveRoute}>
               <summary>
                 <span>
                   <strong>{properties.transmissionLineId}</strong>
@@ -456,19 +498,38 @@ function OpgwRouteSublayerTree({
                 <span>{properties.routeMiles.toFixed(1)} mi</span>
                 <span>{properties.totalFiberCount}F</span>
               </div>
+              <div className="street-opgw-route-actions">
+                <button
+                  type="button"
+                  className={`street-opgw-filter-button ${isRouteFocused ? "active" : ""}`}
+                  onClick={() => onFocusRoute?.(properties.opgwRouteId)}
+                >
+                  {isRouteFocused ? "Line isolated" : "Only this line"}
+                </button>
+              </div>
               <div className="street-opgw-section-heading">Cable sections from splice to splice</div>
               <div className="street-opgw-section-list">
-                {sections.slice(0, 8).map((section) => {
+                {sectionRows.map((section) => {
                   const sectionProperties = section.properties;
+                  const isSectionFocused = focusedSectionId === sectionProperties.cableSectionId;
                   return (
-                    <div className="street-opgw-section-node" key={sectionProperties.cableSectionId}>
-                      <strong>{sectionProperties.cableSectionId}</strong>
-                      <span>{sectionProperties.fromSplicePointId} to {sectionProperties.toSplicePointId}</span>
-                      <small>{sectionProperties.fromStructureNumber} to {sectionProperties.toStructureNumber} / {sectionProperties.routeMiles.toFixed(2)} mi / {sectionProperties.installStatus}</small>
+                    <div className={`street-opgw-section-node ${isSectionFocused ? "is-isolated" : ""}`} key={sectionProperties.cableSectionId}>
+                      <span className="street-opgw-section-copy">
+                        <strong>{sectionProperties.cableSectionId}</strong>
+                        <span>{sectionProperties.fromSplicePointId} to {sectionProperties.toSplicePointId}</span>
+                        <small>{sectionProperties.fromStructureNumber} to {sectionProperties.toStructureNumber} / {sectionProperties.routeMiles.toFixed(2)} mi / {sectionProperties.installStatus}</small>
+                      </span>
+                      <button
+                        type="button"
+                        className={`street-opgw-filter-button section ${isSectionFocused ? "active" : ""}`}
+                        onClick={() => onFocusSection?.(sectionProperties.cableSectionId)}
+                      >
+                        {isSectionFocused ? "Section isolated" : "Only section"}
+                      </button>
                     </div>
                   );
                 })}
-                {sections.length > 8 ? <span className="street-opgw-section-more">+{sections.length - 8} more splice-to-splice sections in this route</span> : null}
+                {sections.length > sectionRows.length ? <span className="street-opgw-section-more">+{sections.length - sectionRows.length} more splice-to-splice sections in this route</span> : null}
               </div>
             </details>
           );
