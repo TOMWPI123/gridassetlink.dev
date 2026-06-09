@@ -1,5 +1,5 @@
 import type { PatchPanel } from "../lib/types/assets";
-import { PATCH_PANELS_PATH, chooseWeighted, createSeededRandom, deriveSpliceBoundedCableSections, readOpgwCables, readSpliceClosures, readStructures, writeJson } from "./fiber-network-utils";
+import { PATCH_PANELS_PATH, chooseWeighted, createSeededRandom, readOpgwCables, readSpliceClosures, writeJson } from "./fiber-network-utils";
 
 const SEED = "gridassetlink-patch-panels-v1";
 
@@ -7,9 +7,7 @@ async function main() {
   const rng = createSeededRandom(SEED);
   const closures = await readSpliceClosures();
   const cables = await readOpgwCables();
-  const structures = await readStructures();
-  const cableSections = deriveSpliceBoundedCableSections(cables.features, structures.features, closures.features);
-  const cableById = new Map(cableSections.map((section) => [section.id, section]));
+  const cableById = new Map(cables.features.map((cable) => [cable.properties.id, cable.properties]));
   const panels: PatchPanel[] = [];
 
   closures.features

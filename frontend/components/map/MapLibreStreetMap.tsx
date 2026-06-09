@@ -1405,14 +1405,10 @@ function buildDatasets(
         type: "Feature" as const,
         properties: {
           kind: "opgw_cable_section",
-          id: feature.properties.cableId,
-          label: feature.properties.cableId,
-          cableId: feature.properties.cableId,
+          id: feature.properties.cableSectionId,
+          label: feature.properties.cableSectionId,
           status: feature.properties.installStatus,
           installStatus: feature.properties.installStatus,
-          cableSectionId: feature.properties.cableSectionId,
-          cableName: feature.properties.cableName,
-          parentRouteCableId: feature.properties.parentRouteCableId || null,
           opgwRouteId: feature.properties.opgwRouteId,
           transmissionLineId: feature.properties.transmissionLineId,
           fromSplicePointId: feature.properties.fromSplicePointId,
@@ -1784,14 +1780,12 @@ function buildSelectionLookup(
     };
   });
   opgwCableSections.forEach((record) => {
-    const selection = {
+    lookup[`opgw_cable_section:${record.properties.cableSectionId}`] = {
       kind: "opgw_cable_section",
-      id: record.properties.cableId,
-      label: record.properties.cableId,
+      id: record.properties.cableSectionId,
+      label: record.properties.cableSectionId,
       record,
-    } as const;
-    lookup[`opgw_cable_section:${record.properties.cableId}`] = selection;
-    lookup[`opgw_cable_section:${record.properties.cableSectionId}`] = selection;
+    };
   });
   opgwSpanSegments.forEach((record) => {
     lookup[`opgw_span_segment:${record.properties.spanSegmentId}`] = {

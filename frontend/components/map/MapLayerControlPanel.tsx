@@ -1,7 +1,6 @@
 "use client";
 
-import { Layers, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Layers } from "lucide-react";
 import type { OpgwCableSectionFeature, OpgwRouteFeature, OpgwSplicePointFeature, StreetMapLayerKey } from "@/lib/types/assets";
 
 type MapLayerControlPanelProps = {
@@ -457,7 +456,6 @@ function OpgwRouteSublayerTree({
   onFocusSplicePoint?: (splicePointId: string) => void;
   onClearFocus?: () => void;
 }) {
-  const [cableEndpointQuery, setCableEndpointQuery] = useState("");
   const sectionsByRoute = new Map<string, OpgwCableSectionFeature[]>();
   const splicePointById = new Map(splicePoints.map((splicePoint) => [splicePoint.properties.splicePointId, splicePoint]));
   for (const section of cableSections) {
@@ -477,34 +475,6 @@ function OpgwRouteSublayerTree({
     ? [allRouteRows[focusedRowIndex], ...allRouteRows.slice(0, 11)]
     : allRouteRows.slice(0, 12);
   const hasFocus = Boolean(focusedRouteId || focusedSectionId || focusedSplicePointId);
-  const normalizedCableEndpointQuery = cableEndpointQuery.trim().toLowerCase();
-  const cableEndpointRows = useMemo(() => {
-    const sortedSections = [...cableSections].sort((a, b) => a.properties.cableId.localeCompare(b.properties.cableId, undefined, { numeric: true }));
-    const matches = sortedSections.filter((section) => {
-      const properties = section.properties;
-      if (!normalizedCableEndpointQuery) return true;
-      return [
-        properties.cableId,
-        properties.cableName,
-        properties.cableSectionId,
-        properties.opgwRouteId,
-        properties.transmissionLineId,
-        properties.fromSplicePointId,
-        properties.toSplicePointId,
-        properties.fromStructureNumber,
-        properties.toStructureNumber,
-      ].join(" ").toLowerCase().includes(normalizedCableEndpointQuery);
-    });
-    const pinned = sortedSections.filter((section) =>
-      section.properties.cableSectionId === focusedSectionId
-      || section.properties.fromSplicePointId === focusedSplicePointId
-      || section.properties.toSplicePointId === focusedSplicePointId
-      || section.properties.opgwRouteId === focusedRouteId,
-    );
-    return [...pinned, ...matches]
-      .filter((section, index, rows) => rows.findIndex((candidate) => candidate.properties.cableId === section.properties.cableId) === index)
-      .slice(0, normalizedCableEndpointQuery ? 12 : 6);
-  }, [cableSections, focusedRouteId, focusedSectionId, focusedSplicePointId, normalizedCableEndpointQuery]);
 
   return (
     <div className="street-opgw-route-sublayers" aria-label="OPGW route transmission-line and cable-section sublayers">
@@ -518,59 +488,6 @@ function OpgwRouteSublayerTree({
             <button type="button" onClick={onClearFocus}>Show all</button>
           </span>
         ) : null}
-      </div>
-      <div className="street-opgw-cable-endpoint-lookup" aria-label="Cable ID splice point lookup">
-        <label className="street-opgw-cable-search">
-          <Search size={13} />
-          <input
-            value={cableEndpointQuery}
-            onChange={(event) => setCableEndpointQuery(event.currentTarget.value)}
-            placeholder="Search cable ID"
-          />
-        </label>
-        <div className="street-opgw-cable-endpoint-list">
-          {cableEndpointRows.map((section) => {
-            const sectionProperties = section.properties;
-            const isSectionFocused = focusedSectionId === sectionProperties.cableSectionId;
-            const isSpliceFocusedInSection = sectionProperties.fromSplicePointId === focusedSplicePointId || sectionProperties.toSplicePointId === focusedSplicePointId;
-            const fromPoint = splicePointById.get(sectionProperties.fromSplicePointId);
-            const toPoint = splicePointById.get(sectionProperties.toSplicePointId);
-            return (
-              <div className={`street-opgw-cable-endpoint-row ${isSectionFocused || isSpliceFocusedInSection ? "is-isolated" : ""}`} key={sectionProperties.cableId}>
-                <div className="street-opgw-cable-endpoint-title">
-                  <strong>{sectionProperties.cableId}</strong>
-                  <span>{sectionProperties.transmissionLineId} / {sectionProperties.routeMiles.toFixed(2)} mi / {sectionProperties.fiberCount}F</span>
-                </div>
-                <div className="street-opgw-cable-endpoint-points">
-                  <SplicePointEndpoint
-                    label="A splice"
-                    splicePointId={sectionProperties.fromSplicePointId}
-                    fallbackStructureNumber={sectionProperties.fromStructureNumber}
-                    splicePoint={fromPoint}
-                    isFocused={focusedSplicePointId === sectionProperties.fromSplicePointId}
-                    onFocus={onFocusSplicePoint}
-                  />
-                  <SplicePointEndpoint
-                    label="Z splice"
-                    splicePointId={sectionProperties.toSplicePointId}
-                    fallbackStructureNumber={sectionProperties.toStructureNumber}
-                    splicePoint={toPoint}
-                    isFocused={focusedSplicePointId === sectionProperties.toSplicePointId}
-                    onFocus={onFocusSplicePoint}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={`street-opgw-filter-button section ${isSectionFocused ? "active" : ""}`}
-                  onClick={() => onFocusSection?.(sectionProperties.cableSectionId)}
-                >
-                  {isSectionFocused ? "Cable + 2 splice points isolated" : "Only this cable"}
-                </button>
-              </div>
-            );
-          })}
-          {!cableEndpointRows.length ? <span className="street-opgw-section-more">No cable IDs match that layer filter.</span> : null}
-        </div>
       </div>
       <div className="street-opgw-route-list">
         {routeRows.map(({ route, sections }, index) => {
@@ -618,7 +535,7 @@ function OpgwRouteSublayerTree({
                   return (
                     <div className={`street-opgw-section-node ${isSectionFocused || isSpliceFocusedInSection ? "is-isolated" : ""}`} key={sectionProperties.cableSectionId}>
                       <span className="street-opgw-section-copy">
-                        <strong>Cable ID {sectionProperties.cableId}</strong>
+                        <strong>{sectionProperties.cableSectionId}</strong>
                         <span>{sectionProperties.fromSplicePointId} to {sectionProperties.toSplicePointId}</span>
                         <small>{sectionProperties.fromStructureNumber} to {sectionProperties.toStructureNumber} / {sectionProperties.routeMiles.toFixed(2)} mi / {sectionProperties.installStatus}</small>
                         <span className="street-opgw-splice-endpoint-list" aria-label={`Splice point endpoints for ${sectionProperties.cableSectionId}`}>
@@ -645,7 +562,7 @@ function OpgwRouteSublayerTree({
                         className={`street-opgw-filter-button section ${isSectionFocused ? "active" : ""}`}
                         onClick={() => onFocusSection?.(sectionProperties.cableSectionId)}
                       >
-                        {isSectionFocused ? "Section + 2 splice points isolated" : "Only section"}
+                        {isSectionFocused ? "Section isolated" : "Only section"}
                       </button>
                     </div>
                   );

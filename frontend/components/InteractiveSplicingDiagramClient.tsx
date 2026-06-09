@@ -77,9 +77,9 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
     const proposed: FiberSplice = {
       id: `PROP-DIAGRAM-${selectedPointId}-${Date.now().toString(36).toUpperCase()}`,
       spliceClosureId: closureId,
-      fromCableId: firstIncoming?.cableId || view.closure?.properties.cableIds[0] || "DEMO-INCOMING-CABLE",
+      fromCableId: firstIncoming?.cableSectionId || view.closure?.properties.cableIds[0] || "DEMO-INCOMING-CABLE",
       fromStrandNumber: nextStrand,
-      toCableId: firstOutgoing?.cableId || view.closure?.properties.cableIds[1] || firstIncoming?.cableId || "DEMO-OUTGOING-CABLE",
+      toCableId: firstOutgoing?.cableSectionId || view.closure?.properties.cableIds[1] || firstIncoming?.cableSectionId || "DEMO-OUTGOING-CABLE",
       toStrandNumber: nextStrand,
       spliceType: "straight_through",
       lossDb: 0.06,
@@ -279,8 +279,8 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
             <div className="splicing-diagram-card-title"><Cable size={17} /><strong>Cable Sections</strong></div>
             <div className="splicing-diagram-section-list">
               {view.connectedCableSections.map((section) => (
-                <article key={section.cableId}>
-                  <strong>{section.cableId}</strong>
+                <article key={section.cableSectionId}>
+                  <strong>{section.cableSectionId}</strong>
                   <span>{section.direction} / {section.fiberCount}F / {section.layer}</span>
                   <small>{section.fromStructure} to {section.toStructure}</small>
                 </article>

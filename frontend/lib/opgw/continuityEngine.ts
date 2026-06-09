@@ -29,7 +29,6 @@ export type FiberContinuityData = {
 };
 
 export type ConnectedCableSection = {
-  cableId: string;
   cableSectionId: string;
   transmissionLineId: string;
   opgwRouteId: string;
@@ -162,7 +161,6 @@ export function connectedSectionsForSplicePoint(splicePointId: string, data: Fib
   return data.opgwCableSections
     .filter((section) => section.properties.fromSplicePointId === splicePointId || section.properties.toSplicePointId === splicePointId)
     .map((section) => ({
-      cableId: section.properties.cableId,
       cableSectionId: section.properties.cableSectionId,
       transmissionLineId: section.properties.transmissionLineId,
       opgwRouteId: section.properties.opgwRouteId,
@@ -269,14 +267,9 @@ export function buildClosureToSplicePointId(splicePoints: OpgwSplicePointFeature
 }
 
 function routeCableIdsForSection(section: OpgwCableSectionFeature, cables: OpgwCableFeature[]) {
-  const routeCableIds = cables
+  return cables
     .filter((cable) => opgwRouteIdForCable(cable) === section.properties.opgwRouteId)
     .map((cable) => cable.properties.id);
-  return [
-    section.properties.cableId,
-    section.properties.cableSectionId,
-    ...routeCableIds,
-  ];
 }
 
 function opgwRouteIdForCable(cable: OpgwCableFeature) {

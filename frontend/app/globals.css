@@ -3575,91 +3575,6 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   background: rgba(255,212,105,.1);
 }
 
-.street-opgw-cable-endpoint-lookup {
-  display: grid;
-  gap: 8px;
-  margin: 8px 0;
-  padding: 8px;
-  border: 1px solid rgba(86,228,219,.16);
-  border-radius: 8px;
-  background: rgba(86,228,219,.055);
-}
-
-.street-opgw-cable-search {
-  display: grid;
-  grid-template-columns: 16px minmax(0,1fr);
-  gap: 6px;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 8px;
-  border: 1px solid rgba(232,241,240,.12);
-  border-radius: 6px;
-  background: rgba(9,18,20,.52);
-  color: var(--dash-muted);
-}
-
-.street-opgw-cable-search input {
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--dash-text);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.street-opgw-cable-search input::placeholder {
-  color: rgba(232,241,240,.46);
-}
-
-.street-opgw-cable-endpoint-list {
-  display: grid;
-  gap: 7px;
-  max-height: 280px;
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.street-opgw-cable-endpoint-row {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid rgba(86,228,219,.16);
-  border-radius: 7px;
-  background: rgba(9,18,20,.38);
-}
-
-.street-opgw-cable-endpoint-row.is-isolated {
-  border-color: rgba(255,212,105,.52);
-  background: rgba(255,212,105,.1);
-}
-
-.street-opgw-cable-endpoint-title {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.street-opgw-cable-endpoint-title strong {
-  color: #e6fffb;
-  font-size: 10px;
-  overflow-wrap: anywhere;
-}
-
-.street-opgw-cable-endpoint-title span {
-  color: var(--dash-muted);
-  font-size: 9px;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.street-opgw-cable-endpoint-points {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0,1fr));
-  gap: 5px;
-}
-
 .street-opgw-section-copy {
   display: grid;
   gap: 2px;
@@ -3724,12 +3639,6 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 .street-opgw-splice-endpoint.active {
   border-color: rgba(255,212,105,.72);
   background: rgba(255,212,105,.18);
-}
-
-@media (max-width: 520px) {
-  .street-opgw-cable-endpoint-points {
-    grid-template-columns: 1fr;
-  }
 }
 
 .map-tool-title {

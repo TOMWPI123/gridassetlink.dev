@@ -19,7 +19,7 @@
     "data:patch-panels": "tsx scripts/generate-patch-panels.ts",
     "data:fiber-assignments": "tsx scripts/generate-fiber-assignments.ts",
     "data:synthetic-services": "tsx scripts/generate-synthetic-services.ts",
-    "data:fiber-network": "npm run data:structures && npm run data:opgw && npm run data:splices && npm run data:strands && npm run data:patch-panels && npm run data:fiber-assignments && npm run data:synthetic-services",
+    "data:fiber-network": "npm run data:structures && npm run data:opgw && npm run data:strands && npm run data:splices && npm run data:patch-panels && npm run data:fiber-assignments && npm run data:synthetic-services",
     "data:validate-fiber-network": "tsx scripts/validate-fiber-network.ts",
     "data:map": "npm run data:transmission && npm run data:public-substations && npm run data:synthetic-substations && npm run data:fiber-network && npm run data:validate-fiber-network"
   },

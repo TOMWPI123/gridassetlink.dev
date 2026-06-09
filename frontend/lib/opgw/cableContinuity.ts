@@ -15,7 +15,6 @@ import type {
 
 export type OpgwCableContinuityView = {
   cable: OpgwCableFeature;
-  selectedCableSection?: OpgwCableSectionFeature;
   routeId: string;
   cableSections: OpgwCableSectionFeature[];
   spanSegments: OpgwSpanSegmentFeature[];
@@ -49,22 +48,18 @@ export type OpgwCableContinuityView = {
 
 export function buildOpgwCableContinuityView(cableId: string, data: FiberContinuityData): OpgwCableContinuityView | null {
   const normalizedId = decodeURIComponent(cableId);
-  const selectedCableSection = data.opgwCableSections.find((section) => section.properties.cableId === normalizedId || section.properties.cableSectionId === normalizedId);
-  const cable = selectedCableSection
-    ? data.opgwCables.find((feature) => feature.properties.id === selectedCableSection.properties.parentRouteCableId || opgwRouteIdForCable(feature) === selectedCableSection.properties.opgwRouteId)
-    : data.opgwCables.find((feature) => feature.properties.id === normalizedId || feature.properties.cableName === normalizedId);
+  const cable = data.opgwCables.find((feature) => feature.properties.id === normalizedId || feature.properties.cableName === normalizedId);
   if (!cable) return null;
 
-  const routeId = selectedCableSection?.properties.opgwRouteId || opgwRouteIdForCable(cable);
-  const cableSections = (selectedCableSection ? [selectedCableSection] : data.opgwCableSections.filter((section) => section.properties.opgwRouteId === routeId))
+  const routeId = opgwRouteIdForCable(cable);
+  const cableSections = data.opgwCableSections
+    .filter((section) => section.properties.opgwRouteId === routeId)
     .sort((a, b) => a.properties.cableSectionId.localeCompare(b.properties.cableSectionId, undefined, { numeric: true }));
   const spanSegments = data.opgwSpanSegments
-    .filter((span) => selectedCableSection ? span.properties.cableSectionId === selectedCableSection.properties.cableSectionId : span.properties.opgwRouteId === routeId)
+    .filter((span) => span.properties.opgwRouteId === routeId)
     .sort((a, b) => a.properties.spanSegmentId.localeCompare(b.properties.spanSegmentId, undefined, { numeric: true }));
   const splicePoints = data.opgwSplicePoints
-    .filter((point) => selectedCableSection
-      ? point.properties.splicePointId === selectedCableSection.properties.fromSplicePointId || point.properties.splicePointId === selectedCableSection.properties.toSplicePointId
-      : point.properties.opgwRouteId === routeId)
+    .filter((point) => point.properties.opgwRouteId === routeId)
     .sort((a, b) => structureSequence(a.properties.structureNumber) - structureSequence(b.properties.structureNumber));
 
   const closureIds = new Set<string>([
@@ -72,11 +67,10 @@ export function buildOpgwCableContinuityView(cableId: string, data: FiberContinu
     ...splicePoints.map((point) => point.properties.closureId).filter(Boolean) as string[],
   ]);
   const sectionIds = new Set(cableSections.map((section) => section.properties.cableSectionId));
-  const sectionCableIds = new Set(cableSections.flatMap((section) => [section.properties.cableId, section.properties.cableSectionId]));
-  const spliceClosures = data.spliceClosures.filter((closure) => closureIds.has(closure.properties.id) || closure.properties.cableIds.includes(cable.properties.id) || closure.properties.cableIds.some((id) => sectionCableIds.has(id)));
+  const spliceClosures = data.spliceClosures.filter((closure) => closureIds.has(closure.properties.id) || closure.properties.cableIds.includes(cable.properties.id));
   spliceClosures.forEach((closure) => closureIds.add(closure.properties.id));
 
-  const fiberAssignments = data.fiberAssignments.filter((assignment) => assignment.cableIds.includes(cable.properties.id) || assignment.cableIds.some((id) => sectionCableIds.has(id)));
+  const fiberAssignments = data.fiberAssignments.filter((assignment) => assignment.cableIds.includes(cable.properties.id));
   const assignmentIds = new Set(fiberAssignments.map((assignment) => assignment.id));
   const fiberSplices = data.fiberSplices.filter((splice) => {
     if (closureIds.has(splice.spliceClosureId)) return true;
@@ -84,12 +78,11 @@ export function buildOpgwCableContinuityView(cableId: string, data: FiberContinu
     if (sectionIds.has(splice.fromCableId) || sectionIds.has(splice.toCableId)) return true;
     return Boolean(splice.assignmentId && assignmentIds.has(splice.assignmentId));
   });
-  const fiberStrands = (data.fiberStrands || []).filter((strand) => strand.cableId === cable.properties.id || sectionCableIds.has(strand.cableId));
-  const patchPanels = data.patchPanels.filter((panel) => panel.fiberCableIds.includes(cable.properties.id) || panel.fiberCableIds.some((id) => sectionCableIds.has(id)));
+  const fiberStrands = (data.fiberStrands || []).filter((strand) => strand.cableId === cable.properties.id);
+  const patchPanels = data.patchPanels.filter((panel) => panel.fiberCableIds.includes(cable.properties.id));
   const splicePointIds = new Set(splicePoints.map((point) => point.properties.splicePointId));
 
   const services = data.syntheticServices.filter((service) => {
-    if (service.continuityCableIds?.some((id) => sectionCableIds.has(id))) return true;
     if (service.continuityCableIds?.includes(cable.properties.id)) return true;
     if (service.continuitySpliceClosureIds?.some((id) => closureIds.has(id))) return true;
     if (service.continuitySplicePointIds?.some((id) => splicePointIds.has(id))) return true;
@@ -113,7 +106,6 @@ export function buildOpgwCableContinuityView(cableId: string, data: FiberContinu
 
   return {
     cable,
-    selectedCableSection,
     routeId,
     cableSections,
     spanSegments,

@@ -67,7 +67,7 @@ export function buildSyntheticOpgwEngineeringModel({
 }: BuildInput): SyntheticOpgwEngineeringModel {
   const structureById = new Map(transmissionStructures.map((feature) => [feature.properties.id, feature]));
   const publicLineById = new Map(publicTransmissionLines.map((feature) => [feature.properties.id, feature]));
-  const closuresByCableId = groupSpliceClosuresByCable(opgwCables, spliceClosures);
+  const closuresByCableId = groupSpliceClosuresByCable(spliceClosures);
   const strandStatsByCableId = buildStrandStats(opgwCables, fiberStrands);
   const assignmentStatsByCableId = buildAssignmentStats(fiberAssignments);
   const patchPanelsByCableId = groupPatchPanelsByCable(patchPanels);
@@ -93,15 +93,13 @@ export function buildSyntheticOpgwEngineeringModel({
     const spliceDrafts = splicePointDraftsFor(cable, structures, closures, lineCode);
     if (spliceDrafts.length < 2) return;
 
+    const strandStats = strandStatsByCableId.get(cable.properties.id) || fallbackStrandStats(cable.properties.fiberCount);
+    const assignmentStats = assignmentStatsByCableId.get(cable.properties.id) || emptyAssignmentStats();
+    const panelIds = (patchPanelsByCableId.get(cable.properties.id) || []).map((panel) => panel.id);
     const publicLine = publicLineById.get(cable.properties.lineId)?.properties;
     const voltageClass = publicLine?.voltageClass || String(structures[0]?.properties.voltageKv || "unknown");
     const cableSectionIds: string[] = [];
     let totalSectionMiles = 0;
-    let routeAvailableStrands = 0;
-    let routeAssignedStrands = 0;
-    let routeReservedStrands = 0;
-    let routeCriticalServices = 0;
-    let routeOpenWorkOrders = 0;
 
     for (let spliceIndex = 0; spliceIndex < spliceDrafts.length - 1; spliceIndex += 1) {
       const fromSplice = spliceDrafts[spliceIndex];
@@ -115,27 +113,15 @@ export function buildSyntheticOpgwEngineeringModel({
       const routeMiles = lengthMiles(coordinates);
       totalSectionMiles += routeMiles;
       const sectionId = `OPGW-${lineCode}-CS-${String(spliceIndex + 1).padStart(3, "0")}`;
-      const sectionCableName = `${sectionId}: ${fromSplice.splicePointId} to ${toSplice.splicePointId}`;
       cableSectionIds.push(sectionId);
       addSplicePointSection(splicePointSectionIds, fromSplice.splicePointId, sectionId);
       addSplicePointSection(splicePointSectionIds, toSplice.splicePointId, sectionId);
 
       const sectionStatus = sectionStatusFor(cable);
-      const strandStats = strandStatsByCableId.get(sectionId) || strandStatsByCableId.get(cable.properties.id) || fallbackStrandStats(cable.properties.fiberCount);
-      const assignmentStats = assignmentStatsByCableId.get(sectionId) || assignmentStatsByCableId.get(cable.properties.id) || emptyAssignmentStats();
-      const panelIds = (patchPanelsByCableId.get(sectionId) || patchPanelsByCableId.get(cable.properties.id) || []).map((panel) => panel.id);
-      routeAvailableStrands += strandStats.available;
-      routeAssignedStrands += assignmentStats.assignedStrands;
-      routeReservedStrands += assignmentStats.reservedStrands;
-      routeCriticalServices += assignmentStats.critical;
-      routeOpenWorkOrders += assignmentStats.openWorkOrders;
       const section: OpgwCableSectionFeature = {
         type: "Feature",
         properties: {
-          cableId: sectionId,
-          cableName: sectionCableName,
           cableSectionId: sectionId,
-          parentRouteCableId: cable.properties.id,
           opgwRouteId: routeId,
           transmissionLineId: cable.properties.lineId,
           fromSplicePointId: fromSplice.splicePointId,
@@ -153,7 +139,7 @@ export function buildSyntheticOpgwEngineeringModel({
           routeMiles: Number(routeMiles.toFixed(3)),
           totalSpans: Math.max(0, sectionStructures.length - 1),
           strandCount: cable.properties.fiberCount,
-        availableStrands: Math.max(0, strandStats.available),
+          availableStrands: Math.max(0, strandStats.available),
           assignedStrands: assignmentStats.assignedStrands,
           reservedStrands: assignmentStats.reservedStrands,
           assignedServices: assignmentStats.critical,
@@ -244,12 +230,12 @@ export function buildSyntheticOpgwEngineeringModel({
         totalCableSections: cableSectionIds.length,
         totalSplicePoints: spliceDrafts.length,
         totalFiberCount: cable.properties.fiberCount,
-        availableStrands: routeAvailableStrands || fallbackStrandStats(cable.properties.fiberCount).available,
-        assignedStrands: routeAssignedStrands,
-        reservedStrands: routeReservedStrands,
-        criticalRidingCircuits: routeCriticalServices,
-        openWorkOrders: routeOpenWorkOrders,
-        outageImpactCount: routeCriticalServices > 0 && confidence === "low" ? 1 : 0,
+        availableStrands: strandStats.available,
+        assignedStrands: assignmentStats.assignedStrands,
+        reservedStrands: assignmentStats.reservedStrands,
+        criticalRidingCircuits: assignmentStats.critical,
+        openWorkOrders: assignmentStats.openWorkOrders,
+        outageImpactCount: assignmentStats.critical > 0 && confidence === "low" ? 1 : 0,
         synthetic: true,
         warning: assumptionWarning,
         notes: "Synthetic OPGW route. Cable sections are defined from splice point to splice point; spans are structure to structure.",
@@ -295,20 +281,10 @@ function splicePointDraftsFor(
   return [...draftsByStructureId.values()].sort((a, b) => a.structure.properties.sequenceIndex - b.structure.properties.sequenceIndex);
 }
 
-function groupSpliceClosuresByCable(cables: OpgwCableFeature[], closures: SpliceClosureFeature[]) {
+function groupSpliceClosuresByCable(closures: SpliceClosureFeature[]) {
   const groups = new Map<string, SpliceClosureFeature[]>();
-  const parentCableIdsByStructureId = new Map<string, string[]>();
-  cables.forEach((cable) => {
-    cable.properties.structureIds.forEach((structureId) => {
-      parentCableIdsByStructureId.set(structureId, [...(parentCableIdsByStructureId.get(structureId) || []), cable.properties.id]);
-    });
-  });
   closures.forEach((closure) => {
-    const parentCableIds = new Set([
-      ...closure.properties.cableIds.filter((cableId) => cables.some((cable) => cable.properties.id === cableId)),
-      ...(parentCableIdsByStructureId.get(closure.properties.structureId) || []),
-    ]);
-    parentCableIds.forEach((cableId) => {
+    closure.properties.cableIds.forEach((cableId) => {
       const current = groups.get(cableId) || [];
       current.push(closure);
       groups.set(cableId, current);

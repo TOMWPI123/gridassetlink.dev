@@ -1,5 +1,5 @@
 import type { FiberAssignment, PatchPanel, SyntheticService } from "../lib/types/assets";
-import { FIBER_ASSIGNMENTS_PATH, PATCH_PANELS_PATH, SYNTHETIC_SERVICES_PATH, deriveSpliceBoundedCableSections, readJson, readOpgwCables, readSpliceClosures, readStructures, writeJson } from "./fiber-network-utils";
+import { FIBER_ASSIGNMENTS_PATH, PATCH_PANELS_PATH, SYNTHETIC_SERVICES_PATH, readJson, readOpgwCables, readSpliceClosures, writeJson } from "./fiber-network-utils";
 
 const SERVICE_BLUEPRINTS: Array<{
   id: string;
@@ -27,16 +27,14 @@ const SERVICE_BLUEPRINTS: Array<{
 async function main() {
   const cables = await readOpgwCables();
   const closures = await readSpliceClosures();
-  const structures = await readStructures();
-  const cableSections = deriveSpliceBoundedCableSections(cables.features, structures.features, closures.features);
   const assignments = await readJson<FiberAssignment[]>(FIBER_ASSIGNMENTS_PATH, []);
   const patchPanels = await readJson<PatchPanel[]>(PATCH_PANELS_PATH, []);
   const usableAssignments = assignments.filter((assignment) => assignment.cableIds.length > 0);
   const services = SERVICE_BLUEPRINTS.map((blueprint, index): SyntheticService => {
     const primary = usableAssignments[index % Math.max(1, usableAssignments.length)];
     const backup = usableAssignments[(index + 7) % Math.max(1, usableAssignments.length)];
-    const cableWindow = cableSections.slice(index * 2, index * 2 + (index < 3 ? 3 : 2));
-    const continuityCableIds = unique([...(primary?.cableIds || []), ...cableWindow.map((section) => section.id)]).slice(0, index < 3 ? 4 : 2);
+    const cableWindow = cables.features.slice(index * 2, index * 2 + (index < 3 ? 3 : 2));
+    const continuityCableIds = unique([...(primary?.cableIds || []), ...cableWindow.map((feature) => feature.properties.id)]).slice(0, index < 3 ? 4 : 2);
     const relatedClosureIds = closures.features
       .filter((closure) => closure.properties.cableIds.some((cableId) => continuityCableIds.includes(cableId)))
       .slice(0, 8)

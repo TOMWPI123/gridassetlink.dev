@@ -7,7 +7,7 @@ import { displayValue } from "@/lib/api";
 import type { JsonRecord } from "@/types";
 
 export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
-  const cables = useMemo(() => rows.filter((row) => typeof row.cable_id === "string"), [rows]);
+  const cables = useMemo(() => rows.filter((row) => typeof row.cable_id === "string" && String(row.cable_id).startsWith("SYN-OPGW")), [rows]);
   const [selectedId, setSelectedId] = useState("");
   const selected = cables.find((row) => row.cable_id === selectedId) || cables[0];
   if (!cables.length || !selected) return null;
@@ -21,9 +21,9 @@ export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
       <div className="panel-header">
         <div>
           <strong>Open Cable Continuity</strong>
-          <div className="subtle">Pick a splice-to-splice OPGW cable ID and open its continuity, splicing, and carried-service view.</div>
+          <div className="subtle">Pick an OPGW cable and open its continuity, splicing, and carried-service view.</div>
         </div>
-        <span className="badge planned">{cables.length.toLocaleString()} splice-to-splice cables</span>
+        <span className="badge planned">{cables.length.toLocaleString()} synthetic cables</span>
       </div>
       <div className="panel-body opgw-cable-menu-body">
         <label className="opgw-cable-picker">
@@ -38,8 +38,6 @@ export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
         </label>
         <div className="opgw-cable-menu-stats">
           <div><span>Route</span><strong>{displayValue(selected.route_name || selected.cable_name)}</strong></div>
-          <div><span>A splice</span><strong>{displayValue(selected.a_end_splice_point_id)}</strong></div>
-          <div><span>Z splice</span><strong>{displayValue(selected.z_end_splice_point_id)}</strong></div>
           <div><span>Fiber</span><strong>{displayValue(selected.fiber_count)}F</strong></div>
           <div><span>Miles</span><strong>{displayValue(selected.route_miles)}</strong></div>
           <div><span>Available</span><strong>{displayValue(selected.available_strands)}</strong></div>
