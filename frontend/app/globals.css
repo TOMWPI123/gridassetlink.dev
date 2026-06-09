@@ -3596,6 +3596,51 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   overflow-wrap: anywhere;
 }
 
+.street-opgw-splice-endpoint-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.street-opgw-splice-endpoint {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid rgba(255,212,105,.24);
+  border-radius: 6px;
+  background: rgba(255,212,105,.07);
+  color: var(--dash-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.street-opgw-splice-endpoint span {
+  color: #ffe6a3;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.street-opgw-splice-endpoint strong {
+  color: #fff8df;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.street-opgw-splice-endpoint small {
+  color: rgba(255,248,223,.74);
+  font-size: 8px;
+  line-height: 1.25;
+}
+
+.street-opgw-splice-endpoint.active {
+  border-color: rgba(255,212,105,.72);
+  background: rgba(255,212,105,.18);
+}
+
 .map-tool-title {
   margin-top: 14px;
 }

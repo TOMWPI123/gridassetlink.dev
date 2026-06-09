@@ -217,6 +217,7 @@ export function DashboardPage() {
   const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => dashboardStreetLayers);
   const [isolatedOpgwRouteId, setIsolatedOpgwRouteId] = useState<string | null>(null);
   const [isolatedOpgwSectionId, setIsolatedOpgwSectionId] = useState<string | null>(null);
+  const [isolatedOpgwSplicePointId, setIsolatedOpgwSplicePointId] = useState<string | null>(null);
   const [visibleTransmissionLineOwners, setVisibleTransmissionLineOwners] = useState<Record<string, boolean>>({});
   const [visibleSubstationOwners, setVisibleSubstationOwners] = useState<Record<string, boolean>>({});
   const [visibleFccTowerOwners, setVisibleFccTowerOwners] = useState<Record<string, boolean>>({});
@@ -450,7 +451,11 @@ export function DashboardPage() {
     () => isolatedOpgwSectionId ? visibleOpgwCableSections.find((section) => section.properties.cableSectionId === isolatedOpgwSectionId) : undefined,
     [isolatedOpgwSectionId, visibleOpgwCableSections],
   );
-  const activeIsolatedOpgwRouteId = isolatedOpgwSection?.properties.opgwRouteId || isolatedOpgwRouteId || "";
+  const isolatedOpgwSplicePoint = useMemo(
+    () => isolatedOpgwSplicePointId ? visibleOpgwSplicePoints.find((splicePoint) => splicePoint.properties.splicePointId === isolatedOpgwSplicePointId) : undefined,
+    [isolatedOpgwSplicePointId, visibleOpgwSplicePoints],
+  );
+  const activeIsolatedOpgwRouteId = isolatedOpgwSplicePoint?.properties.opgwRouteId || isolatedOpgwSection?.properties.opgwRouteId || isolatedOpgwRouteId || "";
   const mapOpgwRoutes = useMemo(
     () => activeIsolatedOpgwRouteId ? visibleOpgwRoutes.filter((route) => route.properties.opgwRouteId === activeIsolatedOpgwRouteId) : visibleOpgwRoutes,
     [activeIsolatedOpgwRouteId, visibleOpgwRoutes],
@@ -458,10 +463,15 @@ export function DashboardPage() {
   const mapOpgwCableSections = useMemo(
     () => {
       if (isolatedOpgwSectionId) return visibleOpgwCableSections.filter((section) => section.properties.cableSectionId === isolatedOpgwSectionId);
+      if (isolatedOpgwSplicePointId) return visibleOpgwCableSections.filter((section) => section.properties.fromSplicePointId === isolatedOpgwSplicePointId || section.properties.toSplicePointId === isolatedOpgwSplicePointId);
       if (isolatedOpgwRouteId) return visibleOpgwCableSections.filter((section) => section.properties.opgwRouteId === isolatedOpgwRouteId);
       return visibleOpgwCableSections;
     },
-    [isolatedOpgwRouteId, isolatedOpgwSectionId, visibleOpgwCableSections],
+    [isolatedOpgwRouteId, isolatedOpgwSectionId, isolatedOpgwSplicePointId, visibleOpgwCableSections],
+  );
+  const mapOpgwSplicePoints = useMemo(
+    () => isolatedOpgwSplicePointId ? visibleOpgwSplicePoints.filter((splicePoint) => splicePoint.properties.splicePointId === isolatedOpgwSplicePointId) : visibleOpgwSplicePoints,
+    [isolatedOpgwSplicePointId, visibleOpgwSplicePoints],
   );
   const opgwPlanningMetrics = useMemo(
     () => buildOpgwPlanningMetrics(visibleOpgwCables, fiberStrands, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints),
@@ -764,6 +774,7 @@ export function DashboardPage() {
     const selection: StreetMapSelection = { kind: "opgw_route", id: route.properties.opgwRouteId, label: route.properties.routeName, record: route };
     setIsolatedOpgwRouteId(route.properties.opgwRouteId);
     setIsolatedOpgwSectionId(null);
+    setIsolatedOpgwSplicePointId(null);
     setSelectedAsset(selection);
     setFocusRequest({ selection, sequence: Date.now() });
     setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwRoutes"));
@@ -781,6 +792,7 @@ export function DashboardPage() {
     const selection: StreetMapSelection = { kind: "opgw_cable_section", id: section.properties.cableSectionId, label: section.properties.cableSectionId, record: section };
     setIsolatedOpgwRouteId(section.properties.opgwRouteId);
     setIsolatedOpgwSectionId(section.properties.cableSectionId);
+    setIsolatedOpgwSplicePointId(null);
     setSelectedAsset(selection);
     setFocusRequest({ selection, sequence: Date.now() });
     setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwCableSections"));
@@ -789,10 +801,29 @@ export function DashboardPage() {
     showToast(`Showing only cable section ${section.properties.cableSectionId}.`);
   }
 
+  function focusOpgwSplicePointLayer(splicePointId: string) {
+    const splicePoint = visibleOpgwSplicePoints.find((feature) => feature.properties.splicePointId === splicePointId);
+    if (!splicePoint) {
+      showToast("That OPGW splice point is not available in the current layer set.");
+      return;
+    }
+    const selection: StreetMapSelection = { kind: "opgw_splice_point", id: splicePoint.properties.splicePointId, label: splicePoint.properties.splicePointId, record: splicePoint };
+    setIsolatedOpgwRouteId(splicePoint.properties.opgwRouteId);
+    setIsolatedOpgwSectionId(null);
+    setIsolatedOpgwSplicePointId(splicePoint.properties.splicePointId);
+    setSelectedAsset(selection);
+    setFocusRequest({ selection, sequence: Date.now() });
+    setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwSplicePoints"));
+    setRightMode("layers");
+    setRightCollapsed(false);
+    showToast(`Showing only splice point ${splicePoint.properties.splicePointId}.`);
+  }
+
   function clearOpgwLayerIsolation() {
     setIsolatedOpgwRouteId(null);
     setIsolatedOpgwSectionId(null);
-    setStreetLayers((current) => ({ ...current, opgwRoutes: true, opgwCableSections: true }));
+    setIsolatedOpgwSplicePointId(null);
+    setStreetLayers((current) => ({ ...current, opgwRoutes: true, opgwCableSections: true, opgwSplicePoints: true }));
     showToast("OPGW route visibility filter cleared.");
   }
 
@@ -968,7 +999,7 @@ export function DashboardPage() {
         opgwRoutes={mapOpgwRoutes}
         opgwCableSections={mapOpgwCableSections}
         opgwSpanSegments={visibleOpgwSpanSegments}
-        opgwSplicePoints={visibleOpgwSplicePoints}
+        opgwSplicePoints={mapOpgwSplicePoints}
         spliceClosures={layerFilteredSpliceClosures}
         fiberSplices={fiberSplices}
         fiberStrands={fiberStrands}
@@ -1125,6 +1156,8 @@ export function DashboardPage() {
                     opgwCableSections={visibleOpgwCableSections}
                     focusedOpgwRouteId={activeIsolatedOpgwRouteId}
                     focusedOpgwSectionId={isolatedOpgwSectionId || undefined}
+                    focusedOpgwSplicePointId={isolatedOpgwSplicePointId || undefined}
+                    opgwSplicePoints={visibleOpgwSplicePoints}
                     dataWarnings={mapDataWarnings}
                     transmissionLineOwnerCounts={transmissionLineOwnerCounts}
                     visibleTransmissionLineOwners={visibleTransmissionLineOwners}
@@ -1149,6 +1182,7 @@ export function DashboardPage() {
                     onAllFccFrequencyBandsChange={handleAllFccFrequencyBandsChange}
                     onFocusOpgwRoute={focusOpgwRouteLayer}
                     onFocusOpgwSection={focusOpgwCableSectionLayer}
+                    onFocusOpgwSplicePoint={focusOpgwSplicePointLayer}
                     onClearOpgwFocus={clearOpgwLayerIsolation}
                   />
                   {streetLayers.missingLocationAssets ? (
@@ -1284,7 +1318,7 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
   };
 }
 
-function isolatedOpgwLayerState(current: Record<StreetMapLayerKey, boolean>, focusedLayer: "opgwRoutes" | "opgwCableSections") {
+function isolatedOpgwLayerState(current: Record<StreetMapLayerKey, boolean>, focusedLayer: "opgwRoutes" | "opgwCableSections" | "opgwSplicePoints") {
   const next = { ...current };
   for (const key of Object.keys(next) as StreetMapLayerKey[]) {
     next[key] = false;
