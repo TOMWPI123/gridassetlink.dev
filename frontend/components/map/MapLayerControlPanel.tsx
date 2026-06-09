@@ -1,6 +1,8 @@
 "use client";
 
-import { Layers } from "lucide-react";
+import { Layers, Search, X } from "lucide-react";
+import type { CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import type { OpgwCableSectionFeature, OpgwRouteFeature, OpgwSplicePointFeature, StreetMapLayerKey } from "@/lib/types/assets";
 
 type MapLayerControlPanelProps = {
@@ -456,32 +458,61 @@ function OpgwRouteSublayerTree({
   onFocusSplicePoint?: (splicePointId: string) => void;
   onClearFocus?: () => void;
 }) {
-  const sectionsByRoute = new Map<string, OpgwCableSectionFeature[]>();
-  const splicePointById = new Map(splicePoints.map((splicePoint) => [splicePoint.properties.splicePointId, splicePoint]));
-  for (const section of cableSections) {
-    const routeId = section.properties.opgwRouteId;
-    const existing = sectionsByRoute.get(routeId) || [];
-    existing.push(section);
-    sectionsByRoute.set(routeId, existing);
-  }
-  const allRouteRows = routes
+  const [searchQuery, setSearchQuery] = useState("");
+  const sectionsByRoute = useMemo(() => {
+    const grouped = new Map<string, OpgwCableSectionFeature[]>();
+    for (const section of cableSections) {
+      const routeId = section.properties.opgwRouteId;
+      const existing = grouped.get(routeId) || [];
+      existing.push(section);
+      grouped.set(routeId, existing);
+    }
+    return grouped;
+  }, [cableSections]);
+  const splicePointById = useMemo(() => new Map(splicePoints.map((splicePoint) => [splicePoint.properties.splicePointId, splicePoint])), [splicePoints]);
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const allRouteRows = useMemo(() => routes
     .map((route) => ({
       route,
       sections: (sectionsByRoute.get(route.properties.opgwRouteId) || []).sort((a, b) => a.properties.cableSectionId.localeCompare(b.properties.cableSectionId, undefined, { numeric: true })),
     }))
-    .sort((a, b) => b.sections.length - a.sections.length || a.route.properties.transmissionLineId.localeCompare(b.route.properties.transmissionLineId));
+    .sort((a, b) => b.sections.length - a.sections.length || a.route.properties.transmissionLineId.localeCompare(b.route.properties.transmissionLineId)), [routes, sectionsByRoute]);
+  const searchedRouteRows = useMemo(() => {
+    if (!normalizedSearchQuery) return allRouteRows;
+    return allRouteRows.flatMap(({ route, sections }) => {
+      const routeMatches = opgwRouteSearchText(route).includes(normalizedSearchQuery);
+      const matchingSections = sections.filter((section) => {
+        const fromPoint = splicePointById.get(section.properties.fromSplicePointId);
+        const toPoint = splicePointById.get(section.properties.toSplicePointId);
+        return opgwSectionSearchText(section, fromPoint, toPoint).includes(normalizedSearchQuery);
+      });
+      if (!routeMatches && !matchingSections.length) return [];
+      return [{ route, sections: routeMatches ? sections : matchingSections }];
+    });
+  }, [allRouteRows, normalizedSearchQuery, splicePointById]);
   const focusedRowIndex = focusedRouteId ? allRouteRows.findIndex(({ route }) => route.properties.opgwRouteId === focusedRouteId) : -1;
-  const routeRows = focusedRowIndex >= 12
+  const focusedRouteRow = focusedRowIndex >= 0 ? allRouteRows[focusedRowIndex] : undefined;
+  const limitedSearchRows = searchedRouteRows.slice(0, 12);
+  const routeRows = normalizedSearchQuery
+    ? limitedSearchRows
+    : focusedRowIndex >= 12
     ? [allRouteRows[focusedRowIndex], ...allRouteRows.slice(0, 11)]
     : allRouteRows.slice(0, 12);
   const hasFocus = Boolean(focusedRouteId || focusedSectionId || focusedSplicePointId);
+  const shownRouteIds = new Set(routeRows.map(({ route }) => route.properties.opgwRouteId));
+  if (!normalizedSearchQuery && focusedRouteRow && !shownRouteIds.has(focusedRouteRow.route.properties.opgwRouteId)) {
+    routeRows.unshift(focusedRouteRow);
+  }
+  const searchMatchLabel = normalizedSearchQuery
+    ? `${searchedRouteRows.length} of ${routes.length} route lines matched`
+    : `${routeRows.length} of ${routes.length} route lines shown`;
 
   return (
     <div className="street-opgw-route-sublayers" aria-label="OPGW route transmission-line and cable-section sublayers">
       <div className="street-owner-sublayer-heading">
         <span>
           OPGW transmission line sublayers
-          <small>{routeRows.length} of {routes.length} route lines shown / cable sections are {cableSectionsVisible ? "visible" : "hidden"}{hasFocus ? " / visibility filter active" : ""}</small>
+          <small>{searchMatchLabel} / cable sections are {cableSectionsVisible ? "visible" : "hidden"}{hasFocus ? " / visibility filter active" : ""}</small>
         </span>
         {hasFocus ? (
           <span className="street-owner-sublayer-actions">
@@ -489,13 +520,30 @@ function OpgwRouteSublayerTree({
           </span>
         ) : null}
       </div>
+      <label className="street-opgw-sublayer-search" style={opgwSublayerSearchStyle}>
+        <Search size={13} />
+        <input
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.currentTarget.value)}
+          placeholder="Search line, route, section, splice"
+          aria-label="Search OPGW transmission line sublayers"
+          style={opgwSublayerSearchInputStyle}
+        />
+        {searchQuery ? (
+          <button type="button" onClick={() => setSearchQuery("")} title="Clear OPGW sublayer search" style={opgwSublayerSearchButtonStyle}>
+            <X size={12} />
+          </button>
+        ) : null}
+      </label>
       <div className="street-opgw-route-list">
-        {routeRows.map(({ route, sections }, index) => {
+        {routeRows.length ? routeRows.map(({ route, sections }, index) => {
           const properties = route.properties;
           const isRouteFocused = focusedRouteId === properties.opgwRouteId && !focusedSectionId;
           const isActiveRoute = focusedRouteId === properties.opgwRouteId || sections.some((section) => section.properties.cableSectionId === focusedSectionId || section.properties.fromSplicePointId === focusedSplicePointId || section.properties.toSplicePointId === focusedSplicePointId);
           const focusedSectionIndex = sections.findIndex((section) => section.properties.cableSectionId === focusedSectionId || section.properties.fromSplicePointId === focusedSplicePointId || section.properties.toSplicePointId === focusedSplicePointId);
-          const sectionRows = focusedSectionIndex >= 8
+          const sectionRows = normalizedSearchQuery
+            ? sections.slice(0, 8)
+            : focusedSectionIndex >= 8
             ? [
                 sections[focusedSectionIndex],
                 ...sections.slice(0, 7),
@@ -571,10 +619,117 @@ function OpgwRouteSublayerTree({
               </div>
             </details>
           );
-        })}
+        }) : (
+          <div className="street-opgw-no-results" style={opgwNoResultsStyle}>
+            No OPGW transmission line sublayers match "{searchQuery.trim()}".
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+const opgwSublayerSearchStyle = {
+  display: "grid",
+  gridTemplateColumns: "15px minmax(0,1fr) auto",
+  alignItems: "center",
+  gap: "6px",
+  minHeight: "32px",
+  padding: "6px 7px",
+  border: "1px solid rgba(105,215,228,.18)",
+  borderRadius: "7px",
+  background: "rgba(5,17,22,.62)",
+  color: "rgba(215,255,251,.86)",
+} satisfies CSSProperties;
+
+const opgwSublayerSearchInputStyle = {
+  minWidth: 0,
+  border: 0,
+  outline: 0,
+  background: "transparent",
+  color: "var(--dash-text)",
+  fontSize: "11px",
+  fontWeight: 720,
+} satisfies CSSProperties;
+
+const opgwSublayerSearchButtonStyle = {
+  display: "inline-grid",
+  placeItems: "center",
+  width: "20px",
+  height: "20px",
+  border: "1px solid rgba(238,252,251,.12)",
+  borderRadius: "6px",
+  background: "rgba(238,252,251,.06)",
+  color: "#d7fffb",
+  cursor: "pointer",
+} satisfies CSSProperties;
+
+const opgwNoResultsStyle = {
+  padding: "10px 8px",
+  border: "1px dashed rgba(238,252,251,.16)",
+  borderRadius: "7px",
+  color: "var(--dash-muted)",
+  fontSize: "10px",
+  fontWeight: 720,
+  lineHeight: 1.35,
+} satisfies CSSProperties;
+
+function opgwRouteSearchText(route: OpgwRouteFeature) {
+  const properties = route.properties;
+  return [
+    properties.opgwRouteId,
+    properties.transmissionLineId,
+    properties.routeName,
+    properties.fromSubstationId,
+    properties.toSubstationId,
+    properties.fromStructureId,
+    properties.toStructureId,
+    properties.voltageClass,
+    properties.routeStatus,
+    properties.syntheticConfidence,
+    properties.notes,
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function opgwSectionSearchText(section: OpgwCableSectionFeature, fromPoint?: OpgwSplicePointFeature, toPoint?: OpgwSplicePointFeature) {
+  const properties = section.properties;
+  return [
+    properties.cableSectionId,
+    properties.opgwRouteId,
+    properties.transmissionLineId,
+    properties.fromSplicePointId,
+    properties.toSplicePointId,
+    properties.fromStructureId,
+    properties.toStructureId,
+    properties.fromStructureNumber,
+    properties.toStructureNumber,
+    properties.fromSubstationId,
+    properties.toSubstationId,
+    properties.manufacturer,
+    properties.installStatus,
+    properties.syntheticConfidence,
+    properties.notes,
+    opgwSplicePointSearchText(fromPoint),
+    opgwSplicePointSearchText(toPoint),
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function opgwSplicePointSearchText(splicePoint?: OpgwSplicePointFeature) {
+  if (!splicePoint) return "";
+  const properties = splicePoint.properties;
+  return [
+    properties.splicePointId,
+    properties.opgwRouteId,
+    properties.transmissionLineId,
+    properties.structureId,
+    properties.structureNumber,
+    properties.substationId,
+    properties.spliceType,
+    properties.closureId,
+    properties.status,
+    properties.syntheticConfidence,
+    properties.notes,
+  ].filter(Boolean).join(" ");
 }
 
 function SplicePointEndpoint({
