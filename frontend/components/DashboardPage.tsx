@@ -470,8 +470,12 @@ export function DashboardPage() {
     [isolatedOpgwRouteId, isolatedOpgwSectionId, isolatedOpgwSplicePointId, visibleOpgwCableSections],
   );
   const mapOpgwSplicePoints = useMemo(
-    () => isolatedOpgwSplicePointId ? visibleOpgwSplicePoints.filter((splicePoint) => splicePoint.properties.splicePointId === isolatedOpgwSplicePointId) : visibleOpgwSplicePoints,
-    [isolatedOpgwSplicePointId, visibleOpgwSplicePoints],
+    () => {
+      if (isolatedOpgwSplicePointId) return visibleOpgwSplicePoints.filter((splicePoint) => splicePoint.properties.splicePointId === isolatedOpgwSplicePointId);
+      if (activeIsolatedOpgwRouteId) return visibleOpgwSplicePoints.filter((splicePoint) => splicePoint.properties.opgwRouteId === activeIsolatedOpgwRouteId);
+      return visibleOpgwSplicePoints;
+    },
+    [activeIsolatedOpgwRouteId, isolatedOpgwSplicePointId, visibleOpgwSplicePoints],
   );
   const opgwPlanningMetrics = useMemo(
     () => buildOpgwPlanningMetrics(visibleOpgwCables, fiberStrands, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints),
@@ -777,10 +781,10 @@ export function DashboardPage() {
     setIsolatedOpgwSplicePointId(null);
     setSelectedAsset(selection);
     setFocusRequest({ selection, sequence: Date.now() });
-    setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwRoutes"));
+    setStreetLayers((current) => isolatedOpgwLayerState(current, ["opgwRoutes", "opgwSplicePoints"]));
     setRightMode("layers");
     setRightCollapsed(false);
-    showToast(`Showing only OPGW transmission line ${route.properties.transmissionLineId}.`);
+    showToast(`Showing OPGW transmission line ${route.properties.transmissionLineId} with splice points.`);
   }
 
   function focusOpgwCableSectionLayer(sectionId: string) {
@@ -1318,12 +1322,16 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
   };
 }
 
-function isolatedOpgwLayerState(current: Record<StreetMapLayerKey, boolean>, focusedLayer: "opgwRoutes" | "opgwCableSections" | "opgwSplicePoints") {
+type IsolatedOpgwLayerKey = "opgwRoutes" | "opgwCableSections" | "opgwSplicePoints";
+
+function isolatedOpgwLayerState(current: Record<StreetMapLayerKey, boolean>, focusedLayers: IsolatedOpgwLayerKey | IsolatedOpgwLayerKey[]) {
   const next = { ...current };
   for (const key of Object.keys(next) as StreetMapLayerKey[]) {
     next[key] = false;
   }
-  next[focusedLayer] = true;
+  for (const layer of Array.isArray(focusedLayers) ? focusedLayers : [focusedLayers]) {
+    next[layer] = true;
+  }
   return next;
 }
 
