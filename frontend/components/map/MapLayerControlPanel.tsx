@@ -317,6 +317,7 @@ export function MapLayerControlPanel({
                 onFocusSection={onFocusOpgwSection}
                 onFocusSplicePoint={onFocusOpgwSplicePoint}
                 onClearFocus={onClearOpgwFocus}
+                onLayerChange={onLayerChange}
               />
             ) : null}
           </div>
@@ -445,6 +446,7 @@ function OpgwRouteSublayerTree({
   onFocusSection,
   onFocusSplicePoint,
   onClearFocus,
+  onLayerChange,
 }: {
   routes: OpgwRouteFeature[];
   cableSections: OpgwCableSectionFeature[];
@@ -457,6 +459,7 @@ function OpgwRouteSublayerTree({
   onFocusSection?: (sectionId: string) => void;
   onFocusSplicePoint?: (splicePointId: string) => void;
   onClearFocus?: () => void;
+  onLayerChange?: (layer: StreetMapLayerKey, enabled: boolean) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const sectionsByRoute = useMemo(() => {
@@ -586,6 +589,11 @@ function OpgwRouteSublayerTree({
                         <strong>{sectionProperties.cableSectionId}</strong>
                         <span>{sectionProperties.fromSplicePointId} to {sectionProperties.toSplicePointId}</span>
                         <small>{sectionProperties.fromStructureNumber} to {sectionProperties.toStructureNumber} / {sectionProperties.routeMiles.toFixed(2)} mi / {sectionProperties.installStatus}</small>
+                        {isSectionFocused ? (
+                          <small style={opgwSectionSpliceNoteStyle}>
+                            Isolated section splice points: {splicePointLabel(fromPoint, sectionProperties.fromSplicePointId)} and {splicePointLabel(toPoint, sectionProperties.toSplicePointId)}
+                          </small>
+                        ) : null}
                         <span className="street-opgw-splice-endpoint-list" aria-label={`Splice point endpoints for ${sectionProperties.cableSectionId}`}>
                           <SplicePointEndpoint
                             label="A splice point"
@@ -608,7 +616,10 @@ function OpgwRouteSublayerTree({
                       <button
                         type="button"
                         className={`street-opgw-filter-button section ${isSectionFocused ? "active" : ""}`}
-                        onClick={() => onFocusSection?.(sectionProperties.cableSectionId)}
+                        onClick={() => {
+                          onFocusSection?.(sectionProperties.cableSectionId);
+                          onLayerChange?.("opgwSplicePoints", true);
+                        }}
                       >
                         {isSectionFocused ? "Section isolated" : "Only section"}
                       </button>
@@ -673,6 +684,16 @@ const opgwNoResultsStyle = {
   fontWeight: 720,
   lineHeight: 1.35,
 } satisfies CSSProperties;
+
+const opgwSectionSpliceNoteStyle = {
+  color: "#fff4cf",
+  fontWeight: 820,
+} satisfies CSSProperties;
+
+function splicePointLabel(splicePoint: OpgwSplicePointFeature | undefined, fallbackId: string) {
+  if (!splicePoint) return fallbackId;
+  return `${splicePoint.properties.splicePointId} (${splicePoint.properties.structureNumber})`;
+}
 
 function opgwRouteSearchText(route: OpgwRouteFeature) {
   const properties = route.properties;
