@@ -10,6 +10,7 @@ import { seedMapNodes } from "@/data/nodeParameters";
 import { seedEditableSubstations } from "@/data/substations";
 import { seedPlanningRegions, seedTransmissionLines } from "@/data/transmissionLines";
 import { seedTransmissionMaps } from "@/data/transmissionMaps";
+import { traceSyntheticService } from "@/lib/opgw/continuityEngine";
 import { buildSyntheticOpgwEngineeringModel } from "@/lib/opgw/spanModel";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 import { LinkedAssetDetailPanel } from "@/components/map/LinkedAssetDetailPanel";
@@ -19,7 +20,7 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type ContinuityHighlight, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
@@ -96,6 +97,26 @@ type DashboardLayerSummary = {
   enabled: boolean;
   moduleHref: string;
   safety: string;
+};
+type DashboardContinuitySummary = {
+  label: string;
+  serviceIds: string[];
+  primaryServiceName: string;
+  endpointA: string;
+  endpointZ: string;
+  pathStatus: FiberContinuityPath["pathStatus"] | "no_service";
+  totalTransmissionLines: number;
+  totalCableSections: number;
+  totalSpanSegments: number;
+  totalSplicePoints: number;
+  totalPatchPanels: number;
+  estimatedLossDb: number;
+  criticality: string;
+  protectionLevel: string;
+  layerType: string;
+  servicesCarried: number;
+  warningSummary: string[];
+  traceHref: string;
 };
 
 const availableDeviceIds = ["NODE-WBS-ICON", "NODE-AUB-ICON", "NODE-BOS-OTN", "NODE-RI-RTR", "NODE-NH-MW"];
@@ -597,6 +618,21 @@ export function DashboardPage() {
   const summaryCards = useMemo(
     () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleFccUtilityTowers, visibleFccMicrowaveLinks, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels),
     [visibleFccMicrowaveLinks, visibleFccUtilityTowers, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
+  );
+  const continuitySummary = useMemo(
+    () => buildDashboardContinuitySummary({
+      continuityHighlight,
+      syntheticServices,
+      opgwCables: visibleOpgwCables,
+      opgwCableSections: visibleOpgwCableSections,
+      opgwSpanSegments: visibleOpgwSpanSegments,
+      opgwSplicePoints: visibleOpgwSplicePoints,
+      spliceClosures: visibleSpliceClosures,
+      fiberSplices,
+      fiberAssignments: visibleFiberAssignments,
+      patchPanels: visiblePatchPanels,
+    }),
+    [continuityHighlight, fiberSplices, syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSpliceClosures],
   );
   const ownerOptions = useMemo(
     () => buildOwnerOptions(visiblePublicSubstations, visiblePublicTransmissionLines, visibleFccUtilityTowers, visibleFccMicrowaveLinks),
@@ -1452,6 +1488,7 @@ export function DashboardPage() {
               ) : null}
               {rightMode === "layers" ? (
                 <div className="dashboard-drawer-stack">
+                  {continuitySummary ? <ContinuitySummaryPanel summary={continuitySummary} /> : null}
                   <MapLayerControlPanel
                     layers={streetLayers}
                     publicLineCount={visiblePublicTransmissionLines.length}
@@ -1588,6 +1625,47 @@ function FilterSelect({ label, value, options, onChange, displayLabel = formatFi
   );
 }
 
+function ContinuitySummaryPanel({ summary }: { summary: DashboardContinuitySummary }) {
+  return (
+    <section className="dashboard-continuity-summary-panel" aria-label="Continuity highlight summary">
+      <div className="dashboard-panel-heading">
+        <Route size={16} />
+        <div>
+          <strong>Continuity Map Summary</strong>
+          <span>{summary.label}</span>
+        </div>
+      </div>
+      <div className="dashboard-continuity-service">
+        <strong>{summary.primaryServiceName}</strong>
+        <span>{summary.endpointA} to {summary.endpointZ}</span>
+      </div>
+      <div className="dashboard-continuity-metrics">
+        <div><span>Status</span><strong>{summary.pathStatus.replaceAll("_", " ")}</strong></div>
+        <div><span>Lines</span><strong>{summary.totalTransmissionLines}</strong></div>
+        <div><span>Sections</span><strong>{summary.totalCableSections}</strong></div>
+        <div><span>Spans</span><strong>{summary.totalSpanSegments}</strong></div>
+        <div><span>Splices</span><strong>{summary.totalSplicePoints}</strong></div>
+        <div><span>Patch panels</span><strong>{summary.totalPatchPanels}</strong></div>
+        <div><span>Loss</span><strong>{summary.estimatedLossDb.toFixed(2)} dB</strong></div>
+        <div><span>Services</span><strong>{summary.servicesCarried}</strong></div>
+      </div>
+      <div className="dashboard-continuity-tags">
+        <span>{summary.criticality}</span>
+        <span>{summary.protectionLevel}</span>
+        <span>{summary.layerType}</span>
+      </div>
+      <div className="dashboard-continuity-actions">
+        <Link href={summary.traceHref}>Open full fiber trace</Link>
+      </div>
+      <div className="dashboard-continuity-warnings">
+        {summary.warningSummary.length
+          ? summary.warningSummary.slice(0, 4).map((warning) => <span key={warning}>{warning}</span>)
+          : <span>Synthetic highlighted continuity has no generated warnings.</span>}
+      </div>
+    </section>
+  );
+}
+
 function formatFilterOption(value: string) {
   return value === "all" ? "All" : value;
 }
@@ -1602,6 +1680,94 @@ function opgwRouteIdForDashboardCable(cable: OpgwCableFeature) {
 
 function splicePointIdsFromSections(sections: OpgwCableSectionFeature[]) {
   return uniqueStrings(sections.flatMap((section) => [section.properties.fromSplicePointId, section.properties.toSplicePointId]));
+}
+
+function buildDashboardContinuitySummary({
+  continuityHighlight,
+  syntheticServices,
+  opgwCables,
+  opgwCableSections,
+  opgwSpanSegments,
+  opgwSplicePoints,
+  spliceClosures,
+  fiberSplices,
+  fiberAssignments,
+  patchPanels,
+}: {
+  continuityHighlight: ContinuityHighlight | undefined;
+  syntheticServices: SyntheticService[];
+  opgwCables: OpgwCableFeature[];
+  opgwCableSections: OpgwCableSectionFeature[];
+  opgwSpanSegments: OpgwSpanSegmentFeature[];
+  opgwSplicePoints: OpgwSplicePointFeature[];
+  spliceClosures: SpliceClosureFeature[];
+  fiberSplices: FiberSplice[];
+  fiberAssignments: FiberAssignment[];
+  patchPanels: PatchPanel[];
+}): DashboardContinuitySummary | undefined {
+  if (!continuityHighlight) return undefined;
+  const assignmentIds = new Set(continuityHighlight.assignmentIds);
+  const cableIds = new Set(continuityHighlight.cableIds);
+  const splicePointIds = new Set(continuityHighlight.splicePointIds);
+  const spliceClosureIds = new Set(
+    opgwSplicePoints
+      .filter((point) => splicePointIds.has(point.properties.splicePointId))
+      .map((point) => point.properties.closureId)
+      .filter(Boolean) as string[],
+  );
+  const matchedServices = syntheticServices.filter((service) => {
+    if (continuityHighlight.serviceId && service.serviceId === continuityHighlight.serviceId) return true;
+    if (assignmentIds.has(service.primaryPathAssignmentId || "") || assignmentIds.has(service.backupPathAssignmentId || "")) return true;
+    if (service.continuityCableIds?.some((cableId) => cableIds.has(cableId))) return true;
+    if (service.continuitySplicePointIds?.some((pointId) => splicePointIds.has(pointId))) return true;
+    if (service.continuitySpliceClosureIds?.some((closureId) => spliceClosureIds.has(closureId))) return true;
+    return false;
+  });
+  const data = { opgwCables, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberAssignments, syntheticServices, patchPanels };
+  const selectedSplicePointId = continuityHighlight.splicePointIds[0];
+  const paths = matchedServices.map((service) => traceSyntheticService(service, data, selectedSplicePointId));
+  const firstService = matchedServices[0];
+  const firstPath = paths[0];
+  const traceHref = continuityHighlight.serviceId
+    ? `/fiber-trace?service=${encodeURIComponent(continuityHighlight.serviceId)}`
+    : continuityHighlight.label.startsWith("SYN-SPLICE-")
+      ? `/fiber-trace?spliceConnection=${encodeURIComponent(continuityHighlight.label)}`
+      : selectedSplicePointId
+        ? `/fiber-trace?splicePoint=${encodeURIComponent(selectedSplicePointId)}`
+        : `/fiber-trace`;
+  return {
+    label: continuityHighlight.label,
+    serviceIds: matchedServices.map((service) => service.serviceId),
+    primaryServiceName: firstService ? `${firstService.serviceId} / ${firstService.serviceName}` : "No synthetic service matched this map highlight",
+    endpointA: firstService?.fromSiteName || "Endpoint A",
+    endpointZ: firstService?.toSiteName || "Endpoint Z",
+    pathStatus: worstPathStatus(paths),
+    totalTransmissionLines: uniqueStrings(paths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId))).length || firstPath?.totalTransmissionLines || 0,
+    totalCableSections: uniqueStrings(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId))).length || continuityHighlight.sectionIds?.length || 0,
+    totalSpanSegments: uniqueStrings(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "span_segment").map((segment) => segment.objectId))).length,
+    totalSplicePoints: uniqueStrings(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "splice_point").map((segment) => segment.objectId))).length || continuityHighlight.splicePointIds.length,
+    totalPatchPanels: uniqueStrings(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "patch_panel").map((segment) => segment.objectId))).length || firstPath?.totalPatchPanels || 0,
+    estimatedLossDb: paths.length ? Math.max(...paths.map((path) => path.totalEstimatedLossDb)) : 0,
+    criticality: highestCriticality(matchedServices),
+    protectionLevel: uniqueStrings(matchedServices.map((service) => service.protectionLevel)).join(", ") || "no service",
+    layerType: uniqueStrings(matchedServices.map((service) => service.layerType)).join(" + ") || "compare",
+    servicesCarried: matchedServices.length,
+    warningSummary: uniqueStrings(paths.flatMap((path) => path.warningSummary)),
+    traceHref,
+  };
+}
+
+function worstPathStatus(paths: FiberContinuityPath[]): DashboardContinuitySummary["pathStatus"] {
+  if (!paths.length) return "no_service";
+  if (paths.some((path) => path.pathStatus === "broken")) return "broken";
+  if (paths.some((path) => path.pathStatus === "warning")) return "warning";
+  if (paths.some((path) => path.pathStatus === "proposed")) return "proposed";
+  return "complete";
+}
+
+function highestCriticality(services: SyntheticService[]) {
+  const order = ["critical", "high", "medium", "low"];
+  return order.find((criticality) => services.some((service) => service.criticality === criticality)) || "no service";
 }
 
 function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Record<StreetMapLayerKey, boolean>) {
