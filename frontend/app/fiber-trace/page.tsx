@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/Badges";
 import { FiberTracePage as LegacyCircuitFiberTracePage } from "@/components/CircuitWorkflowPages";
+import { buildDistributionPoleContinuityView, loadDistributionPoleNetworkData, type DistributionPoleContinuityView } from "@/lib/distribution/staticDistributionData";
 import {
   buildSpliceManagerView,
   resolveContinuityTraceServices,
@@ -28,11 +29,24 @@ export default async function Page({ searchParams }: PageProps) {
   const cableSectionId = firstQueryValue(params?.cableSection) || firstQueryValue(params?.cableSectionId);
   const spliceConnectionId = firstQueryValue(params?.spliceConnection) || firstQueryValue(params?.spliceConnectionId);
   const cableId = firstQueryValue(params?.cable) || firstQueryValue(params?.cableId);
+  const distributionPoleId = firstQueryValue(params?.distributionPole) || firstQueryValue(params?.distributionPoleId);
+  const distributionRouteId = firstQueryValue(params?.distributionRoute) || firstQueryValue(params?.distributionRouteId);
   const layerType = normalizeLayerType(firstQueryValue(params?.layer) || firstQueryValue(params?.layerType));
   const spliceTargetId = splicePointId || spliceClosureId;
   const genericTraceInput: ContinuityTraceInput = { assignmentId, strandId, cableSectionId, spliceConnectionId, layerType };
 
-  if (!spliceTargetId && !serviceId && !assignmentId && !strandId && !cableSectionId && !spliceConnectionId && !cableId) return <LegacyCircuitFiberTracePage />;
+  if (!spliceTargetId && !serviceId && !assignmentId && !strandId && !cableSectionId && !spliceConnectionId && !cableId && !distributionPoleId && !distributionRouteId) return <LegacyCircuitFiberTracePage />;
+
+  if (distributionPoleId || distributionRouteId) {
+    const distributionData = await loadDistributionPoleNetworkData();
+    const view = buildDistributionPoleContinuityView(
+      distributionPoleId ? "distribution_pole" : "distribution_route",
+      distributionPoleId || distributionRouteId || "",
+      distributionData,
+    );
+    if (!view) notFound();
+    return <DistributionPoleFiberTraceView view={view} />;
+  }
 
   const data = await loadSyntheticFiberContinuityData();
 
@@ -150,6 +164,110 @@ export default async function Page({ searchParams }: PageProps) {
   }
 
   return <LegacyCircuitFiberTracePage />;
+}
+
+function DistributionPoleFiberTraceView({ view }: { view: DistributionPoleContinuityView }) {
+  const mapHref = view.targetType === "distribution_pole"
+    ? `/dashboard?drawer=layers&distributionPole=${encodeURIComponent(view.targetId)}`
+    : `/dashboard?drawer=layers&distributionRoute=${encodeURIComponent(view.route.properties.routeId)}`;
+  return (
+    <main className="splice-manager-page">
+      <header className="splice-manager-hero">
+        <div>
+          <Link className="splice-manager-back" href="/dashboard?drawer=layers">Back to map dashboard</Link>
+          <h1>Distribution Pole Fiber Continuity</h1>
+          <p>{view.targetLabel} / {view.route.properties.routeName}</p>
+        </div>
+        <div className="splice-manager-warning">
+          <span aria-hidden="true">!</span>
+          <span>{view.warning}</span>
+        </div>
+      </header>
+
+      <section className="splice-manager-summary-grid" aria-label="Distribution pole continuity summary">
+        <SummaryCard label="Utility owner" value={view.route.properties.utilityOwner} />
+        <SummaryCard label="State" value={view.route.properties.state} />
+        <SummaryCard label="Fiber route" value={view.route.properties.routeId} />
+        <SummaryCard label="Fiber count" value={`${view.route.properties.fiberCount}F`} />
+        <SummaryCard label="Display poles" value={view.route.properties.poleCount.toLocaleString()} />
+        <SummaryCard label="Scale model" value={view.estimatedPoleScaleCount.toLocaleString()} />
+        <SummaryCard label="Route miles" value={view.estimatedRouteMiles.toFixed(2)} />
+        <SummaryCard label="Estimated loss" value={`${view.estimatedLossDb.toFixed(2)} dB`} />
+        <SummaryCard label="Continuity" value={view.route.properties.continuityStatus.replaceAll("_", " ")} />
+        <SummaryCard label="Status" value={view.route.properties.status.replaceAll("_", " ")} />
+      </section>
+
+      <section className="splice-manager-grid">
+        <div className="splice-manager-main">
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Street-Path Continuity</strong></div>
+            <div className="continuity-list">
+              <article className="continuity-card complete">
+                <div>
+                  <strong>{view.route.properties.feederId}</strong>
+                  <span>{view.parentPatchPanel?.name || view.continuityRecord?.endpointAId || "Synthetic upstream node"} to {view.continuityRecord?.endpointZId || view.route.properties.lastPoleId}</span>
+                </div>
+                <dl>
+                  <div><dt>Route</dt><dd>{view.route.properties.routeId}</dd></div>
+                  <div><dt>Street path</dt><dd>{view.route.properties.streetPathId}</dd></div>
+                  <div><dt>Fiber</dt><dd>{view.route.properties.fiberCount}F</dd></div>
+                  <div><dt>Poles</dt><dd>{view.routePoles.length.toLocaleString()}</dd></div>
+                  <div><dt>Scale</dt><dd>{view.estimatedPoleScaleCount.toLocaleString()}</dd></div>
+                  <div><dt>Loss</dt><dd>{view.estimatedLossDb.toFixed(2)} dB</dd></div>
+                </dl>
+                <ol>
+                  {(view.samplePoles.length ? view.samplePoles : view.routePoles.slice(0, 12)).map((pole) => (
+                    <li key={pole.properties.id}>
+                      <span>{pole.properties.sequenceIndex}</span>
+                      <strong>{pole.properties.poleNumber}</strong>
+                      <em>{pole.properties.telecomRole.replaceAll("_", " ")}</em>
+                    </li>
+                  ))}
+                </ol>
+              </article>
+            </div>
+          </section>
+
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Services Carried</strong></div>
+            <div className="service-carried-list">
+              {view.serviceTypes.map((service) => (
+                <article key={service}>
+                  <strong>{service}</strong>
+                  <span>Synthetic distribution telecom service family</span>
+                  <small>{view.route.properties.continuityStatus.replaceAll("_", " ")}</small>
+                  <div>
+                    <Badge value={service.includes("Protection") || service === "SCADA" ? "critical" : "normal"} />
+                    <Badge value="synthetic" />
+                    <Badge value={view.route.properties.status} />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <aside className="splice-manager-side">
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Map and Workflow</strong></div>
+            <div className="splice-action-stack">
+              <Link href={mapHref}>Open highlighted map context</Link>
+              <Link href={`/outage-impact?distributionRoute=${encodeURIComponent(view.route.properties.routeId)}`}>Analyze telecom impact</Link>
+              {view.parentPatchPanel ? <Link href={`/patch-panels?panel=${encodeURIComponent(view.parentPatchPanel.id)}`}>View parent patch panel</Link> : null}
+            </div>
+          </section>
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Planning Boundary</strong></div>
+            <div className="splice-warning-list">
+              <span>Poles, routes, services, and continuity are synthetic demo/planning records.</span>
+              <span>Display samples are clustered for smooth browsing and represent a larger full-territory pole model.</span>
+              <span>Do not use this for operations, dispatch, protection, SCADA, restoration, or CEII-restricted analysis.</span>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  );
 }
 
 function OpgwFiberTraceView({

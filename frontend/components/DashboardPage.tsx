@@ -20,7 +20,7 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type ContinuityHighlight, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, DistributionPoleCollection, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
@@ -55,6 +55,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   c3794Nodes: false,
   fiberRoutes: false,
   opgwRoutes: false,
+  distributionPoles: false,
   distributionFiberRoutes: false,
   circuitEndpoints: false,
   workOrderLocations: false,
@@ -76,6 +77,8 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   opgwCableSections: true,
   opgwSpanSegments: true,
   opgwSplicePoints: true,
+  distributionPoles: false,
+  distributionFiberRoutes: true,
   existingFiberSplices: true,
   proposedFiberSplices: true,
   compareSpliceLayers: false,
@@ -149,6 +152,8 @@ type DashboardSearchLayer =
   | "opgwSpanSegments"
   | "opgwSplicePoints"
   | "fiberAssignments"
+  | "distributionPoles"
+  | "distributionFiberRoutes"
   | "patchPanels"
   | "syntheticSubstations"
   | "editablePlanning";
@@ -167,6 +172,8 @@ const searchLayerOptions: Array<{ value: DashboardSearchLayer; label: string; ki
   { value: "opgwSpanSegments", label: "OPGW span segments", kinds: ["opgw_span_segment"] },
   { value: "opgwSplicePoints", label: "OPGW splice points", kinds: ["opgw_splice_point"] },
   { value: "fiberAssignments", label: "Fiber assignments", kinds: ["fiber_assignment"] },
+  { value: "distributionPoles", label: "Distribution telecom poles", kinds: ["distribution_pole"] },
+  { value: "distributionFiberRoutes", label: "Distribution pole fiber", kinds: ["distribution_pole_fiber"] },
   { value: "patchPanels", label: "Patch panels", kinds: ["patch_panel"] },
   { value: "syntheticSubstations", label: "Synthetic substations", kinds: ["synthetic_substation"] },
   { value: "editablePlanning", label: "Editable planning assets", kinds: ["substation", "node", "transmission_line", "work_order"] },
@@ -184,7 +191,7 @@ const moduleLayerCoverage: Record<string, StreetMapLayerKey[]> = {
   "/transmission-structures": ["transmissionStructures", "opgwSpanSegments", "spliceClosures"],
   "/opgw": ["assumedOpgwRoutes", "plannedOpgwFiber", "verifiedOpgwFiber"],
   "/opgw-cables": ["syntheticOpgwCables", "opgwCableSections", "availableStrandCapacity"],
-  "/distribution-fiber": ["distributionFiberRoutes", "fiberAssignments"],
+  "/distribution-fiber": ["distributionPoles", "distributionFiberRoutes", "fiberAssignments"],
   "/fiber-cables": ["syntheticOpgwCables", "opgwCableSections"],
   "/fiber-strands": ["fiberStrandsLayer", "availableStrandCapacity"],
   "/fiber-assignments": ["fiberAssignments", "criticalRidingCircuits", "availableStrandCapacity"],
@@ -259,6 +266,8 @@ export function DashboardPage() {
   const [patchPanels, setPatchPanels] = useState<PatchPanel[]>([]);
   const [fiberAssignments, setFiberAssignments] = useState<FiberAssignment[]>([]);
   const [syntheticServices, setSyntheticServices] = useState<SyntheticService[]>([]);
+  const [distributionPoles, setDistributionPoles] = useState<DistributionPoleFeature[]>([]);
+  const [distributionPoleFiberRoutes, setDistributionPoleFiberRoutes] = useState<DistributionPoleFiberRouteFeature[]>([]);
   const [mapDataWarnings, setMapDataWarnings] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -327,6 +336,18 @@ export function DashboardPage() {
         warnings.syntheticServices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
         return [] as SyntheticService[];
       });
+      const distributionPoleRecords = await fetchGeoJson<DistributionPoleCollection>("/data/iso-ne-synthetic-distribution-poles.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.distributionPoles = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as DistributionPoleFeature[];
+        });
+      const distributionFiberRoutes = await fetchGeoJson<DistributionPoleFiberRouteCollection>("/data/iso-ne-synthetic-distribution-pole-fiber.geojson")
+        .then((collection) => collection.features || [])
+        .catch((error) => {
+          warnings.distributionPoleFiberRoutes = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+          return [] as DistributionPoleFiberRouteFeature[];
+        });
       if (cancelled) return;
       setPublicTransmissionLines(publicLines);
       setPublicSubstations(publicSubstationRecords);
@@ -340,6 +361,8 @@ export function DashboardPage() {
       setFccMicrowaveLinks(fccLinks);
       setFiberSplices(splices);
       setSyntheticServices(services);
+      setDistributionPoles(distributionPoleRecords);
+      setDistributionPoleFiberRoutes(distributionFiberRoutes);
       setMapDataWarnings(warnings);
     }
     void loadStaticMapData();
@@ -449,6 +472,14 @@ export function DashboardPage() {
   const visibleFiberAssignments = useMemo(
     () => fiberAssignments.filter((assignment) => assignment.synthetic),
     [fiberAssignments],
+  );
+  const visibleDistributionPoles = useMemo(
+    () => distributionPoles.filter((feature) => feature.properties.synthetic),
+    [distributionPoles],
+  );
+  const visibleDistributionPoleFiberRoutes = useMemo(
+    () => distributionPoleFiberRoutes.filter((feature) => feature.properties.synthetic),
+    [distributionPoleFiberRoutes],
   );
   const visiblePlanningRegions = useMemo(
     () => publicOnly ? [] : planningRegions,
@@ -601,6 +632,9 @@ export function DashboardPage() {
       spliceClosureCount: visibleSpliceClosures.length,
       visibleSpliceClosureCount: layerFilteredSpliceClosures.length,
       patchPanelCount: visiblePatchPanels.length,
+      distributionPoleCount: visibleDistributionPoles.length,
+      distributionPoleFiberRouteCount: visibleDistributionPoleFiberRoutes.length,
+      estimatedDistributionPoleScale: 1250000,
       fiberStrandCount: fiberStrands.length,
       availableStrandCount: opgwPlanningMetrics.availableStrands,
       fiberAssignmentCount: visibleFiberAssignments.length,
@@ -612,12 +646,12 @@ export function DashboardPage() {
       transmissionLineCount: visibleTransmissionLines.length,
       workOrderLocationCount: availableWorkOrderIds.length,
     }),
-    [fiberStrands.length, layerFilteredFccMicrowaveLinks.length, layerFilteredFccUtilityTowers.length, layerFilteredPublicSubstations.length, layerFilteredPublicTransmissionLines.length, layerFilteredSpliceClosures.length, layerFilteredTransmissionStructures.length, opgwPlanningMetrics.assumedRouteCount, opgwPlanningMetrics.availableStrands, opgwPlanningMetrics.criticalRidingCircuits, opgwPlanningMetrics.openWorkOrders, opgwPlanningMetrics.outageImpactCount, opgwPlanningMetrics.plannedRouteCount, opgwPlanningMetrics.spanInspectionIssues, opgwPlanningMetrics.verifiedRouteCount, streetLayers, visibleFccMicrowaveLinks.length, visibleFccUtilityTowers.length, visibleFiberAssignments.length, visibleNodes.length, visibleOpgwCableSections.length, visibleOpgwCables.length, visibleOpgwRoutes.length, visibleOpgwSpanSegments.length, visibleOpgwSplicePoints.length, visiblePatchPanels.length, visiblePublicSubstations.length, visiblePublicTransmissionLines.length, visibleSpliceClosures.length, visibleSyntheticSubstations.length, visibleTransmissionLines.length, visibleTransmissionStructures.length],
+    [fiberStrands.length, layerFilteredFccMicrowaveLinks.length, layerFilteredFccUtilityTowers.length, layerFilteredPublicSubstations.length, layerFilteredPublicTransmissionLines.length, layerFilteredSpliceClosures.length, layerFilteredTransmissionStructures.length, opgwPlanningMetrics.assumedRouteCount, opgwPlanningMetrics.availableStrands, opgwPlanningMetrics.criticalRidingCircuits, opgwPlanningMetrics.openWorkOrders, opgwPlanningMetrics.outageImpactCount, opgwPlanningMetrics.plannedRouteCount, opgwPlanningMetrics.spanInspectionIssues, opgwPlanningMetrics.verifiedRouteCount, streetLayers, visibleDistributionPoleFiberRoutes.length, visibleDistributionPoles.length, visibleFccMicrowaveLinks.length, visibleFccUtilityTowers.length, visibleFiberAssignments.length, visibleNodes.length, visibleOpgwCableSections.length, visibleOpgwCables.length, visibleOpgwRoutes.length, visibleOpgwSpanSegments.length, visibleOpgwSplicePoints.length, visiblePatchPanels.length, visiblePublicSubstations.length, visiblePublicTransmissionLines.length, visibleSpliceClosures.length, visibleSyntheticSubstations.length, visibleTransmissionLines.length, visibleTransmissionStructures.length],
   );
 
   const summaryCards = useMemo(
-    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleFccUtilityTowers, visibleFccMicrowaveLinks, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visibleSpliceClosures, visibleFiberAssignments, visiblePatchPanels),
-    [visibleFccMicrowaveLinks, visibleFccUtilityTowers, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
+    () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleFccUtilityTowers, visibleFccMicrowaveLinks, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visibleSpliceClosures, visibleFiberAssignments, visibleDistributionPoles, visibleDistributionPoleFiberRoutes, visiblePatchPanels),
+    [visibleDistributionPoleFiberRoutes, visibleDistributionPoles, visibleFccMicrowaveLinks, visibleFccUtilityTowers, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
   );
   const continuitySummary = useMemo(
     () => buildDashboardContinuitySummary({
@@ -639,8 +673,8 @@ export function DashboardPage() {
     [visibleFccMicrowaveLinks, visibleFccUtilityTowers, visiblePublicSubstations, visiblePublicTransmissionLines],
   );
   const rawSearchResults = useMemo(
-    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, layerFilteredPublicTransmissionLines, layerFilteredPublicSubstations, layerFilteredFccUtilityTowers, layerFilteredFccMicrowaveLinks, visibleSyntheticSubstations, layerFilteredTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, layerFilteredSpliceClosures, visibleFiberAssignments, visiblePatchPanels, search),
-    [layerFilteredFccMicrowaveLinks, layerFilteredFccUtilityTowers, layerFilteredPublicSubstations, layerFilteredPublicTransmissionLines, layerFilteredSpliceClosures, layerFilteredTransmissionStructures, search, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
+    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, layerFilteredPublicTransmissionLines, layerFilteredPublicSubstations, layerFilteredFccUtilityTowers, layerFilteredFccMicrowaveLinks, visibleSyntheticSubstations, layerFilteredTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, layerFilteredSpliceClosures, visibleFiberAssignments, visibleDistributionPoles, visibleDistributionPoleFiberRoutes, visiblePatchPanels, search),
+    [layerFilteredFccMicrowaveLinks, layerFilteredFccUtilityTowers, layerFilteredPublicSubstations, layerFilteredPublicTransmissionLines, layerFilteredSpliceClosures, layerFilteredTransmissionStructures, search, visibleDistributionPoleFiberRoutes, visibleDistributionPoles, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
   );
   const layerScopedSearchResults = useMemo(
     () => rawSearchResults.filter((selection) => matchesSearchLayer(selection, searchLayerFilter)),
@@ -755,6 +789,12 @@ export function DashboardPage() {
   }
 
   function focusSearchResult(selection: StreetMapSelection) {
+    if (selection.kind === "distribution_pole") {
+      setStreetLayers((current) => ({ ...current, distributionPoles: true, distributionFiberRoutes: true }));
+    }
+    if (selection.kind === "distribution_pole_fiber") {
+      setStreetLayers((current) => ({ ...current, distributionFiberRoutes: true, distributionPoles: true }));
+    }
     focusSelection(selection);
     setSearch(selection.label);
     setSearchOpen(false);
@@ -1136,6 +1176,8 @@ export function DashboardPage() {
     const cableSectionId = params.get("cableSection") || params.get("cableSectionId");
     const cableId = params.get("cable");
     const serviceId = params.get("service");
+    const distributionPoleId = params.get("distributionPole") || params.get("distributionPoleId");
+    const distributionRouteId = params.get("distributionRoute") || params.get("distributionRouteId");
 
     if (splicePointId) {
       if (!visibleOpgwSplicePoints.length) return;
@@ -1161,6 +1203,36 @@ export function DashboardPage() {
       return;
     }
 
+    if (distributionPoleId) {
+      if (!visibleDistributionPoles.length) return;
+      const pole = visibleDistributionPoles.find((feature) => feature.properties.id === distributionPoleId || feature.properties.poleNumber === distributionPoleId);
+      if (!pole) return;
+      const selection: StreetMapSelection = { kind: "distribution_pole", id: pole.properties.id, label: pole.properties.poleNumber, record: pole };
+      deepLinkFocusApplied.current = true;
+      setSelectedAsset(selection);
+      setFocusRequest({ selection, sequence: Date.now() });
+      setStreetLayers((current) => ({ ...current, distributionPoles: true, distributionFiberRoutes: true }));
+      setRightMode("details");
+      setRightCollapsed(false);
+      showToast(`Showing distribution pole ${pole.properties.poleNumber}.`);
+      return;
+    }
+
+    if (distributionRouteId) {
+      if (!visibleDistributionPoleFiberRoutes.length) return;
+      const route = visibleDistributionPoleFiberRoutes.find((feature) => feature.properties.routeId === distributionRouteId || feature.properties.routeName === distributionRouteId);
+      if (!route) return;
+      const selection: StreetMapSelection = { kind: "distribution_pole_fiber", id: route.properties.routeId, label: route.properties.routeName, record: route };
+      deepLinkFocusApplied.current = true;
+      setSelectedAsset(selection);
+      setFocusRequest({ selection, sequence: Date.now() });
+      setStreetLayers((current) => ({ ...current, distributionFiberRoutes: true, distributionPoles: true }));
+      setRightMode("details");
+      setRightCollapsed(false);
+      showToast(`Showing distribution feeder ${route.properties.routeId}.`);
+      return;
+    }
+
     if (cableId || serviceId) {
       if (!visibleOpgwCables.length) return;
       const service = serviceId ? syntheticServices.find((item) => item.serviceId === serviceId) : undefined;
@@ -1177,7 +1249,7 @@ export function DashboardPage() {
       setRightCollapsed(false);
       showToast(`Showing map context for ${serviceId || cable.properties.id}.`);
     }
-  }, [fiberSplices, syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints]);
+  }, [fiberSplices, syntheticServices, visibleDistributionPoleFiberRoutes, visibleDistributionPoles, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints]);
 
   function clearOpgwLayerIsolation() {
     setIsolatedOpgwRouteId(null);
@@ -1366,6 +1438,8 @@ export function DashboardPage() {
         fiberStrands={fiberStrands}
         fiberAssignments={visibleFiberAssignments}
         syntheticServices={syntheticServices}
+        distributionPoles={visibleDistributionPoles}
+        distributionPoleFiberRoutes={visibleDistributionPoleFiberRoutes}
         patchPanels={visiblePatchPanels}
         planningRegions={visiblePlanningRegions}
         layers={streetLayers}
@@ -1510,6 +1584,9 @@ export function DashboardPage() {
                     opgwSpanSegmentCount={visibleOpgwSpanSegments.length}
                     opgwSplicePointCount={visibleOpgwSplicePoints.length}
                     patchPanelCount={visiblePatchPanels.length}
+                    distributionPoleCount={visibleDistributionPoles.length}
+                    distributionPoleFiberRouteCount={visibleDistributionPoleFiberRoutes.length}
+                    estimatedDistributionPoleScale={1250000}
                     availableStrandCount={opgwPlanningMetrics.availableStrands}
                     criticalRidingCircuitCount={opgwPlanningMetrics.criticalRidingCircuits}
                     outageImpactCount={opgwPlanningMetrics.outageImpactCount}
@@ -1793,6 +1870,8 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
       compareSpliceLayers: false,
       spliceClosures: true,
       patchPanels: true,
+      distributionPoles: false,
+      distributionFiberRoutes: false,
       fiberAssignments: false,
       availableStrandCapacity: false,
       criticalRidingCircuits: false,
@@ -1822,6 +1901,8 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
     compareSpliceLayers: false,
     spliceClosures: true,
     patchPanels: true,
+    distributionPoles: false,
+    distributionFiberRoutes: true,
     fiberAssignments: true,
     availableStrandCapacity: true,
     criticalRidingCircuits: true,
@@ -2695,6 +2776,9 @@ function buildDashboardLayerSummaries({
   spliceClosureCount,
   visibleSpliceClosureCount,
   patchPanelCount,
+  distributionPoleCount,
+  distributionPoleFiberRouteCount,
+  estimatedDistributionPoleScale,
   fiberStrandCount,
   availableStrandCount,
   fiberAssignmentCount,
@@ -2729,6 +2813,9 @@ function buildDashboardLayerSummaries({
   spliceClosureCount: number;
   visibleSpliceClosureCount: number;
   patchPanelCount: number;
+  distributionPoleCount: number;
+  distributionPoleFiberRouteCount: number;
+  estimatedDistributionPoleScale: number;
   fiberStrandCount: number;
   availableStrandCount: number;
   fiberAssignmentCount: number;
@@ -2781,6 +2868,8 @@ function buildDashboardLayerSummaries({
     layer("compareSpliceLayers", "Splice compare", "Analysis overlays", opgwSplicePointCount, opgwSplicePointCount, "/splice-matrix", "Existing-versus-proposed synthetic splice comparison", "Demo comparison layer only."),
     layer("spliceClosures", "Splice closures", "Synthetic OPGW Fiber", spliceClosureCount, visibleSpliceClosureCount, "/splice-closures", "Synthetic closures mounted on synthetic structure points", "Synthetic/demo splice closure records only."),
     layer("patchPanels", "Patch panels", "Synthetic OPGW Fiber", patchPanelCount, patchPanelCount, "/patch-panels", "Synthetic termination panels at demo structures and nodes", "Synthetic/demo patch panel records only."),
+    layer("distributionPoles", "Distribution telecom poles", "Planning assets", distributionPoleCount, distributionPoleCount, "/distribution-fiber", `Clustered synthetic pole sample for an estimated ${formatCompactCount(estimatedDistributionPoleScale)} full-territory pole model`, "Synthetic street-path pole placements only; not real utility pole inventory."),
+    layer("distributionFiberRoutes", "Distribution pole fiber", "Planning assets", distributionPoleFiberRouteCount, distributionPoleFiberRouteCount, "/distribution-fiber", "Synthetic street-following telecom feeder continuity routes", "Synthetic/demo feeder routes only; not actual private telecom routes."),
     layer("fiberStrandsLayer", "Fiber strands", "Synthetic OPGW Fiber", fiberStrandCount, fiberStrandCount, "/fiber-strand-table", "Synthetic strand records generated from OPGW fiber counts", "Synthetic/demo strand inventory only."),
     layer("availableStrandCapacity", "Available strand capacity", "Analysis overlays", availableStrandCount, availableStrandCount, "/fiber-strand-table", "Capacity overlay calculated from synthetic strand statuses", "Capacity is demo planning data only."),
     layer("fiberAssignments", "Fiber assignments", "Planning assets", fiberAssignmentCount, fiberAssignmentCount, "/fiber-assignments", "Synthetic service-to-strand assignment model", "Synthetic/demo assignments only."),
@@ -2794,7 +2883,6 @@ function buildDashboardLayerSummaries({
     layer("transmissionLines", "Editable transmission lines", "Planning assets", transmissionLineCount, transmissionLineCount, "/transmission-lines", "Local planning line records", "Demo planning records only."),
     layer("workOrderLocations", "Work order locations", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/work-orders", "Synthetic work-order markers", "Demo work orders only."),
     layer("proposedChanges", "Proposed changes", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/deviceops/change-requests", "Synthetic proposed planning changes", "Proposed/demo records only."),
-    layer("distributionFiberRoutes", "Distribution fiber routes", "Planning assets", fiberAssignmentCount, fiberAssignmentCount, "/distribution-fiber", "Synthetic distribution fiber planning routes", "Synthetic/demo fiber routes only."),
   ];
 }
 
@@ -2816,6 +2904,8 @@ function buildSummaryCards(
   opgwSplicePoints: OpgwSplicePointFeature[],
   closures: SpliceClosureFeature[],
   assignments: FiberAssignment[],
+  distributionPoles: DistributionPoleFeature[],
+  distributionPoleFiberRoutes: DistributionPoleFiberRouteFeature[],
   panels: PatchPanel[],
 ) {
   const stateCount = new Set(publicLines.flatMap((line) => line.properties.states)).size;
@@ -2833,6 +2923,9 @@ function buildSummaryCards(
     { label: "Top Owner Bucket", value: topOwner?.count || 0, note: topOwner?.owner || "none", Icon: Gauge },
     { label: "Structures", value: structures.length, note: "synthetic demo points", Icon: MapPin },
     { label: "Splice Closures", value: closures.length, note: "synthetic demo closures", Icon: Cable },
+    { label: "Distribution Poles", value: distributionPoles.length, note: "clustered telecom sample", Icon: MapPin },
+    { label: "Pole Fiber Routes", value: distributionPoleFiberRoutes.length, note: "street-path continuity", Icon: Route },
+    { label: "Pole Scale Model", value: 1250000, note: "estimated full territory", Icon: Gauge },
     { label: "States Covered", value: stateCount, note: "ISO New England states", Icon: MapPin },
     { label: "Voltage Classes", value: voltageClassCount, note: "HIFLD normalized classes", Icon: Gauge },
   ];
@@ -2855,6 +2948,8 @@ function buildSearchResults(
   opgwSplicePoints: OpgwSplicePointFeature[],
   closures: SpliceClosureFeature[],
   assignments: FiberAssignment[],
+  distributionPoles: DistributionPoleFeature[],
+  distributionPoleFiberRoutes: DistributionPoleFiberRouteFeature[],
   panels: PatchPanel[],
   query: string,
 ): StreetMapSelection[] {
@@ -2872,6 +2967,8 @@ function buildSearchResults(
     ...opgwSplicePoints.map((record) => ({ kind: "opgw_splice_point" as const, id: record.properties.splicePointId, label: record.properties.splicePointId, record })),
     ...closures.map((record) => ({ kind: "splice_closure" as const, id: record.properties.id, label: record.properties.name, record })),
     ...assignments.map((record) => ({ kind: "fiber_assignment" as const, id: record.id, label: record.assignmentName, record })),
+    ...distributionPoles.map((record) => ({ kind: "distribution_pole" as const, id: record.properties.id, label: record.properties.poleNumber, record })),
+    ...distributionPoleFiberRoutes.map((record) => ({ kind: "distribution_pole_fiber" as const, id: record.properties.routeId, label: record.properties.routeName, record })),
     ...panels.map((record) => ({ kind: "patch_panel" as const, id: record.id, label: record.name, record })),
     ...substations.map((record) => ({ kind: "substation" as const, id: record.id, label: record.name, record })),
     ...nodes.map((record) => ({ kind: "node" as const, id: record.id, label: record.name, record })),
@@ -2911,6 +3008,8 @@ function isDashboardMapSearchResult(selection: StreetMapSelection) {
     || selection.kind === "opgw_splice_point"
     || selection.kind === "splice_closure"
     || selection.kind === "fiber_assignment"
+    || selection.kind === "distribution_pole"
+    || selection.kind === "distribution_pole_fiber"
     || selection.kind === "patch_panel";
 }
 
@@ -2951,6 +3050,8 @@ function selectionStatus(selection: StreetMapSelection) {
   if (selection.kind === "opgw_splice_point") return selection.record.properties.status;
   if (selection.kind === "splice_closure") return selection.record.properties.status;
   if (selection.kind === "fiber_assignment") return selection.record.status;
+  if (selection.kind === "distribution_pole") return selection.record.properties.status;
+  if (selection.kind === "distribution_pole_fiber") return selection.record.properties.status;
   if (selection.kind === "patch_panel") return selection.record.ports.some((port) => port.status === "assigned") ? "assigned" : "planned";
   const record = selection.record as { status?: string };
   return record.status || "open";
@@ -2962,6 +3063,8 @@ function selectionRegion(selection: StreetMapSelection) {
   if (selection.kind === "fcc_utility_tower") return selection.record.properties.state;
   if (selection.kind === "fcc_microwave_link") return selection.record.properties.states[0] || "MA";
   if (selection.kind === "synthetic_substation") return selection.record.properties.state;
+  if (selection.kind === "distribution_pole") return selection.record.properties.state;
+  if (selection.kind === "distribution_pole_fiber") return selection.record.properties.state;
   if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "opgw_route" || selection.kind === "opgw_cable_section" || selection.kind === "opgw_span_segment" || selection.kind === "opgw_splice_point" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "MA";
   const record = selection.record as { state?: string };
   return record.state || "MA";
@@ -2972,6 +3075,7 @@ function selectionVisibility(selection: StreetMapSelection) {
   if (selection.kind === "public_substation") return "public";
   if (selection.kind === "fcc_utility_tower" || selection.kind === "fcc_microwave_link") return "public";
   if (selection.kind === "synthetic_substation") return selection.record.properties.visibility;
+  if (selection.kind === "distribution_pole" || selection.kind === "distribution_pole_fiber") return "synthetic-demo";
   if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "opgw_route" || selection.kind === "opgw_cable_section" || selection.kind === "opgw_span_segment" || selection.kind === "opgw_splice_point" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "synthetic-demo";
   const record = selection.record as { visibility?: string };
   return record.visibility || "private";
@@ -2981,6 +3085,7 @@ function selectionUtilityOwner(selection: StreetMapSelection) {
   if (selection.kind === "public_transmission_line") return publicTransmissionLineOwner(selection.record.properties);
   if (selection.kind === "public_substation") return selection.record.properties.utilityOwner;
   if (selection.kind === "fcc_utility_tower" || selection.kind === "fcc_microwave_link") return selection.record.properties.utilityOwner;
+  if (selection.kind === "distribution_pole" || selection.kind === "distribution_pole_fiber") return selection.record.properties.utilityOwner;
   return "Unknown public owner";
 }
 
@@ -3130,6 +3235,14 @@ function selectionSearchText(selection: StreetMapSelection) {
     const properties = selection.record.properties;
     return [layerLabel, selection.label, properties.id, properties.name, properties.structureNumber, properties.closureType, properties.status].join(" ");
   }
+  if (selection.kind === "distribution_pole") {
+    const properties = selection.record.properties;
+    return [layerLabel, selection.label, properties.id, properties.poleNumber, properties.feederId, properties.streetPathId, properties.utilityOwner, properties.state, properties.telecomRole, properties.fiberCount, properties.continuityPathId, properties.upstreamPatchPanelId, properties.upstreamPoleId, properties.downstreamPoleId, properties.status].join(" ");
+  }
+  if (selection.kind === "distribution_pole_fiber") {
+    const properties = selection.record.properties;
+    return [layerLabel, selection.label, properties.routeId, properties.routeName, properties.feederId, properties.streetPathId, properties.utilityOwner, properties.state, properties.fiberCount, properties.parentPatchPanelId, properties.parentOpgwRouteId, properties.continuityStatus, properties.serviceTypesCarried.join(" "), properties.status].join(" ");
+  }
   return [layerLabel, JSON.stringify(selection.record)].join(" ");
 }
 
@@ -3180,6 +3293,7 @@ function publicLayerSet(layers: Record<StreetMapLayerKey, boolean>) {
     existingFiberSplices: false,
     proposedFiberSplices: false,
     compareSpliceLayers: false,
+    distributionPoles: false,
     distributionFiberRoutes: false,
     circuitEndpoints: false,
     workOrderLocations: false,

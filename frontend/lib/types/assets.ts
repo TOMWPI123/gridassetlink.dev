@@ -454,6 +454,104 @@ export type TransmissionStructureCollection = {
   features: TransmissionStructureFeature[];
 };
 
+export type DistributionPole = {
+  id: string;
+  poleNumber: string;
+  feederId: string;
+  streetPathId: string;
+  sequenceIndex: number;
+  latitude: number;
+  longitude: number;
+  utilityOwner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  placementModel: "synthetic_street_path";
+  placementBasis: string;
+  roadSide: "left" | "right" | "alternating";
+  poleClass: "distribution_wood" | "composite" | "steel" | "unknown";
+  heightFt: 35 | 40 | 45 | 50 | 55 | 60;
+  spanFromPreviousFt?: number;
+  telecomRole: "distribution_backbone" | "fiber_lateral" | "splice_pole" | "riser" | "service_drop" | "wireless_backhaul" | "spare";
+  hasTelecomFiber: boolean;
+  fiberCount: 0 | 12 | 24 | 48 | 96;
+  connectedDistributionFiberRouteIds: string[];
+  upstreamPoleId?: string;
+  downstreamPoleId?: string;
+  upstreamNetworkNodeId?: string;
+  upstreamPatchPanelId?: string;
+  continuityPathId?: string;
+  serviceDropCount: number;
+  status: "in_service_synthetic" | "planned" | "proposed" | "reserved" | "needs_field_verification";
+  synthetic: true;
+  source: "synthetic-demo";
+  notes: string;
+};
+
+export type DistributionPoleFeature = {
+  type: "Feature";
+  properties: DistributionPole;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type DistributionPoleCollection = {
+  type: "FeatureCollection";
+  features: DistributionPoleFeature[];
+};
+
+export type DistributionPoleFiberRoute = {
+  routeId: string;
+  routeName: string;
+  feederId: string;
+  streetPathId: string;
+  utilityOwner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  synthetic: true;
+  source: "synthetic-demo";
+  placementModel: "synthetic_street_path";
+  routeMiles: number;
+  poleCount: number;
+  firstPoleId: string;
+  lastPoleId: string;
+  samplePoleIds: string[];
+  parentPatchPanelId?: string;
+  parentOpgwRouteId?: string;
+  fiberCount: 12 | 24 | 48 | 96;
+  status: "in_service_synthetic" | "planned" | "proposed" | "reserved" | "needs_field_verification";
+  continuityStatus: "complete_synthetic" | "planned" | "proposed" | "needs_splice_review" | "broken_demo";
+  serviceTypesCarried: Array<"SCADA" | "Distribution Automation" | "Telecom Backhaul" | "AMI Backhaul" | "Protection Pilot" | "Spare">;
+  estimatedPoleScaleCount: number;
+  notes: string;
+};
+
+export type DistributionPoleFiberRouteFeature = {
+  type: "Feature";
+  properties: DistributionPoleFiberRoute;
+  geometry: { type: "LineString"; coordinates: Coordinate[] };
+};
+
+export type DistributionPoleFiberRouteCollection = {
+  type: "FeatureCollection";
+  features: DistributionPoleFiberRouteFeature[];
+};
+
+export type DistributionPoleContinuityRecord = {
+  continuityId: string;
+  routeId: string;
+  feederId: string;
+  utilityOwner: string;
+  state: string;
+  endpointAType: "substation_patch_panel" | "opgw_patch_panel" | "synthetic_telecom_node";
+  endpointAId: string;
+  endpointZType: "distribution_pole";
+  endpointZId: string;
+  totalPoleCount: number;
+  samplePoleIds: string[];
+  fiberCount: 12 | 24 | 48 | 96;
+  serviceTypesCarried: DistributionPoleFiberRoute["serviceTypesCarried"];
+  continuityStatus: DistributionPoleFiberRoute["continuityStatus"];
+  synthetic: true;
+  warning: string;
+};
+
 export type OpgwCable = {
   id: string;
   cableName: string;
@@ -987,6 +1085,7 @@ export type StreetMapLayerKey =
   | "c3794Nodes"
   | "fiberRoutes"
   | "opgwRoutes"
+  | "distributionPoles"
   | "distributionFiberRoutes"
   | "circuitEndpoints"
   | "workOrderLocations"

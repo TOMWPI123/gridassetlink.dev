@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/Badges";
 import { OutageImpactPage } from "@/components/UtilityPages";
+import { buildDistributionPoleContinuityView, loadDistributionPoleNetworkData, type DistributionPoleContinuityView } from "@/lib/distribution/staticDistributionData";
 import { buildOpgwOutageImpactView, type OpgwOutageImpactTargetType, type OpgwOutageImpactView } from "@/lib/opgw/outageImpact";
 import { loadSyntheticFiberContinuityData } from "@/lib/opgw/staticSyntheticData";
 
@@ -10,6 +11,35 @@ type PageProps = {
 
 export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams;
+  const distributionPoleId = firstValue(params?.distributionPole) || firstValue(params?.distributionPoleId);
+  const distributionRouteId = firstValue(params?.distributionRoute) || firstValue(params?.distributionRouteId);
+  if (distributionPoleId || distributionRouteId) {
+    const distributionData = await loadDistributionPoleNetworkData();
+    const view = buildDistributionPoleContinuityView(
+      distributionPoleId ? "distribution_pole" : "distribution_route",
+      distributionPoleId || distributionRouteId || "",
+      distributionData,
+    );
+    if (!view) {
+      return (
+        <main className="splice-manager-page">
+          <header className="splice-manager-hero">
+            <div>
+              <Link className="splice-manager-back" href="/dashboard?drawer=layers">Back to map dashboard</Link>
+              <h1>Distribution Telecom Impact</h1>
+              <p>{distributionPoleId ? "distribution pole" : "distribution route"} / {distributionPoleId || distributionRouteId}</p>
+            </div>
+            <div className="splice-manager-warning">
+              <span aria-hidden="true">!</span>
+              <span>No synthetic distribution continuity matched this target. This does not prove real-world service absence.</span>
+            </div>
+          </header>
+        </main>
+      );
+    }
+    return <DistributionTelecomImpactReport view={view} />;
+  }
+
   const target = targetFromParams(params);
   if (!target) return <OutageImpactPage />;
 
@@ -34,6 +64,120 @@ export default async function Page({ searchParams }: PageProps) {
   }
 
   return <OpgwOutageImpactReport view={view} />;
+}
+
+function DistributionTelecomImpactReport({ view }: { view: DistributionPoleContinuityView }) {
+  const mapHref = view.targetType === "distribution_pole"
+    ? `/dashboard?drawer=layers&distributionPole=${encodeURIComponent(view.targetId)}`
+    : `/dashboard?drawer=layers&distributionRoute=${encodeURIComponent(view.route.properties.routeId)}`;
+  const impactedServices = view.serviceTypes.map((service) => ({
+    service,
+    criticality: service === "SCADA" || service === "Protection Pilot" || service === "Distribution Automation" ? "critical" : "normal",
+  }));
+  return (
+    <main className="splice-manager-page">
+      <header className="splice-manager-hero">
+        <div>
+          <Link className="splice-manager-back" href="/dashboard?drawer=layers">Back to map dashboard</Link>
+          <h1>Distribution Telecom Impact</h1>
+          <p>{view.targetLabel} / {view.route.properties.routeName}</p>
+        </div>
+        <div className="splice-manager-warning">
+          <span aria-hidden="true">!</span>
+          <span>{view.warning}</span>
+        </div>
+      </header>
+
+      <section className="splice-manager-summary-grid" aria-label="Synthetic distribution telecom impact summary">
+        <SummaryCard label="Services affected" value={impactedServices.length.toLocaleString()} />
+        <SummaryCard label="Critical services" value={view.criticalServiceCount.toLocaleString()} />
+        <SummaryCard label="Display poles" value={view.route.properties.poleCount.toLocaleString()} />
+        <SummaryCard label="Scale model" value={view.estimatedPoleScaleCount.toLocaleString()} />
+        <SummaryCard label="Fiber count" value={`${view.route.properties.fiberCount}F`} />
+        <SummaryCard label="Route miles" value={view.estimatedRouteMiles.toFixed(2)} />
+        <SummaryCard label="Estimated loss" value={`${view.estimatedLossDb.toFixed(2)} dB`} />
+        <SummaryCard label="Continuity" value={view.route.properties.continuityStatus.replaceAll("_", " ")} />
+      </section>
+
+      <section className="splice-manager-grid">
+        <div className="splice-manager-main">
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Affected Synthetic Distribution Services</strong></div>
+            <div className="splice-table-wrap">
+              <table className="splice-manager-table">
+                <thead>
+                  <tr>
+                    <th>Service family</th>
+                    <th>Criticality</th>
+                    <th>Status</th>
+                    <th>Route</th>
+                    <th>Fiber</th>
+                    <th>Poles</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {impactedServices.map(({ service, criticality }) => (
+                    <tr key={service}>
+                      <td>{service}<br /><small>Synthetic distribution telecom planning record</small></td>
+                      <td><Badge value={criticality} /></td>
+                      <td><Badge value={view.route.properties.status} /></td>
+                      <td>{view.route.properties.routeId}</td>
+                      <td>{view.route.properties.fiberCount}F</td>
+                      <td>{view.route.properties.poleCount}</td>
+                      <td>
+                        <div className="splice-row-actions">
+                          <Link href={`/fiber-trace?distributionRoute=${encodeURIComponent(view.route.properties.routeId)}`}>Trace</Link>
+                          <Link href={mapHref}>Map</Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Impacted Pole Continuity Sample</strong></div>
+            <div className="continuity-list">
+              <article className="continuity-card complete">
+                <div>
+                  <strong>{view.route.properties.feederId}</strong>
+                  <span>{view.parentPatchPanel?.name || view.continuityRecord?.endpointAId || "Synthetic upstream node"} to {view.continuityRecord?.endpointZId || view.route.properties.lastPoleId}</span>
+                </div>
+                <ol>
+                  {(view.samplePoles.length ? view.samplePoles : view.routePoles.slice(0, 12)).map((pole) => (
+                    <li key={pole.properties.id}>
+                      <span>{pole.properties.sequenceIndex}</span>
+                      <strong>{pole.properties.poleNumber}</strong>
+                      <em>{pole.properties.telecomRole.replaceAll("_", " ")}</em>
+                    </li>
+                  ))}
+                </ol>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <aside className="splice-manager-side">
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Impacted Records</strong></div>
+            <ImpactList title="Distribution poles" values={view.routePoles.slice(0, 24).map((pole) => pole.properties.poleNumber)} />
+            <ImpactList title="Sample pole IDs" values={view.route.properties.samplePoleIds} />
+            <ImpactList title="Patch panels" values={view.parentPatchPanel ? [view.parentPatchPanel.name] : []} />
+          </section>
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Warnings</strong></div>
+            <div className="splice-warning-list">
+              <span>{view.warning}</span>
+              <span>This impact view is demo planning logic only and does not represent actual service restoration or utility telecom topology.</span>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  );
 }
 
 function OpgwOutageImpactReport({ view }: { view: OpgwOutageImpactView }) {

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DistributionPoleFeature, DistributionPoleFiberRouteFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
@@ -21,6 +21,8 @@ export type StreetMapSelection =
   | { kind: "opgw_splice_point"; id: string; label: string; record: OpgwSplicePointFeature }
   | { kind: "splice_closure"; id: string; label: string; record: SpliceClosureFeature }
   | { kind: "fiber_assignment"; id: string; label: string; record: FiberAssignment }
+  | { kind: "distribution_pole"; id: string; label: string; record: DistributionPoleFeature }
+  | { kind: "distribution_pole_fiber"; id: string; label: string; record: DistributionPoleFiberRouteFeature }
   | { kind: "patch_panel"; id: string; label: string; record: PatchPanel }
   | { kind: "planning_region"; id: string; label: string; record: PlanningRegion }
   | { kind: "work_order"; id: string; label: string; record: MapNode };
@@ -62,6 +64,8 @@ type StreetLevelAssetMapProps = {
   fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
   syntheticServices: SyntheticService[];
+  distributionPoles: DistributionPoleFeature[];
+  distributionPoleFiberRoutes: DistributionPoleFiberRouteFeature[];
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
@@ -101,6 +105,8 @@ export function StreetLevelAssetMap({
   fiberStrands,
   fiberAssignments,
   syntheticServices,
+  distributionPoles,
+  distributionPoleFiberRoutes,
   patchPanels,
   planningRegions,
   layers,
@@ -135,9 +141,11 @@ export function StreetLevelAssetMap({
           spliceClosures={spliceClosures}
           fiberSplices={fiberSplices}
           fiberStrands={fiberStrands}
-          fiberAssignments={fiberAssignments}
-          syntheticServices={syntheticServices}
-          patchPanels={patchPanels}
+      fiberAssignments={fiberAssignments}
+      syntheticServices={syntheticServices}
+      distributionPoles={distributionPoles}
+      distributionPoleFiberRoutes={distributionPoleFiberRoutes}
+      patchPanels={patchPanels}
           planningRegions={planningRegions}
           layers={layers}
           activeTool={activeTool}

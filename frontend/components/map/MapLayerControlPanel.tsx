@@ -27,6 +27,9 @@ type MapLayerControlPanelProps = {
   opgwSpanSegmentCount?: number;
   opgwSplicePointCount?: number;
   patchPanelCount?: number;
+  distributionPoleCount?: number;
+  distributionPoleFiberRouteCount?: number;
+  estimatedDistributionPoleScale?: number;
   availableStrandCount?: number;
   criticalRidingCircuitCount?: number;
   outageImpactCount?: number;
@@ -89,6 +92,8 @@ const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string
   { key: "compareSpliceLayers", label: "Compare Existing vs Proposed", note: "Shows existing and proposed splice layers together for review.", badges: ["Compare"] },
   { key: "spliceClosures", label: "Splice Closures", note: "Synthetic closures at terminal and junction structures.", badges: ["Synthetic", "Splices"] },
   { key: "patchPanels", label: "Patch Panels", note: "Synthetic termination panels at structures and nodes.", badges: ["Synthetic", "Panels"] },
+  { key: "distributionPoles", label: "Distribution Telecom Poles", note: "Synthetic utility-style pole placements following generated street paths; clustered for smooth million-scale viewing.", badges: ["Synthetic", "Telecom", "Clustered"] },
+  { key: "distributionFiberRoutes", label: "Distribution Pole Fiber", note: "Synthetic street-following telecom feeder continuity linked into patch panels and OPGW planning records.", badges: ["Telecom", "Continuity"] },
   { key: "fiberStrandsLayer", label: "Fiber Strands", note: "Strand records belong to cable sections in this engineering view.", badges: ["Strands"] },
   { key: "fiberAssignments", label: "Fiber Assignments", note: "Synthetic service assignments on OPGW cable sections.", badges: ["Assignments"] },
   { key: "availableStrandCapacity", label: "Available Strand Capacity", note: "Capacity coloring from synthetic strand records.", badges: ["Capacity"] },
@@ -120,6 +125,9 @@ export function MapLayerControlPanel({
   opgwSpanSegmentCount = 0,
   opgwSplicePointCount = 0,
   patchPanelCount = 0,
+  distributionPoleCount = 0,
+  distributionPoleFiberRouteCount = 0,
+  estimatedDistributionPoleScale = 0,
   availableStrandCount = 0,
   criticalRidingCircuitCount = 0,
   outageImpactCount = 0,
@@ -296,6 +304,8 @@ export function MapLayerControlPanel({
                     outageImpactCount,
                     openOpgwWorkOrderCount,
                     spanInspectionIssueCount,
+                    distributionPoleCount,
+                    distributionPoleFiberRouteCount,
                   })}</em>
                 </strong>
                 <small>{dataWarningForLayer(layer.key, dataWarnings) || layer.note}</small>
@@ -326,6 +336,7 @@ export function MapLayerControlPanel({
       <div className="street-layer-warning">
         Synthetic planning assumption only. Not active fiber. Requires engineer/as-built verification.
         <small>Conversion workflow: synthetic assumption -&gt; planned OPGW -&gt; designed -&gt; work order -&gt; as-built verified.</small>
+        <small>Distribution telecom pole layer: {distributionPoleCount.toLocaleString()} rendered sample poles representing an estimated {estimatedDistributionPoleScale.toLocaleString()} regional-scale poles. Clustering and close-zoom labels keep the map smooth.</small>
       </div>
       <div className="street-map-todo-note">
         Dashboard map is limited to public HIFLD transmission-line references, verified-owner public substation nodes, public FCC ULS utility tower/site records, public FCC ULS microwave path links, close OpenStreetMap owner/operator matches, and synthetic demo planning layers. FCC records are public license/path references only; OPGW cables, strand capacity, assignments, splice closures, patch panels, critical circuits, and outage-impact overlays are synthetic/demo records unless imported and verified later.
@@ -796,6 +807,8 @@ function opgwCountForLayer(
     structureCount: number;
     spliceClosureCount: number;
     patchPanelCount: number;
+    distributionPoleCount: number;
+    distributionPoleFiberRouteCount: number;
     availableStrandCount: number;
     criticalRidingCircuitCount: number;
     outageImpactCount: number;
@@ -818,6 +831,8 @@ function opgwCountForLayer(
   if (layer === "compareSpliceLayers") return counts.opgwSplicePointCount;
   if (layer === "spliceClosures") return counts.spliceClosureCount;
   if (layer === "patchPanels") return counts.patchPanelCount;
+  if (layer === "distributionPoles") return counts.distributionPoleCount;
+  if (layer === "distributionFiberRoutes") return counts.distributionPoleFiberRouteCount;
   if (layer === "fiberStrandsLayer") return counts.availableStrandCount;
   if (layer === "fiberAssignments") return counts.criticalRidingCircuitCount;
   if (layer === "availableStrandCapacity") return counts.availableStrandCount;
@@ -834,6 +849,8 @@ function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string,
   if (layer === "fccUtilityTowers") return warnings?.fccUtilityTowers;
   if (layer === "fccMicrowaveLinks") return warnings?.fccMicrowaveLinks;
   if (layer === "transmissionStructures") return warnings?.structures;
+  if (layer === "distributionPoles") return warnings?.distributionPoles;
+  if (layer === "distributionFiberRoutes") return warnings?.distributionPoleFiberRoutes;
   if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "existingFiberSplices" || layer === "proposedFiberSplices" || layer === "compareSpliceLayers" || layer === "fiberStrandsLayer" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments || warnings?.syntheticServices;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   if (layer === "patchPanels") return warnings?.patchPanels;

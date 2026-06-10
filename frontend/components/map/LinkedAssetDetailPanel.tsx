@@ -86,6 +86,22 @@ export function LinkedAssetDetailPanel({ selection, onClose }: LinkedAssetDetail
           <a href={`/work-orders/new?splicePoint=${encodeURIComponent(selection.id)}`}>Create work order</a>
         </div>
       ) : null}
+      {selection.kind === "distribution_pole" ? (
+        <div className="linked-asset-actions">
+          <a href={`/fiber-trace?distributionPole=${encodeURIComponent(selection.id)}`}>Open Pole Continuity</a>
+          <a href={`/outage-impact?distributionPole=${encodeURIComponent(selection.id)}`}>Analyze Telecom Impact</a>
+          <button type="button">Reserve telecom fiber</button>
+          <button type="button">Create field verification work order</button>
+        </div>
+      ) : null}
+      {selection.kind === "distribution_pole_fiber" ? (
+        <div className="linked-asset-actions">
+          <a href={`/fiber-trace?distributionRoute=${encodeURIComponent(selection.id)}`}>Open Feeder Continuity</a>
+          <a href={`/outage-impact?distributionRoute=${encodeURIComponent(selection.id)}`}>Analyze Route Impact</a>
+          <button type="button">Open pole list sample</button>
+          <button type="button">Create telecom construction work order</button>
+        </div>
+      ) : null}
       {selection.kind === "splice_closure" ? (
         <div className="linked-asset-actions">
           <a href={`/opgw/splices/${encodeURIComponent(selection.id)}/diagram`}>Interactive Splicing Diagram</a>
@@ -209,6 +225,22 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
   if (selection.kind === "fiber_assignment" || selection.kind === "patch_panel") {
     return selection.record as unknown as Record<string, unknown>;
   }
+  if (selection.kind === "distribution_pole") {
+    return {
+      ...selection.record.properties,
+      geometryType: selection.record.geometry.type,
+      viewerOptimization: "Rendered as clustered MapLibre GeoJSON. Individual poles are shown only at close zoom for smooth browsing.",
+      scaleModel: "One displayed synthetic pole can represent many regional-scale planning poles in million-pole exports.",
+    } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "distribution_pole_fiber") {
+    return {
+      ...selection.record.properties,
+      geometryType: selection.record.geometry.type,
+      continuityModel: "Synthetic feeder continuity links endpoint patch panels to ordered distribution pole samples.",
+      viewerOptimization: "Rendered as route linework; individual poles are clustered in a separate layer.",
+    } as unknown as Record<string, unknown>;
+  }
   return selection.record as Record<string, unknown>;
 }
 
@@ -226,6 +258,8 @@ function detailBadgesForSelection(selection: StreetMapSelection) {
   if (selection.kind === "opgw_splice_point") return ["Splice point", "Synthetic"];
   if (selection.kind === "splice_closure") return ["Synthetic splice", "Demo"];
   if (selection.kind === "fiber_assignment") return ["Synthetic assignment", "Demo"];
+  if (selection.kind === "distribution_pole") return ["Synthetic pole", "Telecom", "Clustered"];
+  if (selection.kind === "distribution_pole_fiber") return ["Synthetic feeder", "Telecom continuity"];
   if (selection.kind === "patch_panel") return ["Synthetic panel", "Demo"];
   return [];
 }
@@ -244,6 +278,8 @@ function detailNoticeForSelection(selection: StreetMapSelection) {
   if (selection.kind === "opgw_splice_point") return "Synthetic splice point. Splice points define cable-section boundaries and do not prove real field splices.";
   if (selection.kind === "splice_closure") return "Synthetic splice closure at a synthetic structure point. It is for demo splicing workflows only.";
   if (selection.kind === "fiber_assignment") return "Synthetic fiber assignment for planning demonstration. It is not an actual circuit path.";
+  if (selection.kind === "distribution_pole") return "Synthetic distribution telecom pole placed along generated street paths. This is not a real pole, utility attachment, or private telecom route.";
+  if (selection.kind === "distribution_pole_fiber") return "Synthetic distribution telecom feeder route. It follows generated street-like paths and links into demo patch-panel continuity only.";
   if (selection.kind === "patch_panel") return "Synthetic patch panel and termination ports for demo planning.";
   return "";
 }
