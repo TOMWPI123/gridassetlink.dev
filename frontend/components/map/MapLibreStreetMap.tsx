@@ -769,10 +769,10 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     source: sourceIds.spliceClosures,
     filter: ["!", ["has", "point_count"]],
     paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 5.5, 10, 8.5],
-      "circle-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#ffb84d"],
-      "circle-stroke-color": "#fff6d4",
-      "circle-stroke-width": 1.4,
+      "circle-radius": ["case", ["get", "isContinuityHighlight"], 11.2, ["interpolate", ["linear"], ["zoom"], 5, 5.5, 10, 8.5]],
+      "circle-color": ["case", ["get", "isContinuityHighlight"], "#28f3ff", ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#ffb84d"]],
+      "circle-stroke-color": ["case", ["get", "isContinuityHighlight"], "#ffffff", "#fff6d4"],
+      "circle-stroke-width": ["case", ["get", "isContinuityHighlight"], 3, 1.4],
     },
   });
   map.addLayer({
@@ -1613,6 +1613,7 @@ function buildDatasets(
     })),
     spliceClosures: layers.spliceClosures || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers ? collection(spliceClosures.flatMap((feature) => {
       const pointId = closureToSplicePointId.get(feature.properties.id) || "";
+      const isContinuityHighlight = continuitySets.splicePointIds.has(pointId);
       const metrics = spliceMetricsByPoint.get(pointId);
       const hasExisting = feature.properties.status === "existing" || (metrics?.activeSyntheticServices || 0) > 0;
       const hasProposed = feature.properties.status === "planned" || feature.properties.status === "proposed" || (metrics?.proposedSyntheticServices || 0) > 0;
@@ -1641,6 +1642,8 @@ function buildDatasets(
         spliceCount: feature.properties.spliceCount,
         warning: "Synthetic splice closure only. Existing/proposed rows are demo planning records.",
         synthetic: true,
+        isContinuityHighlight,
+        continuityLabel: continuityHighlight?.label || null,
       },
       geometry: feature.geometry,
       }];

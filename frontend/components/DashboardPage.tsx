@@ -854,6 +854,42 @@ export function DashboardPage() {
     showToast(`Showing only splice point ${splicePoint.properties.splicePointId}.`);
   }
 
+  function focusSpliceConnectionLayer(spliceConnectionId: string) {
+    const splice = fiberSplices.find((row) => row.id === spliceConnectionId);
+    if (!splice) {
+      showToast("That splice connection is not available in the current synthetic splice data.");
+      return;
+    }
+    const parentSplicePoint = visibleOpgwSplicePoints.find((point) => point.properties.closureId === splice.spliceClosureId);
+    const selection: StreetMapSelection | null = parentSplicePoint
+      ? { kind: "opgw_splice_point", id: parentSplicePoint.properties.splicePointId, label: parentSplicePoint.properties.splicePointId, record: parentSplicePoint }
+      : null;
+    const highlight = buildContinuityHighlightForSpliceConnection(splice);
+    setContinuityHighlight(highlight);
+    setIsolatedOpgwRouteId(highlight.routeIds?.[0] || null);
+    setIsolatedOpgwSectionId(null);
+    setIsolatedOpgwSplicePointId(parentSplicePoint?.properties.splicePointId || null);
+    if (selection) {
+      setSelectedAsset(selection);
+      setFocusRequest({ selection, sequence: Date.now() });
+    }
+    setStreetLayers((current) => ({
+      ...current,
+      opgwRoutes: true,
+      opgwCableSections: true,
+      opgwSplicePoints: true,
+      spliceClosures: true,
+      existingFiberSplices: true,
+      proposedFiberSplices: true,
+      compareSpliceLayers: true,
+      fiberAssignments: true,
+      criticalRidingCircuits: true,
+    }));
+    setRightMode("layers");
+    setRightCollapsed(false);
+    showToast(`Showing map continuity for splice connection ${spliceConnectionId}.`);
+  }
+
   function continuityHighlightForSelection(selection: StreetMapSelection): ContinuityHighlight | undefined {
     if (selection.kind === "opgw_splice_point") return buildContinuityHighlightForSplicePoint(selection.record);
     if (selection.kind === "opgw_cable") return buildContinuityHighlightForCable(selection.record);
@@ -971,6 +1007,69 @@ export function DashboardPage() {
     };
   }
 
+  function buildContinuityHighlightForSpliceConnection(splice: FiberSplice): ContinuityHighlight {
+    const parentSplicePoint = visibleOpgwSplicePoints.find((point) => point.properties.closureId === splice.spliceClosureId);
+    const assignmentIds = uniqueStrings([splice.assignmentId]);
+    const cableIds = new Set<string>();
+    const routeIds = new Set<string>();
+    const sectionIds = new Set<string>();
+    [splice.fromCableId, splice.toCableId].forEach((id) => {
+      if (!id) return;
+      const cable = visibleOpgwCables.find((feature) => feature.properties.id === id);
+      const section = visibleOpgwCableSections.find((feature) => feature.properties.cableSectionId === id);
+      if (cable) {
+        cableIds.add(cable.properties.id);
+        routeIds.add(opgwRouteIdForDashboardCable(cable));
+      }
+      if (section) {
+        sectionIds.add(section.properties.cableSectionId);
+        routeIds.add(section.properties.opgwRouteId);
+      }
+    });
+    if (parentSplicePoint) routeIds.add(parentSplicePoint.properties.opgwRouteId);
+    const services = syntheticServices.filter((service) => {
+      if (splice.assignmentId && (service.primaryPathAssignmentId === splice.assignmentId || service.backupPathAssignmentId === splice.assignmentId)) return true;
+      if (service.continuitySpliceClosureIds?.includes(splice.spliceClosureId)) return true;
+      return service.continuityCableIds?.some((id) => cableIds.has(id) || id === splice.fromCableId || id === splice.toCableId) || false;
+    });
+    services.forEach((service) => {
+      uniqueStrings([service.primaryPathAssignmentId, service.backupPathAssignmentId]).forEach((assignmentId) => assignmentIds.push(assignmentId));
+      service.continuityCableIds?.forEach((id) => cableIds.add(id));
+      service.continuitySplicePointIds?.forEach((pointId) => {
+        const point = visibleOpgwSplicePoints.find((item) => item.properties.splicePointId === pointId);
+        if (point) routeIds.add(point.properties.opgwRouteId);
+      });
+    });
+    visibleOpgwCables
+      .filter((cable) => cableIds.has(cable.properties.id))
+      .forEach((cable) => routeIds.add(opgwRouteIdForDashboardCable(cable)));
+    visibleOpgwCableSections
+      .filter((section) => routeIds.has(section.properties.opgwRouteId))
+      .forEach((section) => sectionIds.add(section.properties.cableSectionId));
+    const splicePointIds = new Set(parentSplicePoint ? [parentSplicePoint.properties.splicePointId] : []);
+    visibleOpgwCableSections
+      .filter((section) => sectionIds.has(section.properties.cableSectionId))
+      .forEach((section) => {
+        splicePointIds.add(section.properties.fromSplicePointId);
+        splicePointIds.add(section.properties.toSplicePointId);
+      });
+    services.forEach((service) => {
+      service.continuitySplicePointIds?.forEach((pointId) => splicePointIds.add(pointId));
+      service.continuitySpliceClosureIds?.forEach((closureId) => {
+        const point = visibleOpgwSplicePoints.find((item) => item.properties.closureId === closureId);
+        if (point) splicePointIds.add(point.properties.splicePointId);
+      });
+    });
+    return {
+      label: splice.id,
+      assignmentIds: uniqueStrings(assignmentIds),
+      cableIds: Array.from(cableIds),
+      routeIds: Array.from(routeIds),
+      sectionIds: Array.from(sectionIds),
+      splicePointIds: Array.from(splicePointIds),
+    };
+  }
+
   function buildContinuityHighlightForAssignment(assignment: FiberAssignment): ContinuityHighlight {
     const cableIds = new Set(assignment.cableIds);
     const routeIds = routeIdsForCableIds(cableIds);
@@ -997,6 +1096,7 @@ export function DashboardPage() {
     if (deepLinkFocusApplied.current) return;
     const params = new URLSearchParams(window.location.search);
     const splicePointId = params.get("splicePoint");
+    const spliceConnectionId = params.get("spliceConnection") || params.get("spliceConnectionId");
     const cableSectionId = params.get("cableSection") || params.get("cableSectionId");
     const cableId = params.get("cable");
     const serviceId = params.get("service");
@@ -1006,6 +1106,14 @@ export function DashboardPage() {
       if (!visibleOpgwSplicePoints.some((feature) => feature.properties.splicePointId === splicePointId)) return;
       deepLinkFocusApplied.current = true;
       focusOpgwSplicePointLayer(splicePointId);
+      return;
+    }
+
+    if (spliceConnectionId) {
+      if (!fiberSplices.length || !visibleOpgwSplicePoints.length || !visibleOpgwCableSections.length || !visibleOpgwCables.length) return;
+      if (!fiberSplices.some((splice) => splice.id === spliceConnectionId)) return;
+      deepLinkFocusApplied.current = true;
+      focusSpliceConnectionLayer(spliceConnectionId);
       return;
     }
 
@@ -1033,7 +1141,7 @@ export function DashboardPage() {
       setRightCollapsed(false);
       showToast(`Showing map context for ${serviceId || cable.properties.id}.`);
     }
-  }, [syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints]);
+  }, [fiberSplices, syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints]);
 
   function clearOpgwLayerIsolation() {
     setIsolatedOpgwRouteId(null);

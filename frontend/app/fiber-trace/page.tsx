@@ -113,7 +113,9 @@ export default async function Page({ searchParams }: PageProps) {
           ["Path count", String(paths.length)],
           ["Synthetic source", "demo continuity resolver"],
         ]}
-        mapHref={selectedSplicePointId
+        mapHref={spliceConnectionId
+          ? `/dashboard?drawer=layers&spliceConnection=${encodeURIComponent(spliceConnectionId)}`
+          : selectedSplicePointId
           ? `/dashboard?drawer=layers&splicePoint=${encodeURIComponent(selectedSplicePointId)}`
           : cableSectionId
           ? `/dashboard?drawer=layers&cableSection=${encodeURIComponent(cableSectionId)}`
