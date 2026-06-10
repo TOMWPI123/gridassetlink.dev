@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Cable, ClipboardList, GitCompareArrows, History, Network, Plus, Route, ShieldAlert, Trash2, Workflow } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { FiberSplice } from "@/lib/types/assets";
+import type { FiberContinuityPath, FiberSplice } from "@/lib/types/assets";
 import type { SpliceManagerViewModel } from "@/lib/opgw/continuityEngine";
 
 type SpliceManagerClientProps = {
@@ -19,6 +19,35 @@ type MatrixActionStatus = {
   state: "idle" | "running" | "complete" | "error";
   message: string;
   details?: Record<string, unknown>;
+};
+type ContinuityCompareResponse = {
+  syntheticFlag: true;
+  warning?: string;
+  matrixComparison?: {
+    existingConnectionCount: number;
+    proposedConnectionCount: number;
+    addedInProposed: FiberSplice[];
+    unchanged: number;
+    existingWithoutProposedMatch: FiberSplice[];
+    affectedServices: Array<{ serviceId: string; serviceName: string; layerType: string; criticality: string }>;
+  } | null;
+  existingServiceCount: number;
+  proposedServiceCount: number;
+  existingPaths: FiberContinuityPath[];
+  proposedPaths: FiberContinuityPath[];
+  diffSummary?: {
+    proposedOnlyServices?: string[];
+    existingOnlyServices?: string[];
+    existingBrokenPaths?: string[];
+    proposedBrokenPaths?: string[];
+    existingWarnings?: string[];
+    proposedWarnings?: string[];
+  };
+};
+type ContinuityCompareStatus = {
+  state: "idle" | "running" | "complete" | "error";
+  message: string;
+  result?: ContinuityCompareResponse;
 };
 
 const fiberColors = ["Blue", "Orange", "Green", "Brown", "Slate", "White", "Red", "Black", "Yellow", "Violet", "Rose", "Aqua"];
@@ -38,6 +67,7 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
   const [editorStrandCount, setEditorStrandCount] = useState(1);
   const [editorSpliceType, setEditorSpliceType] = useState<ProposedSpliceType>("straight_through");
   const [matrixActionStatus, setMatrixActionStatus] = useState<MatrixActionStatus | null>(null);
+  const [continuityCompareStatus, setContinuityCompareStatus] = useState<ContinuityCompareStatus | null>(null);
   const selectedPointId = view.splicePoint.properties.splicePointId;
   const closure = view.closure?.properties;
   const header = view.header;
@@ -70,6 +100,7 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
   const existingRows = useMemo(() => spliceRows.filter((splice) => splice.status === "existing"), [spliceRows]);
   const proposedRows = useMemo(() => spliceRows.filter((splice) => splice.status !== "existing"), [spliceRows]);
   const matrixCompare = useMemo(() => compareLocalMatrices(existingRows, proposedRows), [existingRows, proposedRows]);
+  const continuityCompare = continuityCompareStatus?.result;
   const totalLoss = rows.reduce((sum, splice) => sum + (splice.lossDb || 0), 0);
   const assignedRows = rows.filter((splice) => splice.assignmentId).length;
 
@@ -203,6 +234,30 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
     } catch (error) {
       setMatrixActionStatus({
         action,
+        state: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  async function runContinuityCompare() {
+    setContinuityCompareStatus({ state: "running", message: "Comparing existing and proposed continuity..." });
+    try {
+      const response = await fetch("/api/opgw/continuity/compare-existing-proposed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ splicePointId: selectedPointId }),
+      });
+      const details = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof details?.error === "string" ? details.error : "Continuity compare failed");
+      const result = details as ContinuityCompareResponse;
+      setContinuityCompareStatus({
+        state: "complete",
+        message: result.warning || "Synthetic existing/proposed continuity compare is ready.",
+        result,
+      });
+    } catch (error) {
+      setContinuityCompareStatus({
         state: "error",
         message: error instanceof Error ? error.message : String(error),
       });
@@ -395,6 +450,44 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
               <span>Compare view is synthetic and does not alter existing splice records.</span>
               {matrixCompare.addedPreview.map((row) => <span key={row.id}>Proposed: {row.fromCableId}:{row.fromStrandNumber} to {row.toCableId}:{row.toStrandNumber}</span>)}
             </div>
+            <div className="splice-compare-actions">
+              <button type="button" onClick={runContinuityCompare} disabled={continuityCompareStatus?.state === "running"}>
+                <GitCompareArrows size={15} />
+                {continuityCompareStatus?.state === "running" ? "Comparing continuity..." : "Preview continuity compare"}
+              </button>
+              <Link href={`/fiber-trace?splicePoint=${encodeURIComponent(selectedPointId)}&layer=compare`}>Open compare trace</Link>
+              <Link href={`/dashboard?drawer=layers&splicePoint=${encodeURIComponent(selectedPointId)}`}>Highlight splice point</Link>
+            </div>
+            {continuityCompareStatus ? (
+              <div className={`splice-action-result ${continuityCompareStatus.state}`}>
+                <strong>Continuity compare</strong>
+                <span>{continuityCompareStatus.message}</span>
+              </div>
+            ) : null}
+            {continuityCompare ? (
+              <div className="continuity-compare-preview">
+                <div className="splice-compare-grid">
+                  <SummaryCard label="Existing services" value={String(continuityCompare.existingServiceCount)} />
+                  <SummaryCard label="Proposed services" value={String(continuityCompare.proposedServiceCount)} />
+                  <SummaryCard label="API proposed rows" value={String(continuityCompare.matrixComparison?.proposedConnectionCount || 0)} />
+                  <SummaryCard label="API added rows" value={String(continuityCompare.matrixComparison?.addedInProposed.length || 0)} />
+                  <SummaryCard label="Existing unmatched" value={String(continuityCompare.matrixComparison?.existingWithoutProposedMatch.length || 0)} />
+                  <SummaryCard label="Affected services" value={String(continuityCompare.matrixComparison?.affectedServices.length || 0)} />
+                </div>
+                <div className="continuity-compare-diff">
+                  <CompareDiffList label="Proposed only services" values={continuityCompare.diffSummary?.proposedOnlyServices} />
+                  <CompareDiffList label="Existing only services" values={continuityCompare.diffSummary?.existingOnlyServices} />
+                  <CompareDiffList label="Existing broken paths" values={continuityCompare.diffSummary?.existingBrokenPaths} />
+                  <CompareDiffList label="Proposed broken paths" values={continuityCompare.diffSummary?.proposedBrokenPaths} />
+                  <CompareDiffList label="Existing warnings" values={continuityCompare.diffSummary?.existingWarnings} />
+                  <CompareDiffList label="Proposed warnings" values={continuityCompare.diffSummary?.proposedWarnings} />
+                </div>
+                <div className="continuity-compare-columns">
+                  <ContinuityCompareColumn title="Existing continuity" paths={continuityCompare.existingPaths} />
+                  <ContinuityCompareColumn title="Proposed continuity" paths={continuityCompare.proposedPaths} />
+                </div>
+              </div>
+            ) : null}
           </Panel>
 
           <Panel title="Fiber Continuity View" icon={<Route size={17} />}>
@@ -573,6 +666,55 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function CompareDiffList({ label, values }: { label: string; values: string[] | undefined }) {
+  const items = values?.filter(Boolean).slice(0, 8) || [];
+  return (
+    <article className="continuity-compare-diff-card">
+      <strong>{label}</strong>
+      {items.length ? (
+        <div>
+          {items.map((value) => <span key={value}>{value}</span>)}
+        </div>
+      ) : (
+        <em>No differences found</em>
+      )}
+    </article>
+  );
+}
+
+function ContinuityCompareColumn({ title, paths }: { title: string; paths: FiberContinuityPath[] }) {
+  return (
+    <section className="continuity-compare-column">
+      <h3>{title}</h3>
+      {paths.length ? paths.slice(0, 6).map((path) => (
+        <article className={`continuity-card ${path.pathStatus}`} key={`${title}-${path.continuityPathId}`}>
+          <div>
+            <strong>{path.serviceId}</strong>
+            <span>{path.endpointASiteId} to {path.endpointZSiteId}</span>
+          </div>
+          <dl>
+            <div><dt>Status</dt><dd><StatusPill value={path.pathStatus} /></dd></div>
+            <div><dt>Sections</dt><dd>{path.totalCableSections}</dd></div>
+            <div><dt>Splices</dt><dd>{path.totalSplicePoints}</dd></div>
+            <div><dt>Loss</dt><dd>{path.totalEstimatedLossDb.toFixed(2)} dB</dd></div>
+          </dl>
+          <div className="splice-inline-links">
+            <Link href={`/fiber-trace?service=${encodeURIComponent(path.serviceId)}`}>Trace</Link>
+            <Link href={`/dashboard?drawer=layers&service=${encodeURIComponent(path.serviceId)}`}>Map</Link>
+          </div>
+          {path.warningSummary.length ? (
+            <div className="splice-warning-list">
+              {path.warningSummary.slice(0, 4).map((warning) => <span key={warning}>{warning}</span>)}
+            </div>
+          ) : null}
+        </article>
+      )) : (
+        <p className="splice-side-note">No synthetic services matched this layer for the selected splice point.</p>
+      )}
+    </section>
   );
 }
 
