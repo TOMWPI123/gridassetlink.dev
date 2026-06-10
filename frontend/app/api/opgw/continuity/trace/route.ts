@@ -9,7 +9,7 @@ export async function POST(request: Request) {
 
   const selectedSplicePointId = resolveSelectedSplicePointIdForTrace(body, data);
 
-  if (normalizedServiceId && !body.assignmentId && !body.strandId && !body.cableSectionId && !body.spliceClosureId && !body.layerType) {
+  if (normalizedServiceId && !body.assignmentId && !body.strandId && !body.cableSectionId && !body.spliceConnectionId && !body.spliceClosureId && !body.layerType) {
     const service = data.syntheticServices.find((item) => item.serviceId === normalizedServiceId);
     if (!service) return NextResponse.json({ error: "Synthetic service not found" }, { status: 404 });
     return NextResponse.json(traceSyntheticService(service, data, selectedSplicePointId));
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   if (!services.length) {
     return NextResponse.json({
       error: "No synthetic services matched the requested continuity trace input",
-      acceptedInputs: ["serviceId", "assignmentId", "strandId", "cableSectionId", "splicePointId", "spliceClosureId", "layerType"],
+      acceptedInputs: ["serviceId", "assignmentId", "strandId", "cableSectionId", "spliceConnectionId", "splicePointId", "spliceClosureId", "layerType"],
       syntheticFlag: true,
     }, { status: 404 });
   }

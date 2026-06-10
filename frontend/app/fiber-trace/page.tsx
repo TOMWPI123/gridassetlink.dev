@@ -26,12 +26,13 @@ export default async function Page({ searchParams }: PageProps) {
   const assignmentId = firstQueryValue(params?.assignment) || firstQueryValue(params?.assignmentId);
   const strandId = firstQueryValue(params?.strand) || firstQueryValue(params?.strandId);
   const cableSectionId = firstQueryValue(params?.cableSection) || firstQueryValue(params?.cableSectionId);
+  const spliceConnectionId = firstQueryValue(params?.spliceConnection) || firstQueryValue(params?.spliceConnectionId);
   const cableId = firstQueryValue(params?.cable) || firstQueryValue(params?.cableId);
   const layerType = normalizeLayerType(firstQueryValue(params?.layer) || firstQueryValue(params?.layerType));
   const spliceTargetId = splicePointId || spliceClosureId;
-  const genericTraceInput: ContinuityTraceInput = { assignmentId, strandId, cableSectionId, layerType };
+  const genericTraceInput: ContinuityTraceInput = { assignmentId, strandId, cableSectionId, spliceConnectionId, layerType };
 
-  if (!spliceTargetId && !serviceId && !assignmentId && !strandId && !cableSectionId && !cableId) return <LegacyCircuitFiberTracePage />;
+  if (!spliceTargetId && !serviceId && !assignmentId && !strandId && !cableSectionId && !spliceConnectionId && !cableId) return <LegacyCircuitFiberTracePage />;
 
   const data = await loadSyntheticFiberContinuityData();
 
@@ -83,7 +84,7 @@ export default async function Page({ searchParams }: PageProps) {
     );
   }
 
-  if (assignmentId || strandId || cableSectionId) {
+  if (assignmentId || strandId || cableSectionId || spliceConnectionId) {
     const services = resolveContinuityTraceServices(genericTraceInput, data);
     if (!services.length) notFound();
     const selectedSplicePointId = resolveSelectedSplicePointIdForTrace(genericTraceInput, data);
@@ -92,7 +93,11 @@ export default async function Page({ searchParams }: PageProps) {
       ? `assignment ${assignmentId}`
       : strandId
         ? `strand ${strandId}`
-        : `cable section ${cableSectionId}`;
+        : cableSectionId
+          ? `cable section ${cableSectionId}`
+          : `splice connection ${spliceConnectionId}`;
+    const traceInputLabel = assignmentId ? "Assignment" : strandId ? "Strand" : cableSectionId ? "Cable section" : "Splice connection";
+    const targetValue = assignmentId || strandId || cableSectionId || spliceConnectionId || "-";
     return (
       <OpgwFiberTraceView
         title={`Fiber Continuity for ${targetLabel}`}
@@ -101,16 +106,19 @@ export default async function Page({ searchParams }: PageProps) {
         paths={paths}
         warnings={unique(paths.flatMap((path) => path.warningSummary))}
         contextRows={[
-          ["Trace input", assignmentId ? "Assignment" : strandId ? "Strand" : "Cable section"],
-          ["Target", assignmentId || strandId || cableSectionId || "-"],
+          ["Trace input", traceInputLabel],
+          ["Target", targetValue],
           ["Layer", layerType || "compare"],
           ["Matched services", String(services.length)],
           ["Path count", String(paths.length)],
           ["Synthetic source", "demo continuity resolver"],
         ]}
-        mapHref={cableSectionId
+        mapHref={selectedSplicePointId
+          ? `/dashboard?drawer=layers&splicePoint=${encodeURIComponent(selectedSplicePointId)}`
+          : cableSectionId
           ? `/dashboard?drawer=layers&cableSection=${encodeURIComponent(cableSectionId)}`
           : `/dashboard?drawer=layers&service=${encodeURIComponent(services[0].serviceId)}`}
+        managerHref={selectedSplicePointId ? `/opgw/splices/${encodeURIComponent(selectedSplicePointId)}` : undefined}
       />
     );
   }

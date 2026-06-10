@@ -421,9 +421,8 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
                         <td>{splice.notes || "Synthetic splice row."}</td>
                         <td>
                           <div className="splice-row-actions">
-                            {carriedService
-                              ? <Link href={`/fiber-trace?service=${encodeURIComponent(carriedService.serviceId)}`}>Trace</Link>
-                              : <Link href={`/fiber-trace?splicePoint=${encodeURIComponent(selectedPointId)}`}>Trace point</Link>}
+                            <Link href={`/fiber-trace?spliceConnection=${encodeURIComponent(splice.id)}`}>Trace connection</Link>
+                            {carriedService ? <Link href={`/fiber-trace?service=${encodeURIComponent(carriedService.serviceId)}`}>Trace service</Link> : null}
                             {splice.status === "existing"
                               ? <span className="splice-readonly">read-only</span>
                               : <button className="splice-icon-button" type="button" onClick={() => deleteProposedSplice(splice.id)} aria-label={`Delete ${splice.id}`}><Trash2 size={14} /></button>}

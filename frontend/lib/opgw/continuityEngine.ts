@@ -232,6 +232,7 @@ export type ContinuityTraceInput = {
   assignmentId?: string;
   strandId?: string;
   cableSectionId?: string;
+  spliceConnectionId?: string;
   splicePointId?: string;
   spliceClosureId?: string;
   layerType?: ContinuityTraceLayerType;
@@ -265,6 +266,24 @@ export function resolveContinuityTraceServices(input: ContinuityTraceInput, data
     const section = data.opgwCableSections.find((item) => item.properties.cableSectionId === cableSectionId);
     if (section) addServicesForTraceCableSection(section.properties.opgwRouteId, data, matched);
   }
+  if (input.spliceConnectionId) {
+    const spliceConnectionId = decodeURIComponent(input.spliceConnectionId);
+    const spliceConnection = data.fiberSplices.find((splice) => splice.id === spliceConnectionId);
+    if (spliceConnection) {
+      if (spliceConnection.assignmentId) {
+        data.syntheticServices
+          .filter((service) => service.primaryPathAssignmentId === spliceConnection.assignmentId || service.backupPathAssignmentId === spliceConnection.assignmentId)
+          .forEach(add);
+      }
+      data.syntheticServices
+        .filter((service) => {
+          if (service.continuitySpliceClosureIds?.includes(spliceConnection.spliceClosureId)) return true;
+          if (service.continuityCableIds?.includes(spliceConnection.fromCableId) || service.continuityCableIds?.includes(spliceConnection.toCableId)) return true;
+          return false;
+        })
+        .forEach(add);
+    }
+  }
   if (input.splicePointId) buildSpliceManagerView(input.splicePointId, data)?.services.forEach(add);
   if (input.spliceClosureId) buildSpliceManagerView(input.spliceClosureId, data)?.services.forEach(add);
 
@@ -274,6 +293,11 @@ export function resolveContinuityTraceServices(input: ContinuityTraceInput, data
 export function resolveSelectedSplicePointIdForTrace(input: ContinuityTraceInput, data: FiberContinuityData) {
   if (input.splicePointId) return buildSpliceManagerView(input.splicePointId, data)?.header.splicePointId || decodeURIComponent(input.splicePointId);
   if (input.spliceClosureId) return buildSpliceManagerView(input.spliceClosureId, data)?.header.splicePointId;
+  if (input.spliceConnectionId) {
+    const spliceConnectionId = decodeURIComponent(input.spliceConnectionId);
+    const spliceConnection = data.fiberSplices.find((splice) => splice.id === spliceConnectionId);
+    if (spliceConnection) return buildSpliceManagerView(spliceConnection.spliceClosureId, data)?.header.splicePointId;
+  }
   return undefined;
 }
 

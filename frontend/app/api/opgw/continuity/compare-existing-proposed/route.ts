@@ -8,16 +8,17 @@ export async function POST(request: Request) {
   if (!hasCompareInput(payload)) {
     return NextResponse.json({
       error: "At least one compare input is required",
-      acceptedInputs: ["serviceId", "assignmentId", "strandId", "cableSectionId", "splicePointId", "spliceClosureId"],
+      acceptedInputs: ["serviceId", "assignmentId", "strandId", "cableSectionId", "spliceConnectionId", "splicePointId", "spliceClosureId"],
       syntheticFlag: true,
     }, { status: 400 });
   }
 
   const data = await loadSyntheticFiberContinuityData();
-  const matrixComparison = payload.splicePointId || payload.spliceClosureId
-    ? compareExistingProposed(payload.splicePointId || payload.spliceClosureId || "", data)
-    : null;
   const selectedSplicePointId = resolveSelectedSplicePointIdForTrace(payload, data);
+  const matrixCompareTarget = payload.splicePointId || payload.spliceClosureId || selectedSplicePointId;
+  const matrixComparison = matrixCompareTarget
+    ? compareExistingProposed(matrixCompareTarget, data)
+    : null;
   const existingServices = resolveContinuityTraceServices({ ...payload, layerType: "existing" }, data);
   const proposedServices = resolveContinuityTraceServices({ ...payload, layerType: "proposed" }, data);
 
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
 }
 
 function hasCompareInput(payload: ContinuityTraceInput) {
-  return Boolean(payload.serviceId || payload.assignmentId || payload.strandId || payload.cableSectionId || payload.splicePointId || payload.spliceClosureId);
+  return Boolean(payload.serviceId || payload.assignmentId || payload.strandId || payload.cableSectionId || payload.spliceConnectionId || payload.splicePointId || payload.spliceClosureId);
 }
 
 function unique<T>(values: T[]) {

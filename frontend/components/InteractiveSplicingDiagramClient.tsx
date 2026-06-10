@@ -240,7 +240,7 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
               <nav aria-label="Splice node menu actions">
                 <Link className="primary" href={`/opgw/splices/${encodeURIComponent(selectedPointId)}/diagram`}>Interactive Splicing Diagram</Link>
                 <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}`}>Open Splice Manager</Link>
-                <Link href={`/fiber-trace?splicePoint=${encodeURIComponent(selectedPointId)}`}>View Fiber Continuity</Link>
+                <Link href={`/fiber-trace?spliceConnection=${encodeURIComponent(selectedSplice.id)}`}>View Fiber Continuity</Link>
                 <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}?layer=existing`}>View Existing Splices</Link>
                 <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}?layer=proposed`}>View Proposed Splices</Link>
                 <Link href={`/outage-impact?splicePoint=${encodeURIComponent(selectedPointId)}`}>Analyze Outage Impact</Link>
@@ -268,6 +268,7 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
                   <button type="button" onClick={validateDiagram}>Validate continuity</button>
                   <button type="button" onClick={deleteSelectedProposed} disabled={selectedSplice.status === "existing"}><Trash2 size={14} />Delete proposed</button>
                   <button type="button" onClick={() => setNodeMenuOpen(true)}>Open node menu</button>
+                  <Link href={`/fiber-trace?spliceConnection=${encodeURIComponent(selectedSplice.id)}`}>Trace selected connection</Link>
                 </div>
               </>
             ) : (
