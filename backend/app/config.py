@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     database_url: str = default_database_url()
     secret_key: str = "change-this-local-development-secret"
     access_token_expire_minutes: int = 720
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,https://gridassetlink.dev,https://www.gridassetlink.dev"
     auto_seed: bool = True
     allow_admin_write_sql: bool = False
 

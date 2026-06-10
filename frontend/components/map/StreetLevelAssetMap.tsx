@@ -81,6 +81,7 @@ type StreetLevelAssetMapProps = {
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
+  gisApiBase: string;
   activeTool: MapDrawingTool;
   placementHint?: string;
   command: MapCommand | null;
@@ -126,6 +127,7 @@ export function StreetLevelAssetMap({
   patchPanels,
   planningRegions,
   layers,
+  gisApiBase,
   activeTool,
   placementHint,
   command,
@@ -139,6 +141,7 @@ export function StreetLevelAssetMap({
     <section className="street-map-panel street-map-panel-fullscreen" aria-label="Street-level asset map">
       <div className={`street-map-canvas-shell tool-${activeTool}`}>
         <MapLibreStreetMap
+          key={gisApiBase}
           activeMap={activeMap}
           substations={substations}
           nodes={nodes}
@@ -168,6 +171,7 @@ export function StreetLevelAssetMap({
           patchPanels={patchPanels}
           planningRegions={planningRegions}
           layers={layers}
+          gisApiBase={gisApiBase}
           activeTool={activeTool}
           command={command}
           focusRequest={focusRequest}

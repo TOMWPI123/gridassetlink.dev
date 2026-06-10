@@ -107,6 +107,12 @@ def gis_capabilities() -> dict[str, Any]:
         "postgis_configured": is_postgis_engine(engine),
         "vector_tile_endpoint": "/api/tiles/{layer}/{z}/{x}/{y}.mvt",
         "layers": supported_layers(),
+        "local_bridge": {
+            "supported": True,
+            "default_local_api_url": "http://127.0.0.1:8000",
+            "browser_usage": "The hosted frontend can read synthetic GIS tiles/search/details from a locally running API when CORS allows https://gridassetlink.dev.",
+            "upload_boundary": "The 10M PostGIS database is not uploaded through the browser; use a local API bridge or a managed production PostGIS DATABASE_URL.",
+        },
         "level_of_detail": {
             "zoom_0_7": "territory boundary, summaries, major corridors; no individual poles",
             "zoom_8_10": "precomputed density tiles and regional route summaries",

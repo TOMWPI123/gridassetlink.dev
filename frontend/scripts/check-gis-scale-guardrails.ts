@@ -41,7 +41,7 @@ if (!map.includes("/api/tiles/") || !map.includes("gis-pole-density") || !map.in
 }
 
 for (const layer of requiredVectorTileLayers) {
-  if (!map.includes(`vectorTileUrl("${layer}")`)) {
+  if (!map.includes(`vectorTileUrl("${layer}"`)) {
     errors.push(`MapLibreStreetMap must source ${layer} from /api/tiles/${layer}/{z}/{x}/{y}.mvt.`);
   }
 }

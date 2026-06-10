@@ -11,7 +11,7 @@ import { seedEditableSubstations } from "@/data/substations";
 import { seedPlanningRegions, seedTransmissionLines } from "@/data/transmissionLines";
 import { seedTransmissionMaps } from "@/data/transmissionMaps";
 import { traceSyntheticService } from "@/lib/opgw/continuityEngine";
-import { API_BASE, apiFetch } from "@/lib/api";
+import { API_BASE, LOCAL_GIS_API_BASE, clearStoredGisApiBase, fetchFromApiBase, getStoredGisApiBase, normalizeApiBase, saveGisApiBase } from "@/lib/api";
 import { buildSyntheticOpgwEngineeringModel } from "@/lib/opgw/spanModel";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 import { LinkedAssetDetailPanel } from "@/components/map/LinkedAssetDetailPanel";
@@ -293,6 +293,11 @@ export function DashboardPage() {
   const [distributionFiberAssignments, setDistributionFiberAssignments] = useState<DistributionFiberAssignmentFeature[]>([]);
   const [mapDataWarnings, setMapDataWarnings] = useState<Record<string, string>>({});
   const [serverGisSearchResults, setServerGisSearchResults] = useState<StreetMapSelection[]>([]);
+  const [gisApiBase, setGisApiBase] = useState(API_BASE);
+
+  useEffect(() => {
+    setGisApiBase(getStoredGisApiBase());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -443,7 +448,7 @@ export function DashboardPage() {
     async function loadServerSearch() {
       try {
         const responses = await Promise.all(searchTypes.map(async (type) => {
-          const url = `${API_BASE.replace(/\/$/, "")}/api/search?type=${encodeURIComponent(type)}&q=${encodeURIComponent(query)}&limit=8`;
+          const url = `${normalizeApiBase(gisApiBase).replace(/\/$/, "")}/api/search?type=${encodeURIComponent(type)}&q=${encodeURIComponent(query)}&limit=8`;
           const response = await fetch(url, { cache: "no-store", signal: controller.signal });
           if (!response.ok) return [];
           const payload = await response.json() as { results?: Array<Record<string, unknown>>; postgis_configured?: boolean };
@@ -457,7 +462,7 @@ export function DashboardPage() {
     }
     void loadServerSearch();
     return () => controller.abort();
-  }, [search, searchLayerFilter]);
+  }, [gisApiBase, search, searchLayerFilter]);
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
@@ -1023,6 +1028,20 @@ export function DashboardPage() {
 
   function handleStreetLayerChange(layer: StreetMapLayerKey, enabled: boolean) {
     setStreetLayers((current) => ({ ...current, [layer]: enabled }));
+  }
+
+  function handleGisApiBaseChange(value: string) {
+    const nextBase = saveGisApiBase(value);
+    setGisApiBase(nextBase);
+    setServerGisSearchResults([]);
+    showToast(nextBase === API_BASE ? "Using the website GIS backend." : `Using GIS source ${nextBase}.`);
+  }
+
+  function handleResetGisApiBase() {
+    const nextBase = clearStoredGisApiBase();
+    setGisApiBase(nextBase);
+    setServerGisSearchResults([]);
+    showToast("Using the website GIS backend.");
   }
 
   function enableGisScaleLayers() {
@@ -1621,6 +1640,7 @@ export function DashboardPage() {
         patchPanels={visiblePatchPanels}
         planningRegions={visiblePlanningRegions}
         layers={streetLayers}
+        gisApiBase={gisApiBase}
         activeTool={activeTool}
         placementHint={placementHint}
         command={mapCommand}
@@ -1821,7 +1841,14 @@ export function DashboardPage() {
                   ) : null}
                 </div>
               ) : null}
-              {rightMode === "scale" ? <GisScaleControlPanel onEnableGisLayers={enableGisScaleLayers} /> : null}
+              {rightMode === "scale" ? (
+                <GisScaleControlPanel
+                  gisApiBase={gisApiBase}
+                  onGisApiBaseChange={handleGisApiBaseChange}
+                  onResetGisApiBase={handleResetGisApiBase}
+                  onEnableGisLayers={enableGisScaleLayers}
+                />
+              ) : null}
               {rightMode === "sources" ? <DashboardDataSourcesPanel /> : null}
               {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} onClose={handleCloseAssetDetail} /> : null}
               {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} onUpdateStrands={updateFiberStrands} /> : null}
@@ -2170,10 +2197,21 @@ type GisScalePreflightPayload = {
   warnings?: string[];
 };
 
-function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => void }) {
+function GisScaleControlPanel({
+  gisApiBase,
+  onGisApiBaseChange,
+  onResetGisApiBase,
+  onEnableGisLayers,
+}: {
+  gisApiBase: string;
+  onGisApiBaseChange: (value: string) => void;
+  onResetGisApiBase: () => void;
+  onEnableGisLayers: () => void;
+}) {
   const [health, setHealth] = useState<GisScaleHealthPayload | null>(null);
   const [territories, setTerritories] = useState<GisScaleTerritory[]>([]);
   const [selectedTerritoryId, setSelectedTerritoryId] = useState("");
+  const [gisApiBaseDraft, setGisApiBaseDraft] = useState(gisApiBase);
   const [territoryName, setTerritoryName] = useState("Synthetic service territory");
   const [territoryText, setTerritoryText] = useState("");
   const [roadText, setRoadText] = useState("");
@@ -2184,6 +2222,8 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
   const [job, setJob] = useState<GisScaleJob | null>(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const normalizedGisApiBase = normalizeApiBase(gisApiBase);
+  const usingWebsiteBackend = normalizedGisApiBase === normalizeApiBase(API_BASE);
 
   const selectedTerritory = territories.find((territory) => String(territory.id) === selectedTerritoryId) || health?.territories?.find((territory) => String(territory.id) === selectedTerritoryId);
   const postgisReady = Boolean(health?.postgis_configured);
@@ -2209,12 +2249,16 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
     ["Mux sites", tableEstimateMap.get("mux_sites") || 0],
   ];
 
+  useEffect(() => {
+    setGisApiBaseDraft(gisApiBase);
+  }, [gisApiBase]);
+
   const loadHealth = useCallback(async () => {
     setBusy("Loading GIS scale health");
     try {
       const [healthPayload, territoryPayload] = await Promise.all([
-        apiFetch<GisScaleHealthPayload>("/api/gis/scale-health"),
-        apiFetch<{ territories?: GisScaleTerritory[]; postgis_configured?: boolean }>("/api/service-territories"),
+        fetchFromApiBase<GisScaleHealthPayload>(gisApiBase, "/api/gis/scale-health"),
+        fetchFromApiBase<{ territories?: GisScaleTerritory[]; postgis_configured?: boolean }>(gisApiBase, "/api/service-territories"),
       ]);
       const nextTerritories = territoryPayload.territories || healthPayload.territories || [];
       setHealth(healthPayload);
@@ -2225,13 +2269,13 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
         setJobKey(recentJob.job_key);
         setJob(recentJob);
       }
-      setMessage(healthPayload.postgis_configured ? "PostGIS scale services are reachable." : "PostGIS is not configured for this runtime; controls will show safe fallback responses.");
+      setMessage(healthPayload.postgis_configured ? `PostGIS scale services are reachable from ${normalizeApiBase(gisApiBase)}.` : "PostGIS is not configured for this runtime; controls will show safe fallback responses.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(`Could not reach ${normalizeApiBase(gisApiBase)}. ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setBusy("");
     }
-  }, [jobKey, selectedTerritoryId]);
+  }, [gisApiBase, jobKey, selectedTerritoryId]);
 
   useEffect(() => {
     void loadHealth();
@@ -2250,7 +2294,7 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
   async function importTerritory(sourceType: "uploaded_geojson" | "manual_drawn_polygon") {
     setBusy("Importing service territory");
     try {
-      const payload = await apiFetch<{ territory?: GisScaleTerritory; postgis_configured?: boolean }>("/api/service-territories/import-geojson", {
+      const payload = await fetchFromApiBase<{ territory?: GisScaleTerritory; postgis_configured?: boolean }>(gisApiBase, "/api/service-territories/import-geojson", {
         method: "POST",
         body: JSON.stringify({
           name: territoryName || "Synthetic service territory",
@@ -2280,7 +2324,7 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
     }
     setBusy("Importing road centerlines");
     try {
-      const payload = await apiFetch<{ imported_or_updated?: number; excluded?: number; postgis_configured?: boolean }>("/api/road-centerlines/import-geojson", {
+      const payload = await fetchFromApiBase<{ imported_or_updated?: number; excluded?: number; postgis_configured?: boolean }>(gisApiBase, "/api/road-centerlines/import-geojson", {
         method: "POST",
         body: JSON.stringify({
           service_territory_id: Number(selectedTerritoryId),
@@ -2306,7 +2350,7 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
     }
     setBusy("Running generation preflight");
     try {
-      const payload = await apiFetch<GisScalePreflightPayload>(`/api/service-territories/${selectedTerritoryId}/generation-preflight?target_pole_count=${targetPoleCount}&batch_size=${batchSize}&density_profile=auto`);
+      const payload = await fetchFromApiBase<GisScalePreflightPayload>(gisApiBase, `/api/service-territories/${selectedTerritoryId}/generation-preflight?target_pole_count=${targetPoleCount}&batch_size=${batchSize}&density_profile=auto`);
       setPreflight(payload);
       setMessage(payload.preflight ? `Preflight ${payload.preflight.status}: estimated ${formatCompactCount(payload.preflight.estimated_poles || 0)} poles.` : "Preflight requires PostGIS and imported road centerlines.");
     } catch (error) {
@@ -2323,7 +2367,7 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
     }
     setBusy("Queueing background generation");
     try {
-      const payload = await apiFetch<{ job?: GisScaleJob; postgis_configured?: boolean }>(`/api/service-territories/${selectedTerritoryId}/generate-synthetic-assets`, {
+      const payload = await fetchFromApiBase<{ job?: GisScaleJob; postgis_configured?: boolean }>(gisApiBase, `/api/service-territories/${selectedTerritoryId}/generate-synthetic-assets`, {
         method: "POST",
         body: JSON.stringify({
           seed: "gridassetlink-dashboard-v1",
@@ -2356,7 +2400,7 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
     }
     setBusy("Refreshing job status");
     try {
-      const payload = await apiFetch<{ job?: GisScaleJob; postgis_configured?: boolean }>(`/api/generation-jobs/${encodeURIComponent(jobKey.trim())}`);
+      const payload = await fetchFromApiBase<{ job?: GisScaleJob; postgis_configured?: boolean }>(gisApiBase, `/api/generation-jobs/${encodeURIComponent(jobKey.trim())}`);
       if (payload.job) {
         setJob(payload.job);
         setMessage(`Job ${payload.job.job_key || jobKey} is ${payload.job.job_status || "unknown"}.`);
@@ -2385,6 +2429,26 @@ function GisScaleControlPanel({ onEnableGisLayers }: { onEnableGisLayers: () => 
       <div className="dashboard-source-boundary">
         <p>Do not load raw pole inventories in the browser. This panel imports boundaries/road references, queues generation, and shows summary/job state only.</p>
         <p>Generated poles, spans, strand, splice, slack, handhole, mux, circuit, and fiber records are synthetic until explicitly imported and marked verified.</p>
+      </div>
+
+      <div className="dashboard-gis-section">
+        <div className="dashboard-gis-section-title">Local computer GIS source</div>
+        <article className="dashboard-gis-card">
+          <strong>{usingWebsiteBackend ? "Website backend" : "Local computer bridge"}</strong>
+          <span>{normalizedGisApiBase}</span>
+          <span>{usingWebsiteBackend ? "Production backend fallback. Configure managed PostGIS for hosted data." : "Live gridassetlink.dev is reading GIS tiles, search, and details from this computer."}</span>
+        </article>
+        <label className="dashboard-gis-field">
+          <span>GIS API URL</span>
+          <input value={gisApiBaseDraft} onChange={(event) => setGisApiBaseDraft(event.currentTarget.value)} placeholder={LOCAL_GIS_API_BASE} />
+        </label>
+        <div className="dashboard-gis-actions">
+          <button type="button" onClick={() => onGisApiBaseChange(gisApiBaseDraft)} disabled={Boolean(busy)}>Use this source</button>
+          <button type="button" onClick={() => onGisApiBaseChange(LOCAL_GIS_API_BASE)} disabled={Boolean(busy)}>Connect local 10M API</button>
+          <button type="button" onClick={onResetGisApiBase} disabled={Boolean(busy)}>Use website backend</button>
+          <button type="button" onClick={loadHealth} disabled={Boolean(busy)}>Test connection</button>
+        </div>
+        <p className="dashboard-gis-message">For local import, keep the FastAPI backend running on your computer with the 10M PostGIS database. The live site calls that local API from your browser; it does not upload or copy the database to Vercel.</p>
       </div>
 
       <div className="dashboard-gis-status-grid">

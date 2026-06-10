@@ -3,6 +3,8 @@
 import type { UserSession } from "@/types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "/backend" : "http://localhost:8000");
+export const LOCAL_GIS_API_BASE = "http://127.0.0.1:8000";
+export const GIS_API_BASE_STORAGE_KEY = "gridassetlink-gis-api-base";
 const AUTH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AUTH === "true";
 
 export function getSession(): UserSession | null {
@@ -28,6 +30,63 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
       clearSession();
       headers.delete("Authorization");
       const retry = await fetch(`${API_BASE}${path}`, { ...init, headers, cache: "no-store" });
+      if (!retry.ok) throw new Error(await retry.text());
+      return retry.json() as Promise<T>;
+    }
+    throw new Error(detail);
+  }
+  return response.json() as Promise<T>;
+}
+
+export function normalizeApiBase(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return API_BASE;
+  if (trimmed.startsWith("/")) return trimmed.replace(/\/+$/, "") || "/";
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  try {
+    const url = new URL(candidate);
+    const path = url.pathname.replace(/\/+$/, "");
+    return `${url.origin}${path}`;
+  } catch {
+    return API_BASE;
+  }
+}
+
+export function getStoredGisApiBase(): string {
+  if (typeof window === "undefined") return API_BASE;
+  return normalizeApiBase(window.localStorage.getItem(GIS_API_BASE_STORAGE_KEY) || API_BASE);
+}
+
+export function saveGisApiBase(value: string): string {
+  const normalized = normalizeApiBase(value);
+  if (typeof window !== "undefined") window.localStorage.setItem(GIS_API_BASE_STORAGE_KEY, normalized);
+  return normalized;
+}
+
+export function clearStoredGisApiBase(): string {
+  if (typeof window !== "undefined") window.localStorage.removeItem(GIS_API_BASE_STORAGE_KEY);
+  return API_BASE;
+}
+
+export function buildApiUrl(apiBase: string, path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = normalizeApiBase(apiBase).replace(/\/+$/, "");
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${suffix}`;
+}
+
+export async function fetchFromApiBase<T>(apiBase: string, path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set("Content-Type", headers.get("Content-Type") || "application/json");
+  maybeAttachAuth(headers);
+  const requestUrl = buildApiUrl(apiBase, path);
+  const response = await fetch(requestUrl, { ...init, headers, cache: "no-store" });
+  if (!response.ok) {
+    const detail = await response.text();
+    if (isExpiredTokenResponse(response, detail)) {
+      clearSession();
+      headers.delete("Authorization");
+      const retry = await fetch(requestUrl, { ...init, headers, cache: "no-store" });
       if (!retry.ok) throw new Error(await retry.text());
       return retry.json() as Promise<T>;
     }

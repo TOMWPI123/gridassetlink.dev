@@ -205,6 +205,14 @@ Local 10M synthetic load:
 - The full per-pole graph enrichment is intentionally optional for 10M+ bulk loads; route, span, fiber, splice, slack, handhole, mux, circuit-route, vector tile, search, and click-detail records are still generated and served.
 - These records are synthetic demo/planning data only. They do not represent real utility poles, telecom attachments, fiber routes, circuits, splice points, or operational records.
 
+Live website local GIS bridge:
+
+- Open `https://gridassetlink.dev/dashboard?drawer=scale`.
+- Start the local FastAPI backend against the local 10M PostGIS database, for example with `DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:55432/telecomne_grid_10m`.
+- In the dashboard `Scale` drawer, use `Connect local 10M API` or enter `http://127.0.0.1:8000` as the GIS API URL.
+- The browser will request vector tiles, paginated GIS search, and click-detail records directly from the local API while the app shell remains hosted at `gridassetlink.dev`.
+- This does not upload the 10M database, generated tiles, or the local PostGIS data directory to Vercel. To host the 10M dataset fully in production, configure a managed PostgreSQL/PostGIS `DATABASE_URL` for the deployed backend and load the generated data there.
+
 Tile invalidation:
 
 - Use `POST /api/service-territories/{territory_id}/warm-tile-cache` to pre-render a capped set of service-territory, pole density, pole cluster, simplified span, or route-summary tiles. The default request warms only territory, pole density, and pole cluster layers through z15. Request span or route-summary layers only for zoom ranges that remain aggregate-safe; the warmer rejects raw street-level plans and is intentionally capped so it does not sweep an entire high-zoom territory.

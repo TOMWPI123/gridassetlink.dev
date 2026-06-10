@@ -4,7 +4,7 @@ import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapL
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Coordinate, DistributionFiberAssignmentFeature, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointFeature, DistributionSlackLoopFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { ContinuityHighlight, FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
-import { API_BASE } from "@/lib/api";
+import { normalizeApiBase } from "@/lib/api";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 import { buildClosureToSplicePointId, buildSpliceNodeMetrics } from "@/lib/opgw/continuityEngine";
 
@@ -38,6 +38,7 @@ type MapLibreStreetMapProps = {
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
+  gisApiBase: string;
   activeTool: MapDrawingTool;
   command: MapCommand | null;
   focusRequest: FocusRequest | null;
@@ -177,8 +178,8 @@ const darkRasterStyle: StyleSpecification = {
 
 const emptyCollection: MapFeatureCollection = { type: "FeatureCollection", features: [] };
 
-function vectorTileUrl(layer: string) {
-  return `${API_BASE.replace(/\/$/, "")}/api/tiles/${layer}/{z}/{x}/{y}.mvt`;
+function vectorTileUrl(layer: string, gisApiBase: string) {
+  return `${normalizeApiBase(gisApiBase).replace(/\/$/, "")}/api/tiles/${layer}/{z}/{x}/{y}.mvt`;
 }
 
 export function MapLibreStreetMap({
@@ -211,6 +212,7 @@ export function MapLibreStreetMap({
   patchPanels,
   planningRegions,
   layers,
+  gisApiBase,
   activeTool,
   command,
   focusRequest,
@@ -227,6 +229,7 @@ export function MapLibreStreetMap({
   const onMapClickRef = useRef(onMapClick);
   const onSelectRef = useRef(onSelect);
   const activeToolRef = useRef(activeTool);
+  const gisApiBaseRef = useRef(gisApiBase);
   const lookupRef = useRef<Record<string, StreetMapSelection>>({});
   const [styleReady, setStyleReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -244,8 +247,9 @@ export function MapLibreStreetMap({
     onMapClickRef.current = onMapClick;
     onSelectRef.current = onSelect;
     activeToolRef.current = activeTool;
+    gisApiBaseRef.current = gisApiBase;
     lookupRef.current = lookup;
-  }, [activeTool, lookup, onMapClick, onSelect]);
+  }, [activeTool, gisApiBase, lookup, onMapClick, onSelect]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -277,7 +281,7 @@ export function MapLibreStreetMap({
         if (loadedRef.current) return;
         if (!mapRef.current) return;
         try {
-          addPlanningSourcesAndLayers(map);
+          addPlanningSourcesAndLayers(map, gisApiBase);
         } catch {
           window.setTimeout(initializeMap, 500);
           return;
@@ -329,7 +333,7 @@ export function MapLibreStreetMap({
       popupRef.current = null;
       loadedRef.current = false;
     };
-  }, [onStatusChange]);
+  }, [gisApiBase, onStatusChange]);
 
   useEffect(() => {
     if (!styleReady || !mapRef.current) return;
@@ -431,7 +435,7 @@ export function MapLibreStreetMap({
       warning: "Synthetic telecom planning feature loaded from a vector tile. Full details are fetched only after selection.",
     };
     if (layerId === "gis-pole-points") {
-      const record = await fetchPoleDetailForSelection(id, baseRecord);
+      const record = await fetchPoleDetailForSelection(id, baseRecord, gisApiBaseRef.current);
       onSelectRef.current({ kind: "gis_pole", id, label: id, record });
       popupRef.current
         ?.setLngLat(event.lngLat)
@@ -440,7 +444,7 @@ export function MapLibreStreetMap({
       return;
     }
     const detailType = gisDetailTypeForLayer(layerId);
-    const record = detailType ? await fetchGisAssetDetailForSelection(detailType, id, baseRecord) : baseRecord;
+    const record = detailType ? await fetchGisAssetDetailForSelection(detailType, id, baseRecord, gisApiBaseRef.current) : baseRecord;
     onSelectRef.current({ kind: "gis_vector_asset", id, label: id, record });
     popupRef.current
       ?.setLngLat(event.lngLat)
@@ -497,7 +501,7 @@ export function MapLibreStreetMap({
   );
 }
 
-function addPlanningSourcesAndLayers(map: MapLibreMap) {
+function addPlanningSourcesAndLayers(map: MapLibreMap, gisApiBase: string) {
   map.addSource(sourceIds.regions, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.reference, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.lines, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
@@ -519,7 +523,7 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
       clusterMaxZoom: 8,
     });
   });
-  addGisVectorSourcesAndLayers(map);
+  addGisVectorSourcesAndLayers(map, gisApiBase);
 
   map.addLayer({
     id: "regional-planning-regions-fill",
@@ -1046,16 +1050,16 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
   });
 }
 
-function addGisVectorSourcesAndLayers(map: MapLibreMap) {
-  map.addSource(gisVectorSourceIds.territory, { type: "vector", tiles: [vectorTileUrl("territory")], minzoom: 0, maxzoom: 24 });
-  map.addSource(gisVectorSourceIds.poles, { type: "vector", tiles: [vectorTileUrl("poles")], minzoom: 8, maxzoom: 24, promoteId: "id" });
-  map.addSource(gisVectorSourceIds.spans, { type: "vector", tiles: [vectorTileUrl("spans")], minzoom: 10, maxzoom: 24, promoteId: "id" });
-  map.addSource(gisVectorSourceIds.fiberRoutes, { type: "vector", tiles: [vectorTileUrl("fiber_routes")], minzoom: 8, maxzoom: 24, promoteId: "id" });
-  map.addSource(gisVectorSourceIds.spliceCases, { type: "vector", tiles: [vectorTileUrl("splice_cases")], minzoom: 16, maxzoom: 24, promoteId: "id" });
-  map.addSource(gisVectorSourceIds.handholes, { type: "vector", tiles: [vectorTileUrl("handholes")], minzoom: 16, maxzoom: 24, promoteId: "id" });
-  map.addSource(gisVectorSourceIds.slackLoops, { type: "vector", tiles: [vectorTileUrl("slack_loops")], minzoom: 16, maxzoom: 24, promoteId: "id" });
-  map.addSource(gisVectorSourceIds.muxSites, { type: "vector", tiles: [vectorTileUrl("mux_sites")], minzoom: 14, maxzoom: 24, promoteId: "id" });
-  map.addSource(gisVectorSourceIds.circuitRoutes, { type: "vector", tiles: [vectorTileUrl("circuit_routes")], minzoom: 10, maxzoom: 24, promoteId: "id" });
+function addGisVectorSourcesAndLayers(map: MapLibreMap, gisApiBase: string) {
+  map.addSource(gisVectorSourceIds.territory, { type: "vector", tiles: [vectorTileUrl("territory", gisApiBase)], minzoom: 0, maxzoom: 24 });
+  map.addSource(gisVectorSourceIds.poles, { type: "vector", tiles: [vectorTileUrl("poles", gisApiBase)], minzoom: 8, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.spans, { type: "vector", tiles: [vectorTileUrl("spans", gisApiBase)], minzoom: 10, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.fiberRoutes, { type: "vector", tiles: [vectorTileUrl("fiber_routes", gisApiBase)], minzoom: 8, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.spliceCases, { type: "vector", tiles: [vectorTileUrl("splice_cases", gisApiBase)], minzoom: 16, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.handholes, { type: "vector", tiles: [vectorTileUrl("handholes", gisApiBase)], minzoom: 16, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.slackLoops, { type: "vector", tiles: [vectorTileUrl("slack_loops", gisApiBase)], minzoom: 16, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.muxSites, { type: "vector", tiles: [vectorTileUrl("mux_sites", gisApiBase)], minzoom: 14, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.circuitRoutes, { type: "vector", tiles: [vectorTileUrl("circuit_routes", gisApiBase)], minzoom: 10, maxzoom: 24, promoteId: "id" });
 
   map.addLayer({
     id: "gis-territory-boundary",
@@ -2488,9 +2492,9 @@ function syncGisVectorLayerVisibility(map: MapLibreMap, layers: Record<StreetMap
   });
 }
 
-async function fetchPoleDetailForSelection(poleId: string, fallback: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function fetchPoleDetailForSelection(poleId: string, fallback: Record<string, unknown>, gisApiBase: string): Promise<Record<string, unknown>> {
   try {
-    const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/assets/pole/${encodeURIComponent(poleId)}`, { cache: "no-store" });
+    const response = await fetch(`${normalizeApiBase(gisApiBase).replace(/\/$/, "")}/api/assets/pole/${encodeURIComponent(poleId)}`, { cache: "no-store" });
     if (!response.ok) {
       return { ...fallback, detailStatus: `${response.status} ${response.statusText}` };
     }
@@ -2522,9 +2526,9 @@ function gisDetailTypeForLayer(layerId: string) {
   return types[layerId];
 }
 
-async function fetchGisAssetDetailForSelection(assetType: string, assetId: string, fallback: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function fetchGisAssetDetailForSelection(assetType: string, assetId: string, fallback: Record<string, unknown>, gisApiBase: string): Promise<Record<string, unknown>> {
   try {
-    const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/assets/${encodeURIComponent(assetType)}/${encodeURIComponent(assetId)}`, { cache: "no-store" });
+    const response = await fetch(`${normalizeApiBase(gisApiBase).replace(/\/$/, "")}/api/assets/${encodeURIComponent(assetType)}/${encodeURIComponent(assetId)}`, { cache: "no-store" });
     if (!response.ok) {
       return { ...fallback, detailStatus: `${response.status} ${response.statusText}`, detailType: assetType };
     }
