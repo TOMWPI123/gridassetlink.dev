@@ -3,8 +3,10 @@ import type { FiberContinuityPath, SyntheticService } from "@/lib/types/assets";
 
 export type OpgwOutageImpactTargetType =
   | "service"
+  | "assignment"
   | "splice_point"
   | "splice_closure"
+  | "splice_connection"
   | "cable"
   | "cable_section"
   | "span_segment"
@@ -55,10 +57,7 @@ export function buildOpgwOutageImpactView(
   const services = resolveServicesForOutageTarget(targetType, normalizedId, data);
   if (!services.length) return null;
 
-  const selectedSplicePointId =
-    targetType === "splice_point" || targetType === "splice_closure"
-      ? buildSpliceManagerView(normalizedId, data)?.header.splicePointId
-      : undefined;
+  const selectedSplicePointId = selectedSplicePointIdForOutageTarget(targetType, normalizedId, data);
   const paths = services.map((service) => traceSyntheticService(service, data, selectedSplicePointId));
   const impactedTransmissionLines = unique(paths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId).filter(Boolean) as string[]));
   const impactedCableSections = unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId)));
@@ -117,7 +116,16 @@ function resolveServicesForOutageTarget(targetType: OpgwOutageImpactTargetType, 
   };
 
   if (targetType === "service") add(data.syntheticServices.find((service) => service.serviceId === targetId));
+  if (targetType === "assignment") addServicesForAssignmentId(targetId, data, matched);
   if (targetType === "splice_point" || targetType === "splice_closure") buildSpliceManagerView(targetId, data)?.services.forEach(add);
+  if (targetType === "splice_connection") {
+    const connection = data.fiberSplices.find((splice) => splice.id === targetId);
+    if (connection?.assignmentId) addServicesForAssignmentId(connection.assignmentId, data, matched);
+    if (connection) {
+      buildSpliceManagerView(connection.spliceClosureId, data)?.services.forEach(add);
+      addServicesForCableIds(new Set([connection.fromCableId, connection.toCableId]), data, matched);
+    }
+  }
   if (targetType === "cable") addServicesForCableIds(new Set([targetId]), data, matched);
   if (targetType === "cable_section") {
     const section = data.opgwCableSections.find((item) => item.properties.cableSectionId === targetId);
@@ -140,6 +148,21 @@ function resolveServicesForOutageTarget(targetType: OpgwOutageImpactTargetType, 
   return Array.from(matched.values());
 }
 
+function selectedSplicePointIdForOutageTarget(targetType: OpgwOutageImpactTargetType, targetId: string, data: FiberContinuityData) {
+  if (targetType === "splice_point" || targetType === "splice_closure") return buildSpliceManagerView(targetId, data)?.header.splicePointId;
+  if (targetType === "splice_connection") {
+    const connection = data.fiberSplices.find((splice) => splice.id === targetId);
+    if (connection) return buildSpliceManagerView(connection.spliceClosureId, data)?.header.splicePointId;
+  }
+  return undefined;
+}
+
+function addServicesForAssignmentId(assignmentId: string, data: FiberContinuityData, matched: Map<string, SyntheticService>) {
+  data.syntheticServices
+    .filter((service) => service.primaryPathAssignmentId === assignmentId || service.backupPathAssignmentId === assignmentId)
+    .forEach((service) => matched.set(service.serviceId, service));
+}
+
 function addServicesForRoute(routeId: string, data: FiberContinuityData, matched: Map<string, SyntheticService>) {
   const cableIds = new Set(
     data.opgwCables
@@ -157,11 +180,13 @@ function addServicesForCableIds(cableIds: Set<string>, data: FiberContinuityData
 
 function targetLabelFor(targetType: OpgwOutageImpactTargetType, targetId: string, data: FiberContinuityData) {
   if (targetType === "service") return data.syntheticServices.find((service) => service.serviceId === targetId)?.serviceName || targetId;
+  if (targetType === "assignment") return data.fiberAssignments.find((assignment) => assignment.id === targetId)?.assignmentName || targetId;
   if (targetType === "cable") return data.opgwCables.find((cable) => cable.properties.id === targetId)?.properties.cableName || targetId;
   if (targetType === "cable_section") return data.opgwCableSections.find((section) => section.properties.cableSectionId === targetId)?.properties.cableSectionId || targetId;
   if (targetType === "span_segment") return data.opgwSpanSegments.find((span) => span.properties.spanSegmentId === targetId)?.properties.spanSegmentId || targetId;
   if (targetType === "splice_point") return data.opgwSplicePoints.find((point) => point.properties.splicePointId === targetId)?.properties.structureNumber || targetId;
   if (targetType === "splice_closure") return data.spliceClosures.find((closure) => closure.properties.id === targetId)?.properties.name || targetId;
+  if (targetType === "splice_connection") return data.fiberSplices.find((splice) => splice.id === targetId)?.id || targetId;
   return targetId;
 }
 

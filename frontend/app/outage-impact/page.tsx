@@ -185,8 +185,10 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 function targetFromParams(params?: Record<string, string | string[] | undefined>) {
   const pairs: Array<[OpgwOutageImpactTargetType, string | undefined]> = [
     ["service", firstValue(params?.service) || firstValue(params?.serviceId)],
+    ["assignment", firstValue(params?.assignment) || firstValue(params?.assignmentId)],
     ["splice_point", firstValue(params?.splicePoint) || firstValue(params?.splicePointId)],
     ["splice_closure", firstValue(params?.spliceClosure) || firstValue(params?.spliceClosureId)],
+    ["splice_connection", firstValue(params?.spliceConnection) || firstValue(params?.spliceConnectionId)],
     ["cable", firstValue(params?.cable) || firstValue(params?.cableId)],
     ["cable_section", firstValue(params?.cableSection) || firstValue(params?.cableSectionId)],
     ["span_segment", firstValue(params?.span) || firstValue(params?.spanSegment) || firstValue(params?.spanSegmentId)],

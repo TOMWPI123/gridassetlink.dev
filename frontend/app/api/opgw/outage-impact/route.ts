@@ -16,7 +16,7 @@ async function respondWithOutageImpact(payload: { targetType?: OpgwOutageImpactT
   if (!payload.targetType || !payload.targetId) {
     return NextResponse.json({
       error: "targetType and targetId are required",
-      acceptedTargetTypes: ["service", "splice_point", "splice_closure", "cable", "cable_section", "span_segment", "strand"],
+      acceptedTargetTypes: ["service", "assignment", "splice_point", "splice_closure", "splice_connection", "cable", "cable_section", "span_segment", "strand"],
       syntheticFlag: true,
     }, { status: 400 });
   }
@@ -30,8 +30,10 @@ async function respondWithOutageImpact(payload: { targetType?: OpgwOutageImpactT
 function targetFromSearch(searchParams: URLSearchParams) {
   const pairs: Array<[OpgwOutageImpactTargetType, string | null]> = [
     ["service", searchParams.get("service") || searchParams.get("serviceId")],
+    ["assignment", searchParams.get("assignment") || searchParams.get("assignmentId")],
     ["splice_point", searchParams.get("splicePoint") || searchParams.get("splicePointId")],
     ["splice_closure", searchParams.get("spliceClosure") || searchParams.get("spliceClosureId")],
+    ["splice_connection", searchParams.get("spliceConnection") || searchParams.get("spliceConnectionId")],
     ["cable", searchParams.get("cable") || searchParams.get("cableId")],
     ["cable_section", searchParams.get("cableSection") || searchParams.get("cableSectionId")],
     ["span_segment", searchParams.get("span") || searchParams.get("spanSegment") || searchParams.get("spanSegmentId")],

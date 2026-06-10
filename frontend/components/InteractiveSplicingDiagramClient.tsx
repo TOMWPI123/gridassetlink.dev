@@ -243,7 +243,7 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
                 <Link href={`/fiber-trace?spliceConnection=${encodeURIComponent(selectedSplice.id)}`}>View Fiber Continuity</Link>
                 <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}?layer=existing`}>View Existing Splices</Link>
                 <Link href={`/opgw/splices/${encodeURIComponent(selectedPointId)}?layer=proposed`}>View Proposed Splices</Link>
-                <Link href={`/outage-impact?splicePoint=${encodeURIComponent(selectedPointId)}`}>Analyze Outage Impact</Link>
+                <Link href={`/outage-impact?spliceConnection=${encodeURIComponent(selectedSplice.id)}`}>Analyze Outage Impact</Link>
                 <Link href={`/work-orders/new?splicePoint=${encodeURIComponent(selectedPointId)}`}>Create Work Order</Link>
               </nav>
             </section>
@@ -269,6 +269,7 @@ export function InteractiveSplicingDiagramClient({ view }: InteractiveSplicingDi
                   <button type="button" onClick={deleteSelectedProposed} disabled={selectedSplice.status === "existing"}><Trash2 size={14} />Delete proposed</button>
                   <button type="button" onClick={() => setNodeMenuOpen(true)}>Open node menu</button>
                   <Link href={`/fiber-trace?spliceConnection=${encodeURIComponent(selectedSplice.id)}`}>Trace selected connection</Link>
+                  <Link href={`/outage-impact?spliceConnection=${encodeURIComponent(selectedSplice.id)}`}>Analyze selected outage</Link>
                 </div>
               </>
             ) : (

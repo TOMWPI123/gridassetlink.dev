@@ -422,7 +422,9 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
                         <td>
                           <div className="splice-row-actions">
                             <Link href={`/fiber-trace?spliceConnection=${encodeURIComponent(splice.id)}`}>Trace connection</Link>
+                            <Link href={`/outage-impact?spliceConnection=${encodeURIComponent(splice.id)}`}>Outage impact</Link>
                             {carriedService ? <Link href={`/fiber-trace?service=${encodeURIComponent(carriedService.serviceId)}`}>Trace service</Link> : null}
+                            {splice.assignmentId ? <Link href={`/outage-impact?assignment=${encodeURIComponent(splice.assignmentId)}`}>Assignment impact</Link> : null}
                             {splice.status === "existing"
                               ? <span className="splice-readonly">read-only</span>
                               : <button className="splice-icon-button" type="button" onClick={() => deleteProposedSplice(splice.id)} aria-label={`Delete ${splice.id}`}><Trash2 size={14} /></button>}
