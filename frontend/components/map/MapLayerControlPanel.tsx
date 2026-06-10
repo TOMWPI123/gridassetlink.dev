@@ -27,8 +27,12 @@ type MapLayerControlPanelProps = {
   opgwSpanSegmentCount?: number;
   opgwSplicePointCount?: number;
   patchPanelCount?: number;
+  distributionPoleDensityCount?: number;
   distributionPoleCount?: number;
   distributionPoleFiberRouteCount?: number;
+  distributionSplicePointCount?: number;
+  distributionSlackLoopCount?: number;
+  distributionFiberAssignmentCount?: number;
   estimatedDistributionPoleScale?: number;
   availableStrandCount?: number;
   criticalRidingCircuitCount?: number;
@@ -92,8 +96,12 @@ const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string
   { key: "compareSpliceLayers", label: "Compare Existing vs Proposed", note: "Shows existing and proposed splice layers together for review.", badges: ["Compare"] },
   { key: "spliceClosures", label: "Splice Closures", note: "Synthetic closures at terminal and junction structures.", badges: ["Synthetic", "Splices"] },
   { key: "patchPanels", label: "Patch Panels", note: "Synthetic termination panels at structures and nodes.", badges: ["Synthetic", "Panels"] },
+  { key: "distributionPoleDensity", label: "Distribution Pole Density", note: "Optimized rollups representing millions of synthetic street-path poles without rendering every pole.", badges: ["Synthetic", "Million-scale", "Fast"] },
   { key: "distributionPoles", label: "Distribution Telecom Poles", note: "Synthetic utility-style pole placements following generated street paths; clustered for smooth million-scale viewing.", badges: ["Synthetic", "Telecom", "Clustered"] },
   { key: "distributionFiberRoutes", label: "Distribution Pole Fiber", note: "Synthetic street-following telecom feeder continuity linked into patch panels and OPGW planning records.", badges: ["Telecom", "Continuity"] },
+  { key: "distributionSplicePoints", label: "Distribution Splice Points", note: "Synthetic splice nodes, risers, taps, and branch points placed on generated pole routes.", badges: ["Synthetic", "Splices"] },
+  { key: "distributionSlackLoops", label: "Distribution Slack Loops", note: "Synthetic slack storage and maintenance loops tied to splice or pole positions.", badges: ["Synthetic", "Slack"] },
+  { key: "distributionFiberAssignments", label: "Distribution Fiber Assignments", note: "Synthetic SCADA, automation, telecom backhaul, and spare assignments riding generated pole fiber routes.", badges: ["Synthetic", "Assignments"] },
   { key: "fiberStrandsLayer", label: "Fiber Strands", note: "Strand records belong to cable sections in this engineering view.", badges: ["Strands"] },
   { key: "fiberAssignments", label: "Fiber Assignments", note: "Synthetic service assignments on OPGW cable sections.", badges: ["Assignments"] },
   { key: "availableStrandCapacity", label: "Available Strand Capacity", note: "Capacity coloring from synthetic strand records.", badges: ["Capacity"] },
@@ -125,8 +133,12 @@ export function MapLayerControlPanel({
   opgwSpanSegmentCount = 0,
   opgwSplicePointCount = 0,
   patchPanelCount = 0,
+  distributionPoleDensityCount = 0,
   distributionPoleCount = 0,
   distributionPoleFiberRouteCount = 0,
+  distributionSplicePointCount = 0,
+  distributionSlackLoopCount = 0,
+  distributionFiberAssignmentCount = 0,
   estimatedDistributionPoleScale = 0,
   availableStrandCount = 0,
   criticalRidingCircuitCount = 0,
@@ -172,6 +184,10 @@ export function MapLayerControlPanel({
     fccMicrowaveLinks: fccLinkCount,
     transmissionStructures: structureCount,
     spliceClosures: spliceClosureCount,
+    distributionPoleDensity: distributionPoleDensityCount,
+    distributionSplicePoints: distributionSplicePointCount,
+    distributionSlackLoops: distributionSlackLoopCount,
+    distributionFiberAssignments: distributionFiberAssignmentCount,
   };
   const visibleLineOwnerCount = transmissionLineOwnerCounts.filter(({ owner }) => visibleTransmissionLineOwners[owner] !== false).length;
   const visibleSubstationOwnerCount = substationOwnerCounts.filter(({ owner }) => visibleSubstationOwners[owner] !== false).length;
@@ -304,8 +320,12 @@ export function MapLayerControlPanel({
                     outageImpactCount,
                     openOpgwWorkOrderCount,
                     spanInspectionIssueCount,
+                    distributionPoleDensityCount,
                     distributionPoleCount,
                     distributionPoleFiberRouteCount,
+                    distributionSplicePointCount,
+                    distributionSlackLoopCount,
+                    distributionFiberAssignmentCount,
                   })}</em>
                 </strong>
                 <small>{dataWarningForLayer(layer.key, dataWarnings) || layer.note}</small>
@@ -807,8 +827,12 @@ function opgwCountForLayer(
     structureCount: number;
     spliceClosureCount: number;
     patchPanelCount: number;
+    distributionPoleDensityCount: number;
     distributionPoleCount: number;
     distributionPoleFiberRouteCount: number;
+    distributionSplicePointCount: number;
+    distributionSlackLoopCount: number;
+    distributionFiberAssignmentCount: number;
     availableStrandCount: number;
     criticalRidingCircuitCount: number;
     outageImpactCount: number;
@@ -831,8 +855,12 @@ function opgwCountForLayer(
   if (layer === "compareSpliceLayers") return counts.opgwSplicePointCount;
   if (layer === "spliceClosures") return counts.spliceClosureCount;
   if (layer === "patchPanels") return counts.patchPanelCount;
+  if (layer === "distributionPoleDensity") return counts.distributionPoleDensityCount;
   if (layer === "distributionPoles") return counts.distributionPoleCount;
   if (layer === "distributionFiberRoutes") return counts.distributionPoleFiberRouteCount;
+  if (layer === "distributionSplicePoints") return counts.distributionSplicePointCount;
+  if (layer === "distributionSlackLoops") return counts.distributionSlackLoopCount;
+  if (layer === "distributionFiberAssignments") return counts.distributionFiberAssignmentCount;
   if (layer === "fiberStrandsLayer") return counts.availableStrandCount;
   if (layer === "fiberAssignments") return counts.criticalRidingCircuitCount;
   if (layer === "availableStrandCapacity") return counts.availableStrandCount;
@@ -849,8 +877,12 @@ function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string,
   if (layer === "fccUtilityTowers") return warnings?.fccUtilityTowers;
   if (layer === "fccMicrowaveLinks") return warnings?.fccMicrowaveLinks;
   if (layer === "transmissionStructures") return warnings?.structures;
+  if (layer === "distributionPoleDensity") return warnings?.distributionPoleDensity;
   if (layer === "distributionPoles") return warnings?.distributionPoles;
   if (layer === "distributionFiberRoutes") return warnings?.distributionPoleFiberRoutes;
+  if (layer === "distributionSplicePoints") return warnings?.distributionSplicePoints;
+  if (layer === "distributionSlackLoops") return warnings?.distributionSlackLoops;
+  if (layer === "distributionFiberAssignments") return warnings?.distributionFiberAssignments;
   if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "existingFiberSplices" || layer === "proposedFiberSplices" || layer === "compareSpliceLayers" || layer === "fiberStrandsLayer" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments || warnings?.syntheticServices;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   if (layer === "patchPanels") return warnings?.patchPanels;

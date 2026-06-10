@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, DistributionPoleFeature, DistributionPoleFiberRouteFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DistributionFiberAssignmentFeature, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointFeature, DistributionSlackLoopFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+
+export type GisVectorAssetRecord = Record<string, unknown>;
 
 export type StreetMapSelection =
   | { kind: "substation"; id: string; label: string; record: Substation }
@@ -21,8 +23,14 @@ export type StreetMapSelection =
   | { kind: "opgw_splice_point"; id: string; label: string; record: OpgwSplicePointFeature }
   | { kind: "splice_closure"; id: string; label: string; record: SpliceClosureFeature }
   | { kind: "fiber_assignment"; id: string; label: string; record: FiberAssignment }
+  | { kind: "distribution_pole_density"; id: string; label: string; record: DistributionPoleDensityFeature }
   | { kind: "distribution_pole"; id: string; label: string; record: DistributionPoleFeature }
   | { kind: "distribution_pole_fiber"; id: string; label: string; record: DistributionPoleFiberRouteFeature }
+  | { kind: "distribution_splice_point"; id: string; label: string; record: DistributionPoleSplicePointFeature }
+  | { kind: "distribution_slack_loop"; id: string; label: string; record: DistributionSlackLoopFeature }
+  | { kind: "distribution_fiber_assignment"; id: string; label: string; record: DistributionFiberAssignmentFeature }
+  | { kind: "gis_pole"; id: string; label: string; record: GisVectorAssetRecord }
+  | { kind: "gis_vector_asset"; id: string; label: string; record: GisVectorAssetRecord }
   | { kind: "patch_panel"; id: string; label: string; record: PatchPanel }
   | { kind: "planning_region"; id: string; label: string; record: PlanningRegion }
   | { kind: "work_order"; id: string; label: string; record: MapNode };
@@ -64,8 +72,12 @@ type StreetLevelAssetMapProps = {
   fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
   syntheticServices: SyntheticService[];
+  distributionPoleDensity: DistributionPoleDensityFeature[];
   distributionPoles: DistributionPoleFeature[];
   distributionPoleFiberRoutes: DistributionPoleFiberRouteFeature[];
+  distributionSplicePoints: DistributionPoleSplicePointFeature[];
+  distributionSlackLoops: DistributionSlackLoopFeature[];
+  distributionFiberAssignments: DistributionFiberAssignmentFeature[];
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
@@ -105,8 +117,12 @@ export function StreetLevelAssetMap({
   fiberStrands,
   fiberAssignments,
   syntheticServices,
+  distributionPoleDensity,
   distributionPoles,
   distributionPoleFiberRoutes,
+  distributionSplicePoints,
+  distributionSlackLoops,
+  distributionFiberAssignments,
   patchPanels,
   planningRegions,
   layers,
@@ -141,11 +157,15 @@ export function StreetLevelAssetMap({
           spliceClosures={spliceClosures}
           fiberSplices={fiberSplices}
           fiberStrands={fiberStrands}
-      fiberAssignments={fiberAssignments}
-      syntheticServices={syntheticServices}
-      distributionPoles={distributionPoles}
-      distributionPoleFiberRoutes={distributionPoleFiberRoutes}
-      patchPanels={patchPanels}
+          fiberAssignments={fiberAssignments}
+          syntheticServices={syntheticServices}
+          distributionPoleDensity={distributionPoleDensity}
+          distributionPoles={distributionPoles}
+          distributionPoleFiberRoutes={distributionPoleFiberRoutes}
+          distributionSplicePoints={distributionSplicePoints}
+          distributionSlackLoops={distributionSlackLoops}
+          distributionFiberAssignments={distributionFiberAssignments}
+          patchPanels={patchPanels}
           planningRegions={planningRegions}
           layers={layers}
           activeTool={activeTool}

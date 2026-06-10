@@ -12,3 +12,7 @@ dependencies = [
   "psycopg[binary]==3.2.4",
   "python-multipart==0.0.20"
 ]
+
+[project.scripts]
+gridassetlink-gis-worker = "app.jobs.synthetic_telecom_generation_worker:main"
+gridassetlink-gis-performance-check = "app.jobs.gis_scale_performance_check:main"

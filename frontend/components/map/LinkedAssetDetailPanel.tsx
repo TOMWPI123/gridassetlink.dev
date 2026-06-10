@@ -86,6 +86,13 @@ export function LinkedAssetDetailPanel({ selection, onClose }: LinkedAssetDetail
           <a href={`/work-orders/new?splicePoint=${encodeURIComponent(selection.id)}`}>Create work order</a>
         </div>
       ) : null}
+      {selection.kind === "distribution_pole_density" ? (
+        <div className="linked-asset-actions">
+          <a href="/distribution-fiber">Open Distribution Fiber Module</a>
+          <button type="button">Filter feeders in this density cell</button>
+          <button type="button">Create planning study</button>
+        </div>
+      ) : null}
       {selection.kind === "distribution_pole" ? (
         <div className="linked-asset-actions">
           <a href={`/fiber-trace?distributionPole=${encodeURIComponent(selection.id)}`}>Open Pole Continuity</a>
@@ -100,6 +107,39 @@ export function LinkedAssetDetailPanel({ selection, onClose }: LinkedAssetDetail
           <a href={`/outage-impact?distributionRoute=${encodeURIComponent(selection.id)}`}>Analyze Route Impact</a>
           <button type="button">Open pole list sample</button>
           <button type="button">Create telecom construction work order</button>
+        </div>
+      ) : null}
+      {selection.kind === "distribution_splice_point" ? (
+        <div className="linked-asset-actions">
+          <a href={`/fiber-trace?distributionRoute=${encodeURIComponent(selection.record.properties.routeId)}`}>Open Route Continuity</a>
+          <a href={`/outage-impact?distributionRoute=${encodeURIComponent(selection.record.properties.routeId)}`}>Analyze Route Impact</a>
+          <button type="button">Open distribution splice matrix</button>
+          <button type="button">Create splice work order</button>
+        </div>
+      ) : null}
+      {selection.kind === "distribution_slack_loop" ? (
+        <div className="linked-asset-actions">
+          <a href={`/fiber-trace?distributionRoute=${encodeURIComponent(selection.record.properties.routeId)}`}>Open Route Continuity</a>
+          <a href={`/outage-impact?distributionRoute=${encodeURIComponent(selection.record.properties.routeId)}`}>Analyze Route Impact</a>
+          <button type="button">Reserve slack for service</button>
+          <button type="button">Create field verification task</button>
+        </div>
+      ) : null}
+      {selection.kind === "distribution_fiber_assignment" ? (
+        <div className="linked-asset-actions">
+          <a href={`/fiber-trace?distributionRoute=${encodeURIComponent(selection.record.properties.routeId)}`}>Open Assignment Continuity</a>
+          <a href={`/outage-impact?distributionRoute=${encodeURIComponent(selection.record.properties.routeId)}`}>Analyze Service Impact</a>
+          <button type="button">Reserve related strands</button>
+          <button type="button">Create service work order</button>
+        </div>
+      ) : null}
+      {selection.kind === "gis_pole" || selection.kind === "gis_vector_asset" ? (
+        <div className="linked-asset-actions">
+          <a href={`/fiber-trace?asset=${encodeURIComponent(selection.id)}`}>Open Server-Side Trace</a>
+          <a href={`/outage-impact?asset=${encodeURIComponent(selection.id)}`}>Analyze Tile-Aware Impact</a>
+          {selection.kind === "gis_pole" ? <button type="button">Load connected spans</button> : null}
+          <button type="button">Create proposed edit</button>
+          <button type="button">Mark affected tile dirty</button>
         </div>
       ) : null}
       {selection.kind === "splice_closure" ? (
@@ -225,6 +265,14 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
   if (selection.kind === "fiber_assignment" || selection.kind === "patch_panel") {
     return selection.record as unknown as Record<string, unknown>;
   }
+  if (selection.kind === "distribution_pole_density") {
+    return {
+      ...selection.record.properties,
+      geometryType: selection.record.geometry.type,
+      viewerOptimization: "Density cells summarize many synthetic poles and feeders so the browser does not render millions of point features.",
+      scaleModel: "Use this layer for regional browsing, then enable pole/splice/slack layers at closer zoom.",
+    } as unknown as Record<string, unknown>;
+  }
   if (selection.kind === "distribution_pole") {
     return {
       ...selection.record.properties,
@@ -240,6 +288,34 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
       continuityModel: "Synthetic feeder continuity links endpoint patch panels to ordered distribution pole samples.",
       viewerOptimization: "Rendered as route linework; individual poles are clustered in a separate layer.",
     } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "distribution_splice_point") {
+    return {
+      ...selection.record.properties,
+      geometryType: selection.record.geometry.type,
+      continuityModel: "Synthetic splice point tied to a generated pole route, slack loop, and distribution fiber assignments.",
+    } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "distribution_slack_loop") {
+    return {
+      ...selection.record.properties,
+      geometryType: selection.record.geometry.type,
+      continuityModel: "Synthetic slack storage point used for distribution fiber planning and restoration margin demos.",
+    } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "distribution_fiber_assignment") {
+    return {
+      ...selection.record.properties,
+      geometryType: selection.record.geometry.type,
+      continuityModel: "Synthetic service assignment across generated distribution pole fiber and splice/slack records.",
+    } as unknown as Record<string, unknown>;
+  }
+  if (selection.kind === "gis_pole" || selection.kind === "gis_vector_asset") {
+    return {
+      ...selection.record,
+      viewerOptimization: "Loaded from a server-side vector tile. Full raw pole/support-structure datasets are never downloaded into the browser.",
+      scaleModel: "Low zooms render density/cluster records; individual poles appear only at street zoom and fetch details on click.",
+    };
   }
   return selection.record as Record<string, unknown>;
 }
@@ -258,8 +334,14 @@ function detailBadgesForSelection(selection: StreetMapSelection) {
   if (selection.kind === "opgw_splice_point") return ["Splice point", "Synthetic"];
   if (selection.kind === "splice_closure") return ["Synthetic splice", "Demo"];
   if (selection.kind === "fiber_assignment") return ["Synthetic assignment", "Demo"];
+  if (selection.kind === "distribution_pole_density") return ["Synthetic density", "Million-scale", "Fast"];
   if (selection.kind === "distribution_pole") return ["Synthetic pole", "Telecom", "Clustered"];
   if (selection.kind === "distribution_pole_fiber") return ["Synthetic feeder", "Telecom continuity"];
+  if (selection.kind === "distribution_splice_point") return ["Distribution splice", "Synthetic"];
+  if (selection.kind === "distribution_slack_loop") return ["Slack loop", "Synthetic"];
+  if (selection.kind === "distribution_fiber_assignment") return ["Distribution assignment", "Synthetic"];
+  if (selection.kind === "gis_pole") return ["PostGIS", "Vector tile", "Click-loaded"];
+  if (selection.kind === "gis_vector_asset") return ["PostGIS", "Vector tile"];
   if (selection.kind === "patch_panel") return ["Synthetic panel", "Demo"];
   return [];
 }
@@ -278,8 +360,14 @@ function detailNoticeForSelection(selection: StreetMapSelection) {
   if (selection.kind === "opgw_splice_point") return "Synthetic splice point. Splice points define cable-section boundaries and do not prove real field splices.";
   if (selection.kind === "splice_closure") return "Synthetic splice closure at a synthetic structure point. It is for demo splicing workflows only.";
   if (selection.kind === "fiber_assignment") return "Synthetic fiber assignment for planning demonstration. It is not an actual circuit path.";
+  if (selection.kind === "distribution_pole_density") return "Synthetic density rollup representing many generated distribution telecom poles for smooth regional browsing. It is not real utility pole inventory.";
   if (selection.kind === "distribution_pole") return "Synthetic distribution telecom pole placed along generated street paths. This is not a real pole, utility attachment, or private telecom route.";
   if (selection.kind === "distribution_pole_fiber") return "Synthetic distribution telecom feeder route. It follows generated street-like paths and links into demo patch-panel continuity only.";
+  if (selection.kind === "distribution_splice_point") return "Synthetic distribution splice point on a generated pole route. It is not a real field splice or utility telecom record.";
+  if (selection.kind === "distribution_slack_loop") return "Synthetic slack loop for distribution fiber planning. It is not real slack storage inventory.";
+  if (selection.kind === "distribution_fiber_assignment") return "Synthetic distribution fiber service assignment. It does not represent an actual SCADA, protection, telecom, or private fiber route.";
+  if (selection.kind === "gis_pole") return "Synthetic GIS-scale pole/support structure served through PostGIS vector tiles. The browser receives only minimal tile fields until this detail panel is opened.";
+  if (selection.kind === "gis_vector_asset") return "Synthetic GIS-scale planning asset served through a vector tile. Use server-side search, trace, and detail endpoints for full records.";
   if (selection.kind === "patch_panel") return "Synthetic patch panel and termination ports for demo planning.";
   return "";
 }

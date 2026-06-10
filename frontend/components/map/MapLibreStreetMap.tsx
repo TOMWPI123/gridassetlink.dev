@@ -2,8 +2,9 @@
 
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, DistributionPoleFeature, DistributionPoleFiberRouteFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DistributionFiberAssignmentFeature, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointFeature, DistributionSlackLoopFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { ContinuityHighlight, FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
+import { API_BASE } from "@/lib/api";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 import { buildClosureToSplicePointId, buildSpliceNodeMetrics } from "@/lib/opgw/continuityEngine";
 
@@ -28,8 +29,12 @@ type MapLibreStreetMapProps = {
   fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
   syntheticServices: SyntheticService[];
+  distributionPoleDensity: DistributionPoleDensityFeature[];
   distributionPoles: DistributionPoleFeature[];
   distributionPoleFiberRoutes: DistributionPoleFiberRouteFeature[];
+  distributionSplicePoints: DistributionPoleSplicePointFeature[];
+  distributionSlackLoops: DistributionSlackLoopFeature[];
+  distributionFiberAssignments: DistributionFiberAssignmentFeature[];
   patchPanels: PatchPanel[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
@@ -73,8 +78,12 @@ const sourceIds = {
   opgwSplicePoints: "synthetic-opgw-splice-points",
   spliceClosures: "synthetic-splice-closures",
   fiberAssignments: "synthetic-fiber-assignments",
+  distributionPoleDensity: "synthetic-distribution-pole-density",
   distributionPoles: "synthetic-distribution-poles",
   distributionPoleFiberRoutes: "synthetic-distribution-pole-fiber-routes",
+  distributionSplicePoints: "synthetic-distribution-splice-points",
+  distributionSlackLoops: "synthetic-distribution-slack-loops",
+  distributionFiberAssignments: "synthetic-distribution-fiber-assignments",
   patchPanels: "synthetic-patch-panels",
   substations: "regional-substations",
   syntheticSubstations: "synthetic-substations",
@@ -82,7 +91,40 @@ const sourceIds = {
   workOrders: "regional-work-orders",
 };
 
+const gisVectorSourceIds = {
+  territory: "gis-territory-vector",
+  poles: "gis-poles-vector",
+  spans: "gis-spans-vector",
+  fiberRoutes: "gis-fiber-routes-vector",
+  spliceCases: "gis-splice-cases-vector",
+  handholes: "gis-handholes-vector",
+  slackLoops: "gis-slack-loops-vector",
+  muxSites: "gis-mux-sites-vector",
+  circuitRoutes: "gis-circuit-routes-vector",
+};
+
+const gisVectorLayerIds = [
+  "gis-territory-boundary",
+  "gis-pole-density",
+  "gis-pole-clusters",
+  "gis-pole-points",
+  "gis-span-lines",
+  "gis-fiber-routes",
+  "gis-splice-cases",
+  "gis-handholes",
+  "gis-slack-loops",
+  "gis-mux-sites",
+  "gis-circuit-routes",
+];
+
 const clickableLayerIds = [
+  "gis-pole-points",
+  "gis-fiber-routes",
+  "gis-splice-cases",
+  "gis-handholes",
+  "gis-slack-loops",
+  "gis-mux-sites",
+  "gis-circuit-routes",
   "regional-planning-regions-fill",
   "regional-reference-line",
   "public-transmission-lines",
@@ -98,7 +140,11 @@ const clickableLayerIds = [
   "synthetic-opgw-capacity",
   "synthetic-opgw-outage-impact",
   "synthetic-fiber-assignments",
+  "synthetic-distribution-fiber-assignments",
   "synthetic-distribution-pole-fiber-routes",
+  "synthetic-distribution-pole-density",
+  "synthetic-distribution-splice-points",
+  "synthetic-distribution-slack-loops",
   "synthetic-distribution-poles",
   "synthetic-transmission-structures",
   "synthetic-splice-closures-hit",
@@ -131,6 +177,10 @@ const darkRasterStyle: StyleSpecification = {
 
 const emptyCollection: MapFeatureCollection = { type: "FeatureCollection", features: [] };
 
+function vectorTileUrl(layer: string) {
+  return `${API_BASE.replace(/\/$/, "")}/api/tiles/${layer}/{z}/{x}/{y}.mvt`;
+}
+
 export function MapLibreStreetMap({
   activeMap,
   substations,
@@ -152,8 +202,12 @@ export function MapLibreStreetMap({
   fiberStrands,
   fiberAssignments,
   syntheticServices,
+  distributionPoleDensity,
   distributionPoles,
   distributionPoleFiberRoutes,
+  distributionSplicePoints,
+  distributionSlackLoops,
+  distributionFiberAssignments,
   patchPanels,
   planningRegions,
   layers,
@@ -178,12 +232,12 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, distributionPoles, distributionPoleFiberRoutes, patchPanels, planningRegions, layers, continuityHighlight),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, distributionPoles, distributionPoleFiberRoutes, patchPanels, planningRegions, layers, continuityHighlight],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, planningRegions, layers, continuityHighlight),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, planningRegions, layers, continuityHighlight],
   );
   const lookup = useMemo(
-    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, distributionPoles, distributionPoleFiberRoutes, patchPanels, planningRegions),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, distributionPoles, distributionPoleFiberRoutes, patchPanels, planningRegions],
+    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, planningRegions),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, planningRegions],
   );
 
   useEffect(() => {
@@ -294,7 +348,11 @@ export function MapLibreStreetMap({
     updateSource(mapRef.current, sourceIds.opgwSplicePoints, datasets.opgwSplicePoints);
     updateSource(mapRef.current, sourceIds.spliceClosures, datasets.spliceClosures);
     updateSource(mapRef.current, sourceIds.fiberAssignments, datasets.fiberAssignments);
+    updateSource(mapRef.current, sourceIds.distributionPoleDensity, datasets.distributionPoleDensity);
     updateSource(mapRef.current, sourceIds.distributionPoleFiberRoutes, datasets.distributionPoleFiberRoutes);
+    updateSource(mapRef.current, sourceIds.distributionFiberAssignments, datasets.distributionFiberAssignments);
+    updateSource(mapRef.current, sourceIds.distributionSplicePoints, datasets.distributionSplicePoints);
+    updateSource(mapRef.current, sourceIds.distributionSlackLoops, datasets.distributionSlackLoops);
     updateSource(mapRef.current, sourceIds.distributionPoles, datasets.distributionPoles);
     updateSource(mapRef.current, sourceIds.patchPanels, datasets.patchPanels);
     updateSource(mapRef.current, sourceIds.substations, datasets.substations);
@@ -302,6 +360,11 @@ export function MapLibreStreetMap({
     updateSource(mapRef.current, sourceIds.nodes, datasets.nodes);
     updateSource(mapRef.current, sourceIds.workOrders, datasets.workOrders);
   }, [datasets, styleReady]);
+
+  useEffect(() => {
+    if (!styleReady || !mapRef.current) return;
+    syncGisVectorLayerVisibility(mapRef.current, layers);
+  }, [layers, styleReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -336,6 +399,11 @@ export function MapLibreStreetMap({
     lastFeatureClickRef.current = Date.now();
     const feature = event.features?.[0];
     if (!feature?.properties || "point_count" in feature.properties) return;
+    const layerId = feature.layer?.id || "";
+    if (layerId.startsWith("gis-")) {
+      void handleGisVectorFeatureClick(event, layerId, feature.properties);
+      return;
+    }
     const id = String(feature.properties.id || "");
     const kind = String(feature.properties.kind || "");
     const selection = lookupRef.current[`${kind}:${id}`];
@@ -347,6 +415,36 @@ export function MapLibreStreetMap({
     popupRef.current
       ?.setLngLat(event.lngLat)
       .setHTML(popupHtml)
+      .addTo(event.target);
+  }
+
+  async function handleGisVectorFeatureClick(event: MapLayerMouseEvent, layerId: string, properties: Record<string, unknown>) {
+    const id = String(properties.id || "");
+    if (!id) return;
+    const assetType = String(properties.asset_type || properties.display_class || layerId.replace("gis-", ""));
+    const baseRecord: Record<string, unknown> = {
+      ...properties,
+      id,
+      tileLayer: layerId,
+      source: "PostGIS vector tile",
+      levelOfDetail: layerId.includes("density") ? "density" : layerId.includes("cluster") ? "cluster" : "detail",
+      warning: "Synthetic telecom planning feature loaded from a vector tile. Full details are fetched only after selection.",
+    };
+    if (layerId === "gis-pole-points") {
+      const record = await fetchPoleDetailForSelection(id, baseRecord);
+      onSelectRef.current({ kind: "gis_pole", id, label: id, record });
+      popupRef.current
+        ?.setLngLat(event.lngLat)
+        .setHTML(renderPopupHtml(id, "GIS pole", record.asset_status || record.status || "synthetic", record.warning))
+        .addTo(event.target);
+      return;
+    }
+    const detailType = gisDetailTypeForLayer(layerId);
+    const record = detailType ? await fetchGisAssetDetailForSelection(detailType, id, baseRecord) : baseRecord;
+    onSelectRef.current({ kind: "gis_vector_asset", id, label: id, record });
+    popupRef.current
+      ?.setLngLat(event.lngLat)
+      .setHTML(renderPopupHtml(id, assetType, record.asset_status || record.status || "synthetic", record.warning))
       .addTo(event.target);
   }
 
@@ -376,8 +474,12 @@ export function MapLibreStreetMap({
           {layers.proposedFiberSplices ? <span><i className="legend-proposed-splice" />Proposed fiber splices</span> : null}
           {layers.availableStrandCapacity ? <span><i className="legend-opgw-capacity" />Available strands</span> : null}
           {layers.criticalRidingCircuits ? <span><i className="legend-critical-route" />Critical riding circuits</span> : null}
+          {layers.distributionPoleDensity ? <span><i className="legend-node" />Distribution pole density</span> : null}
           {layers.distributionPoles ? <span><i className="legend-node" />Distribution telecom poles</span> : null}
           {layers.distributionFiberRoutes ? <span><i className="legend-line" />Distribution pole fiber</span> : null}
+          {layers.distributionSplicePoints ? <span><i className="legend-splice-point" />Distribution splice points</span> : null}
+          {layers.distributionSlackLoops ? <span><i className="legend-node" />Distribution slack loops</span> : null}
+          {layers.distributionFiberAssignments ? <span><i className="legend-line" />Distribution assignments</span> : null}
           {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
           {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
           {layers.substations ? <span><i className="legend-substation" />Substations</span> : null}
@@ -407,7 +509,8 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
   map.addSource(sourceIds.opgwSpanSegments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.fiberAssignments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.distributionPoleFiberRoutes, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
-  [sourceIds.publicSubstations, sourceIds.fccUtilityTowers, sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.structures, sourceIds.opgwSplicePoints, sourceIds.spliceClosures, sourceIds.distributionPoles, sourceIds.patchPanels, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
+  map.addSource(sourceIds.distributionFiberAssignments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  [sourceIds.publicSubstations, sourceIds.fccUtilityTowers, sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.structures, sourceIds.opgwSplicePoints, sourceIds.spliceClosures, sourceIds.distributionPoleDensity, sourceIds.distributionPoles, sourceIds.distributionSplicePoints, sourceIds.distributionSlackLoops, sourceIds.patchPanels, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
     map.addSource(sourceId, {
       type: "geojson",
       data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0],
@@ -416,6 +519,7 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
       clusterMaxZoom: 8,
     });
   });
+  addGisVectorSourcesAndLayers(map);
 
   map.addLayer({
     id: "regional-planning-regions-fill",
@@ -673,6 +777,30 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
       "line-dasharray": ["case", ["get", "isCritical"], ["literal", [1.4, 0.8]], ["literal", [1, 0]]],
     },
   });
+  addClusterLayers(map, sourceIds.distributionPoleDensity, "synthetic-distribution-pole-density", "#7dd3fc", "density cells");
+  map.addLayer({
+    id: "synthetic-distribution-pole-density",
+    type: "circle",
+    source: sourceIds.distributionPoleDensity,
+    filter: ["!", ["has", "point_count"]],
+    maxzoom: 10.8,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["to-number", ["get", "representedPoleCount"]], 1, 8, 8000, 14, 25000, 22],
+      "circle-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "needs_field_verification", "#ff9f43", "#44d7ff"],
+      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.38, 9, 0.72, 10.8, 0.2],
+      "circle-stroke-color": "#dff9ff",
+      "circle-stroke-width": 1.1,
+    },
+  });
+  map.addLayer({
+    id: "synthetic-distribution-pole-density-labels",
+    type: "symbol",
+    source: sourceIds.distributionPoleDensity,
+    filter: ["!", ["has", "point_count"]],
+    maxzoom: 10.2,
+    layout: { "text-field": ["concat", ["to-string", ["get", "representedPoleCount"]], " poles"], "text-size": 10, "text-offset": [0, 1.45], "text-anchor": "top" },
+    paint: { "text-color": "#e8fbff", "text-halo-color": "#061012", "text-halo-width": 1.4 },
+  });
   map.addLayer({
     id: "synthetic-distribution-pole-fiber-routes",
     type: "line",
@@ -682,6 +810,17 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
       "line-width": ["interpolate", ["linear"], ["zoom"], 6, 1.1, 10, 3.2, 14, 5.8],
       "line-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.24, 10, 0.66, 14, 0.9],
       "line-dasharray": ["case", ["==", ["get", "status"], "in_service_synthetic"], ["literal", [1, 0]], ["literal", [1.4, 0.85]]],
+    },
+  });
+  map.addLayer({
+    id: "synthetic-distribution-fiber-assignments",
+    type: "line",
+    source: sourceIds.distributionFiberAssignments,
+    paint: {
+      "line-color": ["match", ["get", "criticality"], "critical", "#ff5b5b", "high", "#ffb84d", "low", "#8ab4f8", "#a8fff2"],
+      "line-width": ["case", ["==", ["get", "criticality"], "critical"], ["interpolate", ["linear"], ["zoom"], 6, 2.2, 12, 6.8], ["interpolate", ["linear"], ["zoom"], 6, 1.4, 12, 4.8]],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.28, 10, 0.68, 13, 0.92],
+      "line-dasharray": ["case", ["==", ["get", "status"], "active_synthetic"], ["literal", [1, 0]], ["literal", [1.1, 0.75]]],
     },
   });
   addClusterLayers(map, sourceIds.distributionPoles, "synthetic-distribution-poles", "#52f2c8", "poles");
@@ -707,6 +846,36 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     minzoom: 14.6,
     layout: { "text-field": ["get", "poleNumber"], "text-size": 9, "text-offset": [0, 1.05], "text-anchor": "top" },
     paint: { "text-color": "#dffdf8", "text-halo-color": "#061012", "text-halo-width": 1.3 },
+  });
+  addClusterLayers(map, sourceIds.distributionSplicePoints, "synthetic-distribution-splice-points", "#ffb84d", "distribution splices");
+  map.addLayer({
+    id: "synthetic-distribution-splice-points",
+    type: "circle",
+    source: sourceIds.distributionSplicePoints,
+    filter: ["!", ["has", "point_count"]],
+    minzoom: 9.2,
+    paint: {
+      "circle-radius": ["match", ["get", "spliceType"], "riser_terminal", 6.8, "branch_splice", 6.2, "tap_splice", 5.8, 4.8],
+      "circle-color": ["match", ["get", "spliceType"], "riser_terminal", "#efc95f", "branch_splice", "#ff8a3d", "tap_splice", "#ff4fd8", "#ffb84d"],
+      "circle-opacity": 0.92,
+      "circle-stroke-color": "#fff7d8",
+      "circle-stroke-width": 1.3,
+    },
+  });
+  addClusterLayers(map, sourceIds.distributionSlackLoops, "synthetic-distribution-slack-loops", "#b390ff", "slack");
+  map.addLayer({
+    id: "synthetic-distribution-slack-loops",
+    type: "circle",
+    source: sourceIds.distributionSlackLoops,
+    filter: ["!", ["has", "point_count"]],
+    minzoom: 9.8,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["to-number", ["get", "slackFeet"]], 50, 3.8, 350, 7.2, 700, 9.5],
+      "circle-color": ["match", ["get", "slackType"], "splice_slack", "#b390ff", "riser_storage", "#7dd3fc", "snowshoe_loop", "#efc95f", "#c4b5fd"],
+      "circle-opacity": 0.88,
+      "circle-stroke-color": "#f3e8ff",
+      "circle-stroke-width": 1.1,
+    },
   });
   map.addLayer({
     id: "regional-transmission-lines",
@@ -874,6 +1043,146 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     source: sourceIds.workOrders,
     filter: ["!", ["has", "point_count"]],
     paint: { "circle-radius": 6.5, "circle-color": "#efc95f", "circle-stroke-color": "#1b1305", "circle-stroke-width": 1.5 },
+  });
+}
+
+function addGisVectorSourcesAndLayers(map: MapLibreMap) {
+  map.addSource(gisVectorSourceIds.territory, { type: "vector", tiles: [vectorTileUrl("territory")], minzoom: 0, maxzoom: 24 });
+  map.addSource(gisVectorSourceIds.poles, { type: "vector", tiles: [vectorTileUrl("poles")], minzoom: 8, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.spans, { type: "vector", tiles: [vectorTileUrl("spans")], minzoom: 10, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.fiberRoutes, { type: "vector", tiles: [vectorTileUrl("fiber_routes")], minzoom: 8, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.spliceCases, { type: "vector", tiles: [vectorTileUrl("splice_cases")], minzoom: 16, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.handholes, { type: "vector", tiles: [vectorTileUrl("handholes")], minzoom: 16, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.slackLoops, { type: "vector", tiles: [vectorTileUrl("slack_loops")], minzoom: 16, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.muxSites, { type: "vector", tiles: [vectorTileUrl("mux_sites")], minzoom: 14, maxzoom: 24, promoteId: "id" });
+  map.addSource(gisVectorSourceIds.circuitRoutes, { type: "vector", tiles: [vectorTileUrl("circuit_routes")], minzoom: 10, maxzoom: 24, promoteId: "id" });
+
+  map.addLayer({
+    id: "gis-territory-boundary",
+    type: "line",
+    source: gisVectorSourceIds.territory,
+    "source-layer": "territory",
+    paint: { "line-color": "#f6e27f", "line-width": 2.4, "line-dasharray": [3, 1.5], "line-opacity": 0.86 },
+  });
+  map.addLayer({
+    id: "gis-pole-density",
+    type: "circle",
+    source: gisVectorSourceIds.poles,
+    "source-layer": "poles",
+    minzoom: 8,
+    maxzoom: 11,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["to-number", ["get", "feature_count"]], 1, 6, 500, 11, 5000, 22],
+      "circle-color": "#38bdf8",
+      "circle-opacity": 0.54,
+      "circle-stroke-color": "#dff9ff",
+      "circle-stroke-width": 0.9,
+    },
+  });
+  map.addLayer({
+    id: "gis-pole-clusters",
+    type: "circle",
+    source: gisVectorSourceIds.poles,
+    "source-layer": "poles",
+    minzoom: 11,
+    maxzoom: 16,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["to-number", ["get", "feature_count"]], 1, 6, 80, 13, 600, 24],
+      "circle-color": "#52f2c8",
+      "circle-opacity": 0.66,
+      "circle-stroke-color": "#eafffb",
+      "circle-stroke-width": 1,
+    },
+  });
+  map.addLayer({
+    id: "gis-pole-points",
+    type: "circle",
+    source: gisVectorSourceIds.poles,
+    "source-layer": "poles",
+    minzoom: 16,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 16, 3.1, 20, 6.5],
+      "circle-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "faulted", "#ff5b5b", "#52f2c8"],
+      "circle-opacity": 0.92,
+      "circle-stroke-color": "#061012",
+      "circle-stroke-width": 1,
+    },
+  });
+  map.addLayer({
+    id: "gis-span-lines",
+    type: "line",
+    source: gisVectorSourceIds.spans,
+    "source-layer": "spans",
+    minzoom: 11,
+    paint: {
+      "line-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "faulted", "#ff5b5b", "#a8fff2"],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.8, 16, 2.1, 20, 4.2],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0.24, 16, 0.78],
+    },
+  });
+  map.addLayer({
+    id: "gis-fiber-routes",
+    type: "line",
+    source: gisVectorSourceIds.fiberRoutes,
+    "source-layer": "fiber_routes",
+    minzoom: 8,
+    paint: {
+      "line-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "active_synthetic", "#52f2c8", "#38bdf8"],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.4, 13, 3.4, 17, 5.8],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.34, 14, 0.86],
+      "line-dasharray": ["case", ["==", ["get", "status"], "active_synthetic"], ["literal", [1, 0]], ["literal", [1.4, 0.75]]],
+    },
+  });
+  map.addLayer({
+    id: "gis-splice-cases",
+    type: "circle",
+    source: gisVectorSourceIds.spliceCases,
+    "source-layer": "splice_cases",
+    minzoom: 16,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 16, 5.2, 20, 9.2],
+      "circle-color": "#ffb84d",
+      "circle-opacity": 0.92,
+      "circle-stroke-color": "#fff6d4",
+      "circle-stroke-width": 1.2,
+    },
+  });
+  map.addLayer({
+    id: "gis-handholes",
+    type: "circle",
+    source: gisVectorSourceIds.handholes,
+    "source-layer": "handholes",
+    minzoom: 16,
+    paint: { "circle-radius": 4.8, "circle-color": "#a8fff2", "circle-opacity": 0.86, "circle-stroke-color": "#061012", "circle-stroke-width": 1 },
+  });
+  map.addLayer({
+    id: "gis-slack-loops",
+    type: "circle",
+    source: gisVectorSourceIds.slackLoops,
+    "source-layer": "slack_loops",
+    minzoom: 16,
+    paint: { "circle-radius": 5.4, "circle-color": "#b390ff", "circle-opacity": 0.88, "circle-stroke-color": "#f3e8ff", "circle-stroke-width": 1 },
+  });
+  map.addLayer({
+    id: "gis-mux-sites",
+    type: "circle",
+    source: gisVectorSourceIds.muxSites,
+    "source-layer": "mux_sites",
+    minzoom: 14,
+    paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 5.6, 18, 9.8], "circle-color": "#69d7e4", "circle-opacity": 0.9, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.2 },
+  });
+  map.addLayer({
+    id: "gis-circuit-routes",
+    type: "line",
+    source: gisVectorSourceIds.circuitRoutes,
+    "source-layer": "circuit_routes",
+    minzoom: 10,
+    paint: {
+      "line-color": ["match", ["get", "status"], "proposed", "#ff4fd8", "planned", "#efc95f", "#ff5b5b"],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.2, 16, 4.8],
+      "line-opacity": 0.72,
+      "line-dasharray": ["literal", [1.1, 0.65]],
+    },
   });
 }
 
@@ -1297,8 +1606,12 @@ function buildDatasets(
   fiberStrands: FiberStrand[],
   fiberAssignments: FiberAssignment[],
   syntheticServices: SyntheticService[],
+  distributionPoleDensity: DistributionPoleDensityFeature[],
   distributionPoles: DistributionPoleFeature[],
   distributionPoleFiberRoutes: DistributionPoleFiberRouteFeature[],
+  distributionSplicePoints: DistributionPoleSplicePointFeature[],
+  distributionSlackLoops: DistributionSlackLoopFeature[],
+  distributionFiberAssignments: DistributionFiberAssignmentFeature[],
   patchPanels: PatchPanel[],
   planningRegions: PlanningRegion[],
   layers: Record<StreetMapLayerKey, boolean>,
@@ -1725,6 +2038,28 @@ function buildDatasets(
           : { type: "MultiLineString" as const, coordinates },
       }];
     })) : emptyCollection,
+    distributionPoleDensity: layers.distributionPoleDensity ? collection(distributionPoleDensity.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "distribution_pole_density",
+        id: feature.properties.id,
+        label: feature.properties.densityCellName,
+        status: feature.properties.statusSummary,
+        utilityOwner: feature.properties.utilityOwner,
+        state: feature.properties.state,
+        displayPoleCount: feature.properties.displayPoleCount,
+        representedPoleCount: feature.properties.representedPoleCount,
+        feederRouteCount: feature.properties.feederRouteCount,
+        fiberRouteMiles: feature.properties.fiberRouteMiles,
+        splicePointCount: feature.properties.splicePointCount,
+        slackLoopCount: feature.properties.slackLoopCount,
+        assignmentCount: feature.properties.assignmentCount,
+        fiberCount: feature.properties.maxFiberCount,
+        synthetic: true,
+        warning: "Synthetic density rollup only. It represents generated demo poles and does not prove real utility pole locations.",
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
     distributionPoleFiberRoutes: layers.distributionFiberRoutes ? collection(distributionPoleFiberRoutes.map((feature) => ({
       type: "Feature",
       properties: {
@@ -1738,6 +2073,11 @@ function buildDatasets(
         utilityOwner: feature.properties.utilityOwner,
         state: feature.properties.state,
         poleCount: feature.properties.poleCount,
+        representedPoleCount: feature.properties.representedPoleCount || feature.properties.estimatedPoleScaleCount,
+        splicePointCount: feature.properties.splicePointIds?.length || 0,
+        slackLoopCount: feature.properties.slackLoopIds?.length || 0,
+        assignmentCount: feature.properties.assignmentIds?.length || 0,
+        totalSlackFeet: feature.properties.totalSlackFeet || 0,
         fiberCount: feature.properties.fiberCount,
         routeMiles: feature.properties.routeMiles,
         parentPatchPanelId: feature.properties.parentPatchPanelId || null,
@@ -1745,6 +2085,30 @@ function buildDatasets(
         estimatedPoleScaleCount: feature.properties.estimatedPoleScaleCount,
         synthetic: true,
         warning: "Synthetic street-following distribution telecom fiber route. Not real utility fiber.",
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
+    distributionFiberAssignments: layers.distributionFiberAssignments ? collection(distributionFiberAssignments.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "distribution_fiber_assignment",
+        id: feature.properties.id,
+        label: feature.properties.assignmentName,
+        status: feature.properties.status,
+        serviceType: feature.properties.serviceType,
+        criticality: feature.properties.criticality,
+        routeId: feature.properties.routeId,
+        feederId: feature.properties.feederId,
+        utilityOwner: feature.properties.utilityOwner,
+        state: feature.properties.state,
+        strandNumbers: feature.properties.strandNumbers.join(", "),
+        splicePointCount: feature.properties.splicePointIds.length,
+        slackLoopCount: feature.properties.slackLoopIds.length,
+        routeMiles: feature.properties.routeMiles,
+        estimatedLossDb: feature.properties.estimatedLossDb,
+        fiberCount: feature.properties.fiberCount,
+        synthetic: true,
+        warning: "Synthetic distribution assignment only. Not an actual telecom service route.",
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
@@ -1767,8 +2131,56 @@ function buildDatasets(
         upstreamPoleId: feature.properties.upstreamPoleId || null,
         downstreamPoleId: feature.properties.downstreamPoleId || null,
         serviceDropCount: feature.properties.serviceDropCount,
+        representedPoleCount: feature.properties.representedPoleCount || 1,
+        splicePointCount: feature.properties.splicePointIds?.length || 0,
+        slackLoopCount: feature.properties.slackLoopIds?.length || 0,
+        assignmentCount: feature.properties.assignmentIds?.length || 0,
         synthetic: true,
         warning: "Synthetic distribution pole placement following generated street paths. Not a real pole record.",
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
+    distributionSplicePoints: layers.distributionSplicePoints ? collection(distributionSplicePoints.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "distribution_splice_point",
+        id: feature.properties.id,
+        label: feature.properties.spliceName,
+        status: feature.properties.status,
+        routeId: feature.properties.routeId,
+        feederId: feature.properties.feederId,
+        streetPathId: feature.properties.streetPathId,
+        poleId: feature.properties.poleId,
+        poleNumber: feature.properties.poleNumber,
+        utilityOwner: feature.properties.utilityOwner,
+        state: feature.properties.state,
+        spliceType: feature.properties.spliceType,
+        spliceCount: feature.properties.spliceCount,
+        slackLoopFeet: feature.properties.slackLoopFeet,
+        connectedAssignmentCount: feature.properties.connectedAssignmentIds.length,
+        synthetic: true,
+        warning: "Synthetic distribution splice point only. Not a real field splice.",
+      },
+      geometry: feature.geometry,
+    }))) : emptyCollection,
+    distributionSlackLoops: layers.distributionSlackLoops ? collection(distributionSlackLoops.map((feature) => ({
+      type: "Feature",
+      properties: {
+        kind: "distribution_slack_loop",
+        id: feature.properties.id,
+        label: feature.properties.slackName,
+        status: feature.properties.status,
+        routeId: feature.properties.routeId,
+        feederId: feature.properties.feederId,
+        poleId: feature.properties.poleId,
+        poleNumber: feature.properties.poleNumber,
+        utilityOwner: feature.properties.utilityOwner,
+        state: feature.properties.state,
+        slackType: feature.properties.slackType,
+        slackFeet: feature.properties.slackFeet,
+        relatedSplicePointId: feature.properties.relatedSplicePointId || null,
+        synthetic: true,
+        warning: "Synthetic distribution slack loop only. Not a real slack-storage record.",
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
@@ -1867,8 +2279,12 @@ function buildSelectionLookup(
   opgwSplicePoints: OpgwSplicePointFeature[],
   spliceClosures: SpliceClosureFeature[],
   fiberAssignments: FiberAssignment[],
+  distributionPoleDensity: DistributionPoleDensityFeature[],
   distributionPoles: DistributionPoleFeature[],
   distributionPoleFiberRoutes: DistributionPoleFiberRouteFeature[],
+  distributionSplicePoints: DistributionPoleSplicePointFeature[],
+  distributionSlackLoops: DistributionSlackLoopFeature[],
+  distributionFiberAssignments: DistributionFiberAssignmentFeature[],
   patchPanels: PatchPanel[],
   planningRegions: PlanningRegion[],
 ) {
@@ -1989,11 +2405,43 @@ function buildSelectionLookup(
       record,
     };
   });
+  distributionPoleDensity.forEach((record) => {
+    lookup[`distribution_pole_density:${record.properties.id}`] = {
+      kind: "distribution_pole_density",
+      id: record.properties.id,
+      label: record.properties.densityCellName,
+      record,
+    };
+  });
   distributionPoles.forEach((record) => {
     lookup[`distribution_pole:${record.properties.id}`] = {
       kind: "distribution_pole",
       id: record.properties.id,
       label: record.properties.poleNumber,
+      record,
+    };
+  });
+  distributionSplicePoints.forEach((record) => {
+    lookup[`distribution_splice_point:${record.properties.id}`] = {
+      kind: "distribution_splice_point",
+      id: record.properties.id,
+      label: record.properties.spliceName,
+      record,
+    };
+  });
+  distributionSlackLoops.forEach((record) => {
+    lookup[`distribution_slack_loop:${record.properties.id}`] = {
+      kind: "distribution_slack_loop",
+      id: record.properties.id,
+      label: record.properties.slackName,
+      record,
+    };
+  });
+  distributionFiberAssignments.forEach((record) => {
+    lookup[`distribution_fiber_assignment:${record.properties.id}`] = {
+      kind: "distribution_fiber_assignment",
+      id: record.properties.id,
+      label: record.properties.assignmentName,
       record,
     };
   });
@@ -2017,6 +2465,91 @@ function buildSelectionLookup(
     lookup[`planning_region:${record.id}`] = { kind: "planning_region", id: record.id, label: record.name, record };
   });
   return lookup;
+}
+
+function syncGisVectorLayerVisibility(map: MapLibreMap, layers: Record<StreetMapLayerKey, boolean>) {
+  const distributionAny = layers.distributionPoleDensity || layers.distributionPoles || layers.distributionFiberRoutes || layers.distributionSplicePoints || layers.distributionSlackLoops || layers.distributionFiberAssignments;
+  const visibility: Record<string, boolean> = {
+    "gis-territory-boundary": distributionAny,
+    "gis-pole-density": layers.distributionPoleDensity,
+    "gis-pole-clusters": layers.distributionPoles,
+    "gis-pole-points": layers.distributionPoles,
+    "gis-span-lines": layers.distributionPoles || layers.distributionFiberRoutes,
+    "gis-fiber-routes": layers.distributionFiberRoutes || layers.distributionFiberAssignments,
+    "gis-splice-cases": layers.distributionSplicePoints,
+    "gis-handholes": layers.distributionSplicePoints,
+    "gis-slack-loops": layers.distributionSlackLoops,
+    "gis-mux-sites": layers.distributionFiberRoutes,
+    "gis-circuit-routes": layers.distributionFiberAssignments,
+  };
+  gisVectorLayerIds.forEach((layerId) => {
+    if (!map.getLayer(layerId)) return;
+    map.setLayoutProperty(layerId, "visibility", visibility[layerId] ? "visible" : "none");
+  });
+}
+
+async function fetchPoleDetailForSelection(poleId: string, fallback: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/assets/pole/${encodeURIComponent(poleId)}`, { cache: "no-store" });
+    if (!response.ok) {
+      return { ...fallback, detailStatus: `${response.status} ${response.statusText}` };
+    }
+    const payload = await response.json() as { pole?: Record<string, unknown>; connected_spans?: unknown[] };
+    return {
+      ...fallback,
+      ...(payload.pole || {}),
+      connected_spans: payload.connected_spans || [],
+      detailStatus: "loaded",
+    };
+  } catch (error) {
+    return {
+      ...fallback,
+      detailStatus: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function gisDetailTypeForLayer(layerId: string) {
+  const types: Record<string, string> = {
+    "gis-span-lines": "span",
+    "gis-fiber-routes": "fiber_route",
+    "gis-splice-cases": "splice_case",
+    "gis-handholes": "handhole",
+    "gis-slack-loops": "slack_loop",
+    "gis-mux-sites": "mux_site",
+    "gis-circuit-routes": "circuit_route",
+  };
+  return types[layerId];
+}
+
+async function fetchGisAssetDetailForSelection(assetType: string, assetId: string, fallback: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/assets/${encodeURIComponent(assetType)}/${encodeURIComponent(assetId)}`, { cache: "no-store" });
+    if (!response.ok) {
+      return { ...fallback, detailStatus: `${response.status} ${response.statusText}`, detailType: assetType };
+    }
+    const payload = await response.json() as {
+      asset?: Record<string, unknown>;
+      related?: Record<string, unknown>;
+      detail_strategy?: string;
+      payload_note?: string;
+    };
+    return {
+      ...fallback,
+      ...(payload.asset || {}),
+      related: payload.related || {},
+      detailStrategy: payload.detail_strategy || "click_to_load_server_detail",
+      detailNote: payload.payload_note,
+      detailType: assetType,
+      detailStatus: "loaded",
+    };
+  } catch (error) {
+    return {
+      ...fallback,
+      detailType: assetType,
+      detailStatus: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function updateSource(map: MapLibreMap, sourceId: string, data: MapFeatureCollection) {
@@ -2058,11 +2591,22 @@ function selectionCoordinates(selection: StreetMapSelection): Coordinate[] {
   if (selection.kind === "opgw_span_segment") return selection.record.geometry.coordinates;
   if (selection.kind === "opgw_splice_point") return [selection.record.geometry.coordinates];
   if (selection.kind === "splice_closure") return [selection.record.geometry.coordinates];
+  if (selection.kind === "distribution_pole_density") return [selection.record.geometry.coordinates];
   if (selection.kind === "distribution_pole") return [selection.record.geometry.coordinates];
   if (selection.kind === "distribution_pole_fiber") return selection.record.geometry.coordinates;
+  if (selection.kind === "distribution_splice_point") return [selection.record.geometry.coordinates];
+  if (selection.kind === "distribution_slack_loop") return [selection.record.geometry.coordinates];
+  if (selection.kind === "distribution_fiber_assignment") return selection.record.geometry.coordinates;
+  if (selection.kind === "gis_pole" || selection.kind === "gis_vector_asset") {
+    const longitude = Number(selection.record.longitude);
+    const latitude = Number(selection.record.latitude);
+    if (Number.isFinite(longitude) && Number.isFinite(latitude)) return [[longitude, latitude]];
+  }
   if (selection.kind === "planning_region") return selection.record.geometry.coordinates[0];
   if ("latitude" in selection.record && selection.record.latitude !== undefined && selection.record.longitude !== undefined) {
-    return [[selection.record.longitude, selection.record.latitude]];
+    const longitude = Number(selection.record.longitude);
+    const latitude = Number(selection.record.latitude);
+    if (Number.isFinite(longitude) && Number.isFinite(latitude)) return [[longitude, latitude]];
   }
   return [];
 }

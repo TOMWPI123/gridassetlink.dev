@@ -93,6 +93,9 @@ function DistributionTelecomImpactReport({ view }: { view: DistributionPoleConti
         <SummaryCard label="Critical services" value={view.criticalServiceCount.toLocaleString()} />
         <SummaryCard label="Display poles" value={view.route.properties.poleCount.toLocaleString()} />
         <SummaryCard label="Scale model" value={view.estimatedPoleScaleCount.toLocaleString()} />
+        <SummaryCard label="Splice points" value={view.splicePoints.length.toLocaleString()} />
+        <SummaryCard label="Slack loops" value={view.slackLoops.length.toLocaleString()} />
+        <SummaryCard label="Assignments" value={view.fiberAssignments.length.toLocaleString()} />
         <SummaryCard label="Fiber count" value={`${view.route.properties.fiberCount}F`} />
         <SummaryCard label="Route miles" value={view.estimatedRouteMiles.toFixed(2)} />
         <SummaryCard label="Estimated loss" value={`${view.estimatedLossDb.toFixed(2)} dB`} />
@@ -133,6 +136,22 @@ function DistributionTelecomImpactReport({ view }: { view: DistributionPoleConti
                       </td>
                     </tr>
                   ))}
+                  {view.fiberAssignments.map((assignment) => (
+                    <tr key={assignment.properties.id}>
+                      <td>{assignment.properties.assignmentName}<br /><small>{assignment.properties.serviceType} / synthetic assignment</small></td>
+                      <td><Badge value={assignment.properties.criticality} /></td>
+                      <td><Badge value={assignment.properties.status} /></td>
+                      <td>{assignment.properties.routeId}</td>
+                      <td>{assignment.properties.fiberCount}F / {assignment.properties.strandNumbers.join(", ")}</td>
+                      <td>{assignment.properties.poleIds.length}</td>
+                      <td>
+                        <div className="splice-row-actions">
+                          <Link href={`/fiber-trace?distributionRoute=${encodeURIComponent(assignment.properties.routeId)}`}>Trace</Link>
+                          <Link href={mapHref}>Map</Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -164,6 +183,9 @@ function DistributionTelecomImpactReport({ view }: { view: DistributionPoleConti
           <section className="splice-manager-panel">
             <div className="splice-manager-panel-title"><strong>Impacted Records</strong></div>
             <ImpactList title="Distribution poles" values={view.routePoles.slice(0, 24).map((pole) => pole.properties.poleNumber)} />
+            <ImpactList title="Splice points" values={view.splicePoints.slice(0, 24).map((splice) => splice.properties.spliceName)} />
+            <ImpactList title="Slack loops" values={view.slackLoops.slice(0, 24).map((slack) => `${slack.properties.slackName} (${slack.properties.slackFeet} ft)`)} />
+            <ImpactList title="Fiber assignments" values={view.fiberAssignments.slice(0, 24).map((assignment) => assignment.properties.assignmentName)} />
             <ImpactList title="Sample pole IDs" values={view.route.properties.samplePoleIds} />
             <ImpactList title="Patch panels" values={view.parentPatchPanel ? [view.parentPatchPanel.name] : []} />
           </section>

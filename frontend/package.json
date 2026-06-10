@@ -22,6 +22,7 @@
     "data:distribution-poles": "tsx scripts/generate-synthetic-distribution-poles.ts",
     "data:fiber-network": "npm run data:structures && npm run data:opgw && npm run data:strands && npm run data:splices && npm run data:patch-panels && npm run data:fiber-assignments && npm run data:synthetic-services",
     "data:validate-fiber-network": "tsx scripts/validate-fiber-network.ts",
+    "perf:gis-guardrails": "tsx scripts/check-gis-scale-guardrails.ts",
     "data:map": "npm run data:transmission && npm run data:public-substations && npm run data:synthetic-substations && npm run data:fiber-network && npm run data:distribution-poles && npm run data:validate-fiber-network"
   },
   "dependencies": {

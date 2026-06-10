@@ -479,6 +479,10 @@ export type DistributionPole = {
   upstreamNetworkNodeId?: string;
   upstreamPatchPanelId?: string;
   continuityPathId?: string;
+  representedPoleCount?: number;
+  splicePointIds?: string[];
+  slackLoopIds?: string[];
+  assignmentIds?: string[];
   serviceDropCount: number;
   status: "in_service_synthetic" | "planned" | "proposed" | "reserved" | "needs_field_verification";
   synthetic: true;
@@ -509,9 +513,14 @@ export type DistributionPoleFiberRoute = {
   placementModel: "synthetic_street_path";
   routeMiles: number;
   poleCount: number;
+  representedPoleCount?: number;
   firstPoleId: string;
   lastPoleId: string;
   samplePoleIds: string[];
+  splicePointIds?: string[];
+  slackLoopIds?: string[];
+  assignmentIds?: string[];
+  totalSlackFeet?: number;
   parentPatchPanelId?: string;
   parentOpgwRouteId?: string;
   fiberCount: 12 | 24 | 48 | 96;
@@ -544,12 +553,150 @@ export type DistributionPoleContinuityRecord = {
   endpointZType: "distribution_pole";
   endpointZId: string;
   totalPoleCount: number;
+  representedPoleCount?: number;
   samplePoleIds: string[];
+  splicePointIds?: string[];
+  slackLoopIds?: string[];
+  assignmentIds?: string[];
+  totalSlackFeet?: number;
   fiberCount: 12 | 24 | 48 | 96;
   serviceTypesCarried: DistributionPoleFiberRoute["serviceTypesCarried"];
   continuityStatus: DistributionPoleFiberRoute["continuityStatus"];
   synthetic: true;
   warning: string;
+};
+
+export type DistributionPoleDensity = {
+  id: string;
+  densityCellName: string;
+  utilityOwner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  latitude: number;
+  longitude: number;
+  displayPoleCount: number;
+  representedPoleCount: number;
+  feederRouteCount: number;
+  fiberRouteMiles: number;
+  splicePointCount: number;
+  slackLoopCount: number;
+  assignmentCount: number;
+  maxFiberCount: 12 | 24 | 48 | 96;
+  statusSummary: string;
+  synthetic: true;
+  source: "synthetic-demo";
+  notes: string;
+};
+
+export type DistributionPoleDensityFeature = {
+  type: "Feature";
+  properties: DistributionPoleDensity;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type DistributionPoleDensityCollection = {
+  type: "FeatureCollection";
+  features: DistributionPoleDensityFeature[];
+};
+
+export type DistributionPoleSplicePoint = {
+  id: string;
+  spliceName: string;
+  routeId: string;
+  feederId: string;
+  streetPathId: string;
+  poleId: string;
+  poleNumber: string;
+  sequenceIndex: number;
+  utilityOwner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  latitude: number;
+  longitude: number;
+  spliceType: "riser_terminal" | "inline_splice" | "tap_splice" | "branch_splice" | "midspan_storage";
+  spliceCount: number;
+  slackLoopFeet: number;
+  connectedAssignmentIds: string[];
+  status: "in_service_synthetic" | "planned" | "proposed" | "needs_field_verification";
+  synthetic: true;
+  source: "synthetic-demo";
+  notes: string;
+};
+
+export type DistributionPoleSplicePointFeature = {
+  type: "Feature";
+  properties: DistributionPoleSplicePoint;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type DistributionPoleSplicePointCollection = {
+  type: "FeatureCollection";
+  features: DistributionPoleSplicePointFeature[];
+};
+
+export type DistributionSlackLoop = {
+  id: string;
+  slackName: string;
+  routeId: string;
+  feederId: string;
+  poleId: string;
+  poleNumber: string;
+  sequenceIndex: number;
+  utilityOwner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  latitude: number;
+  longitude: number;
+  slackType: "splice_slack" | "snowshoe_loop" | "riser_storage" | "maintenance_loop" | "service_reserve";
+  slackFeet: number;
+  relatedSplicePointId?: string;
+  status: "in_service_synthetic" | "planned" | "proposed" | "needs_field_verification";
+  synthetic: true;
+  source: "synthetic-demo";
+  notes: string;
+};
+
+export type DistributionSlackLoopFeature = {
+  type: "Feature";
+  properties: DistributionSlackLoop;
+  geometry: { type: "Point"; coordinates: Coordinate };
+};
+
+export type DistributionSlackLoopCollection = {
+  type: "FeatureCollection";
+  features: DistributionSlackLoopFeature[];
+};
+
+export type DistributionFiberAssignment = {
+  id: string;
+  assignmentName: string;
+  routeId: string;
+  feederId: string;
+  utilityOwner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  serviceType: "SCADA" | "Distribution Automation" | "Telecom Backhaul" | "AMI Backhaul" | "Protection Pilot" | "Spare";
+  status: "active_synthetic" | "planned" | "proposed" | "reserved";
+  criticality: "low" | "normal" | "high" | "critical";
+  strandNumbers: number[];
+  aEndPoleId: string;
+  zEndPoleId: string;
+  poleIds: string[];
+  splicePointIds: string[];
+  slackLoopIds: string[];
+  routeMiles: number;
+  estimatedLossDb: number;
+  fiberCount: 12 | 24 | 48 | 96;
+  synthetic: true;
+  source: "synthetic-demo";
+  notes: string;
+};
+
+export type DistributionFiberAssignmentFeature = {
+  type: "Feature";
+  properties: DistributionFiberAssignment;
+  geometry: { type: "LineString"; coordinates: Coordinate[] };
+};
+
+export type DistributionFiberAssignmentCollection = {
+  type: "FeatureCollection";
+  features: DistributionFiberAssignmentFeature[];
 };
 
 export type OpgwCable = {
@@ -1085,8 +1232,12 @@ export type StreetMapLayerKey =
   | "c3794Nodes"
   | "fiberRoutes"
   | "opgwRoutes"
+  | "distributionPoleDensity"
   | "distributionPoles"
   | "distributionFiberRoutes"
+  | "distributionSplicePoints"
+  | "distributionSlackLoops"
+  | "distributionFiberAssignments"
   | "circuitEndpoints"
   | "workOrderLocations"
   | "proposedChanges"

@@ -191,6 +191,10 @@ function DistributionPoleFiberTraceView({ view }: { view: DistributionPoleContin
         <SummaryCard label="Fiber count" value={`${view.route.properties.fiberCount}F`} />
         <SummaryCard label="Display poles" value={view.route.properties.poleCount.toLocaleString()} />
         <SummaryCard label="Scale model" value={view.estimatedPoleScaleCount.toLocaleString()} />
+        <SummaryCard label="Splice points" value={view.splicePoints.length.toLocaleString()} />
+        <SummaryCard label="Slack loops" value={view.slackLoops.length.toLocaleString()} />
+        <SummaryCard label="Slack storage" value={`${view.totalSlackFeet.toLocaleString()} ft`} />
+        <SummaryCard label="Assignments" value={view.fiberAssignments.length.toLocaleString()} />
         <SummaryCard label="Route miles" value={view.estimatedRouteMiles.toFixed(2)} />
         <SummaryCard label="Estimated loss" value={`${view.estimatedLossDb.toFixed(2)} dB`} />
         <SummaryCard label="Continuity" value={view.route.properties.continuityStatus.replaceAll("_", " ")} />
@@ -231,18 +235,59 @@ function DistributionPoleFiberTraceView({ view }: { view: DistributionPoleContin
           <section className="splice-manager-panel">
             <div className="splice-manager-panel-title"><strong>Services Carried</strong></div>
             <div className="service-carried-list">
-              {view.serviceTypes.map((service) => (
-                <article key={service}>
-                  <strong>{service}</strong>
-                  <span>Synthetic distribution telecom service family</span>
-                  <small>{view.route.properties.continuityStatus.replaceAll("_", " ")}</small>
+              {(view.fiberAssignments.length ? view.fiberAssignments : view.serviceTypes.map((service) => ({ properties: { id: service, assignmentName: service, serviceType: service, status: view.route.properties.status, criticality: service.includes("Protection") || service === "SCADA" ? "critical" : "normal", strandNumbers: [], estimatedLossDb: view.estimatedLossDb } }))).map((assignment) => (
+                <article key={assignment.properties.id}>
+                  <strong>{assignment.properties.assignmentName}</strong>
+                  <span>{assignment.properties.serviceType} synthetic distribution telecom service family</span>
+                  <small>{assignment.properties.status.replaceAll("_", " ")}</small>
                   <div>
-                    <Badge value={service.includes("Protection") || service === "SCADA" ? "critical" : "normal"} />
+                    <Badge value={assignment.properties.criticality} />
                     <Badge value="synthetic" />
-                    <Badge value={view.route.properties.status} />
+                    <Badge value={`${assignment.properties.strandNumbers.length || view.route.properties.fiberCount} strands`} />
+                    <Badge value={`${Number(assignment.properties.estimatedLossDb || view.estimatedLossDb).toFixed(2)} dB`} />
                   </div>
                 </article>
               ))}
+            </div>
+          </section>
+
+          <section className="splice-manager-panel">
+            <div className="splice-manager-panel-title"><strong>Splice and Slack Continuity</strong></div>
+            <div className="splice-table-wrap">
+              <table className="splice-manager-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Node</th>
+                    <th>Pole</th>
+                    <th>Route</th>
+                    <th>Slack</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {view.splicePoints.slice(0, 18).map((splice) => (
+                    <tr key={splice.properties.id}>
+                      <td>{splice.properties.spliceType.replaceAll("_", " ")}</td>
+                      <td>{splice.properties.spliceName}<br /><small>{splice.properties.id}</small></td>
+                      <td>{splice.properties.poleNumber}</td>
+                      <td>{splice.properties.routeId}</td>
+                      <td>{splice.properties.slackLoopFeet} ft</td>
+                      <td><Badge value={splice.properties.status} /></td>
+                    </tr>
+                  ))}
+                  {view.slackLoops.slice(0, 12).map((slack) => (
+                    <tr key={slack.properties.id}>
+                      <td>{slack.properties.slackType.replaceAll("_", " ")}</td>
+                      <td>{slack.properties.slackName}<br /><small>{slack.properties.id}</small></td>
+                      <td>{slack.properties.poleNumber}</td>
+                      <td>{slack.properties.routeId}</td>
+                      <td>{slack.properties.slackFeet} ft</td>
+                      <td><Badge value={slack.properties.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
         </div>

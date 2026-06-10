@@ -19,6 +19,10 @@ export const DISTRIBUTION_POLES_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-d
 export const DISTRIBUTION_POLES_META_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-distribution-poles.meta.json");
 export const DISTRIBUTION_POLE_FIBER_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-distribution-pole-fiber.geojson");
 export const DISTRIBUTION_POLE_CONTINUITY_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-distribution-continuity.json");
+export const DISTRIBUTION_POLE_DENSITY_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-distribution-pole-density.geojson");
+export const DISTRIBUTION_POLE_SPLICE_POINTS_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-distribution-splice-points.geojson");
+export const DISTRIBUTION_POLE_SLACK_LOOPS_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-distribution-slack-loops.geojson");
+export const DISTRIBUTION_FIBER_ASSIGNMENTS_PATH = path.join(OUTPUT_DIR, "iso-ne-synthetic-distribution-fiber-assignments.geojson");
 
 export const SYNTHETIC_DISCLAIMER = "Synthetic demo/planning data. Not a real utility asset or verified utility telecom record.";
 

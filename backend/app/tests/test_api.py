@@ -1,3 +1,4 @@
+import inspect
 import os
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
@@ -7,6 +8,10 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
 from app.seed.seed import seed_database  # noqa: E402
+from app.routers.gis import _extract_geojson_geometry, _is_safe_tile_warm_plan, _like_pattern, _proposed_edit_target, _recursive_trace_sql, _search_target, import_service_territory, validate_service_territory  # noqa: E402
+from app.services.gis_vector_tiles import _tile_sql, choose_plan, supported_layers  # noqa: E402
+from app.jobs import synthetic_telecom_generation_worker as generation_worker  # noqa: E402
+from app.jobs import gis_scale_performance_check  # noqa: E402
 
 seed_database()
 client = TestClient(app)
@@ -244,3 +249,367 @@ def test_regional_grid_synthetic_network_access_and_reports() -> None:
     assert reports.status_code == 200
     regional_reports = [row for row in reports.json() if row["report_name"].startswith("RegionalGrid - ")]
     assert len(regional_reports) >= 20
+
+
+def test_gis_scale_capabilities_empty_tile_and_search() -> None:
+    capabilities = client.get("/api/gis/capabilities")
+    assert capabilities.status_code == 200
+    payload = capabilities.json()
+    assert payload["vector_tile_endpoint"] == "/api/tiles/{layer}/{z}/{x}/{y}.mvt"
+    assert "poles" in payload["layers"]
+    assert "slack_loops" in payload["layers"]
+    assert payload["synthetic_boundary"]
+    assert any("Geometry-aware" in row for row in payload["cache_strategy"])
+
+    health = client.get("/api/gis/scale-health")
+    assert health.status_code == 200
+    health_payload = health.json()
+    assert health_payload["postgis_configured"] is False
+    assert health_payload["status"] == "postgis_not_configured"
+    assert health_payload["architecture_checks"]["vector_tiles"] is True
+    assert health_payload["architecture_checks"]["raw_browser_pole_load"] is False
+    assert "poles" in health_payload["layers"]
+    assert health_payload["warnings"]
+
+    tile = client.get("/api/tiles/poles/8/74/96.mvt")
+    assert tile.status_code == 200
+    assert tile.headers["content-type"].startswith("application/vnd.mapbox-vector-tile")
+    assert tile.headers["x-gis-postgis"] == "false"
+    assert tile.headers["etag"]
+    assert tile.headers["x-gis-feature-count"] == "0"
+    assert tile.headers["x-gis-tile-truncated"] == "false"
+    assert tile.content == b""
+
+    cached_tile = client.get("/api/tiles/poles/8/74/96.mvt", headers={"If-None-Match": tile.headers["etag"]})
+    assert cached_tile.status_code == 304
+    assert cached_tile.headers["x-gis-postgis"] == "false"
+
+    search = client.get("/api/search", params={"type": "pole", "q": "TEST", "limit": 10})
+    assert search.status_code == 200
+    assert search.json()["postgis_configured"] is False
+    assert search.json()["results"] == []
+
+    generic_asset = client.get("/api/assets/fiber_route/FIBER-TEST")
+    assert generic_asset.status_code == 200
+    assert generic_asset.json()["postgis_configured"] is False
+
+    roads = client.get("/api/road-centerlines/summary")
+    assert roads.status_code == 200
+    assert roads.json()["postgis_configured"] is False
+
+    preflight = client.get("/api/service-territories/1/generation-preflight", params={"target_pole_count": 10_000_000})
+    assert preflight.status_code == 200
+    assert preflight.json()["postgis_configured"] is False
+    assert preflight.json()["preflight"] is None
+    assert preflight.json()["warnings"]
+
+    preflight_post = client.post(
+        "/api/service-territories/1/generation-preflight",
+        json={"target_pole_count": 10_000_000, "batch_size": 50_000, "density_profile": "auto"},
+    )
+    assert preflight_post.status_code == 200
+    assert preflight_post.json()["postgis_configured"] is False
+
+    dirty = client.post("/api/tiles/dirty", json={"layer": "poles", "z": 16, "x": 19231, "y": 24611, "reason": "unit test"})
+    assert dirty.status_code == 200
+    assert dirty.json()["postgis_configured"] is False
+
+    warm = client.post(
+        "/api/service-territories/1/warm-tile-cache",
+        json={"layers": ["territory", "poles", "pole_clusters"], "min_z": 8, "max_z": 15, "max_tiles": 25},
+    )
+    assert warm.status_code == 200
+    assert warm.json()["postgis_configured"] is False
+
+    default_warm = client.post("/api/service-territories/1/warm-tile-cache", json={})
+    assert default_warm.status_code == 200
+    assert default_warm.json()["postgis_configured"] is False
+
+    dirty_geometry = client.post(
+        "/api/tiles/dirty-by-geometry",
+        json={
+            "layers": ["poles", "spans"],
+            "min_z": 14,
+            "max_z": 16,
+            "geojson": {"type": "Point", "coordinates": [-71.8, 42.3]},
+            "reason": "unit test geometry edit",
+        },
+    )
+    assert dirty_geometry.status_code == 200
+    assert dirty_geometry.json()["postgis_configured"] is False
+
+    invalid_dirty_geometry = client.post(
+        "/api/tiles/dirty-by-geometry",
+        json={
+            "layers": ["not-a-layer"],
+            "geojson": {"type": "Point", "coordinates": [-71.8, 42.3]},
+        },
+    )
+    assert invalid_dirty_geometry.status_code == 404
+
+    invalid_zoom_range = client.post(
+        "/api/tiles/dirty-by-geometry",
+        json={
+            "layers": ["poles"],
+            "min_z": 17,
+            "max_z": 16,
+            "geojson": {"type": "Point", "coordinates": [-71.8, 42.3]},
+        },
+    )
+    assert invalid_zoom_range.status_code == 400
+
+    proposed_edit = client.post(
+        "/api/proposed-edits/pole",
+        json={
+            "service_territory_id": 1,
+            "base_asset_id": "POLE-TEST",
+            "geojson": {"type": "Point", "coordinates": [-71.8, 42.3]},
+            "properties": {"edit_reason": "unit test"},
+        },
+    )
+    assert proposed_edit.status_code == 201
+    assert proposed_edit.json()["postgis_configured"] is False
+
+
+def test_gis_tile_lod_plans_keep_raw_poles_at_street_zoom_only() -> None:
+    low_zoom = choose_plan("poles", 8)
+    density_zoom = choose_plan("poles", 9)
+    mid_zoom = choose_plan("poles", 12)
+    road_zoom = choose_plan("poles", 15)
+    high_zoom = choose_plan("poles", 16)
+
+    assert low_zoom is not None
+    assert low_zoom.source_table == "pole_density_z8"
+    low_sql = _tile_sql(low_zoom)
+    assert "tile_z = 8" in low_sql
+    assert "tile_x BETWEEN" in low_sql
+    assert "tile_y BETWEEN" in low_sql
+    assert "telecom_poles" not in low_sql
+
+    assert density_zoom is not None
+    assert density_zoom.source_table == "pole_density_z10"
+    assert "tile_z = 10" in _tile_sql(density_zoom)
+
+    assert mid_zoom is not None
+    assert mid_zoom.source_table == "pole_clusters_z12"
+    mid_sql = _tile_sql(mid_zoom)
+    assert "tile_z = 12" in mid_sql
+    assert "power(2, 12 - :z)" in mid_sql
+
+    assert road_zoom is not None
+    assert road_zoom.source_table == "pole_clusters_z15"
+    road_sql = _tile_sql(road_zoom)
+    assert "tile_z = 15" in road_sql
+    assert "power(2, 15 - :z)" in road_sql
+
+    assert high_zoom is not None
+    assert high_zoom.source_table == "telecom_poles"
+    assert high_zoom.max_features == 8000
+    assert "tile_z" not in _tile_sql(high_zoom)
+    assert "candidates AS MATERIALIZED" in _tile_sql(high_zoom)
+    assert "LIMIT 8001" in _tile_sql(high_zoom)
+    assert "AS truncated" in _tile_sql(high_zoom)
+
+
+def test_gis_vector_tile_contract_covers_required_layers() -> None:
+    required_layers = {
+        "territory": 0,
+        "poles": 8,
+        "pole_clusters": 12,
+        "spans": 11,
+        "fiber_routes": 8,
+        "splice_cases": 16,
+        "handholes": 16,
+        "slack_loops": 16,
+        "mux_sites": 14,
+        "circuit_routes": 10,
+    }
+
+    assert set(required_layers).issubset(set(supported_layers()))
+    for layer, zoom in required_layers.items():
+        plan = choose_plan(layer, zoom)
+        assert plan is not None, f"{layer} should have a tile plan at z{zoom}"
+        sql = _tile_sql(plan)
+        assert "ST_AsMVTGeom" in sql
+        assert "ST_AsMVT" in sql
+        assert "ST_Intersects" in sql
+        assert f"LIMIT {plan.max_features + 1}" in sql
+        assert f"LIMIT {plan.max_features}" in sql
+        assert "AS truncated" in sql
+
+
+def test_gis_tile_warming_allows_only_aggregate_or_territory_plans() -> None:
+    assert _is_safe_tile_warm_plan("territory", 8) is True
+    assert _is_safe_tile_warm_plan("poles", 15) is True
+    assert _is_safe_tile_warm_plan("pole_clusters", 15) is True
+    assert _is_safe_tile_warm_plan("poles", 16) is False
+    assert _is_safe_tile_warm_plan("spans", 15) is False
+
+
+def test_gis_service_territory_import_normalizes_polygon_collections() -> None:
+    polygon_a = {
+        "type": "Polygon",
+        "coordinates": [[[-72.0, 42.0], [-71.9, 42.0], [-71.9, 42.1], [-72.0, 42.1], [-72.0, 42.0]]],
+    }
+    polygon_b = {
+        "type": "Polygon",
+        "coordinates": [[[-71.8, 42.0], [-71.7, 42.0], [-71.7, 42.1], [-71.8, 42.1], [-71.8, 42.0]]],
+    }
+    collection = {
+        "type": "FeatureCollection",
+        "features": [
+            {"type": "Feature", "properties": {"name": "A"}, "geometry": polygon_a},
+            {"type": "Feature", "properties": {"name": "B"}, "geometry": polygon_b},
+            {"type": "Feature", "properties": {"ignored": True}, "geometry": {"type": "Point", "coordinates": [-71.85, 42.05]}},
+        ],
+    }
+    extracted = _extract_geojson_geometry(collection)
+
+    assert extracted["type"] == "GeometryCollection"
+    assert len(extracted["geometries"]) == 2
+
+    territory_import_source = inspect.getsource(import_service_territory)
+    assert "ST_MakeValid(input_geom)" in territory_import_source
+    assert "ST_UnaryUnion" in territory_import_source
+    assert "ST_CollectionExtract" in territory_import_source
+    assert "::geometry(MultiPolygon, 4326)" in territory_import_source
+    assert "WHERE NOT ST_IsEmpty(geom)" in territory_import_source
+
+
+def test_gis_service_territory_validate_persists_boundary_status() -> None:
+    validate_source = inspect.getsource(validate_service_territory)
+
+    assert "UPDATE service_territories" in validate_source
+    assert "SET boundary_status = CASE" in validate_source
+    assert "ST_IsValid(geom) AND NOT ST_IsEmpty(geom)" in validate_source
+    assert "geom_3857 = ST_Transform(geom, 3857)" in validate_source
+    assert "area_sq_miles = ST_Area(ST_Transform(geom, 5070)) / 2589988.110336" in validate_source
+    assert "validation_action', 'manual_or_api_validate'" in validate_source
+    assert "RETURNING id, territory_key, name, boundary_status" in validate_source
+
+
+def test_gis_search_uses_indexed_columns_and_escaped_patterns() -> None:
+    pole_target = _search_target("pole")
+    assert pole_target["table"] == "telecom_poles"
+    assert "properties" not in pole_target["search_columns"]
+    assert {"pole_id", "road_name", "town", "county"}.issubset(set(pole_target["search_columns"]))
+
+    fiber_target = _search_target("fiber")
+    assert fiber_target["search_columns"] == ["fiber_route_id", "route_name"]
+
+    assert _like_pattern("POLE_100%!") == "%POLE!_100!%!!%"
+
+
+def test_gis_trace_uses_bounded_recursive_network_sql() -> None:
+    sql = _recursive_trace_sql()
+    assert "WITH RECURSIVE" in sql
+    assert "candidate_edges" in sql
+    assert "ST_Reverse(geom)" in sql
+    assert "walk.depth < :max_depth" in sql
+    assert "NOT next_edge.z_node_id = ANY(walk.node_path)" in sql
+
+    trace = client.post("/api/trace/fiber", json={"a_node_id": "POLE-A", "z_node_id": "POLE-Z", "max_depth": 4})
+    assert trace.status_code == 200
+    assert trace.json()["postgis_configured"] is False
+
+
+def test_gis_generation_worker_batches_by_estimated_pole_records() -> None:
+    road_plan_source = inspect.getsource(generation_worker._prepare_generation_roads)
+    worker_source = inspect.getsource(generation_worker)
+
+    assert "estimated_pole_count" in road_plan_source
+    assert "record_batch_id" in road_plan_source
+    assert "estimated_poles_before" in road_plan_source
+    assert "WHERE record_batch_id = :record_batch_id" in worker_source
+    assert "LIMIT :batch_size OFFSET :offset" not in worker_source
+    assert "next_record_batch_id = :next_record_batch_id" in worker_source
+
+
+def test_gis_generation_worker_keeps_generated_assets_inside_service_territory() -> None:
+    pole_insert_source = inspect.getsource(generation_worker._insert_pole_batch)
+    span_insert_source = inspect.getsource(generation_worker._insert_span_batch)
+
+    assert "ST_Covers(territory.geom, points.geom)" in pole_insert_source
+    assert "clipped_spans AS" in span_insert_source
+    assert "ST_Covers(territory.geom, spans.geom)" in span_insert_source
+    assert "FROM clipped_spans" in span_insert_source
+    assert "ST_Within(points.geom, territory.geom)" not in pole_insert_source
+
+
+def test_gis_generation_worker_precomputes_tile_binned_pole_lod() -> None:
+    pole_lod_source = inspect.getsource(generation_worker._insert_pole_lod)
+    precompute_source = inspect.getsource(generation_worker._precompute_lod_tables)
+
+    assert "ST_SnapToGrid" not in pole_lod_source
+    assert "tile_x" in pole_lod_source
+    assert "tile_y" in pole_lod_source
+    assert "geom_3857" in pole_lod_source
+    assert "pole_clusters_z15" in precompute_source
+
+
+def test_gis_generation_worker_precomputes_tile_local_span_and_route_lod() -> None:
+    span_lod_source = inspect.getsource(generation_worker._insert_span_lod)
+    route_lod_source = inspect.getsource(generation_worker._insert_route_summary)
+
+    assert "GROUP BY service_territory_id, fiber_route_id, tile_x, tile_y" in span_lod_source
+    assert "span_tiles AS" in span_lod_source
+    assert "ST_SnapToGrid" not in span_lod_source
+
+    assert "generate_series(min_tile_x, max_tile_x)" in route_lod_source
+    assert "generate_series(min_tile_y, max_tile_y)" in route_lod_source
+    assert "ST_TileEnvelope(8, tile_x, tile_y)" in route_lod_source
+    assert "ST_Intersection(geom, tile_geom)" in route_lod_source
+    assert "ST_Centroid" not in route_lod_source
+
+
+def test_gis_proposed_edit_targets_are_staged_and_tile_aware() -> None:
+    pole_target = _proposed_edit_target("pole")
+    span_target = _proposed_edit_target("span")
+    fiber_target = _proposed_edit_target("fiber_route")
+
+    assert pole_target["proposed_table"] == "proposed_poles"
+    assert pole_target["base_table"] == "telecom_poles"
+    assert {"poles", "pole_clusters", "spans"}.issubset(set(pole_target["layers"]))
+    assert span_target["proposed_table"] == "proposed_spans"
+    assert fiber_target["proposed_table"] == "proposed_fiber_routes"
+
+
+def test_gis_performance_check_targets_required_scale_contract() -> None:
+    required_layers = {
+        "territory",
+        "poles",
+        "pole_clusters",
+        "spans",
+        "fiber_routes",
+        "splice_cases",
+        "handholes",
+        "slack_loops",
+        "mux_sites",
+        "circuit_routes",
+    }
+    tile_checks = gis_scale_performance_check.representative_tile_checks()
+    checked_layers = {check.layer for check in tile_checks}
+
+    assert required_layers == set(gis_scale_performance_check.required_tile_layers())
+    assert required_layers.issubset(checked_layers)
+    assert any(check.layer == "poles" and check.z == 8 and check.expected_lod == "density" for check in tile_checks)
+    assert any(check.layer == "poles" and check.z == 12 and check.expected_lod == "cluster" for check in tile_checks)
+    assert any(check.layer == "poles" and check.z == 16 and check.expected_lod == "individual" for check in tile_checks)
+    assert all(check.path.startswith("/api/tiles/") and check.path.endswith(".mvt") for check in tile_checks)
+
+    checker_source = inspect.getsource(gis_scale_performance_check)
+    assert "If-None-Match" in checker_source
+    assert "X-GIS-Tile-Truncated" in checker_source
+    assert "application/vnd.mapbox-vector-tile" in checker_source
+    assert "/api/search?type=pole&q=TEST&limit=25&offset=0" in checker_source
+    assert "/api/trace/fiber" in checker_source
+    assert "raw_browser_pole_load_allowed" in checker_source
+
+
+def test_gis_performance_check_url_join_preserves_api_mounts() -> None:
+    join_url = gis_scale_performance_check.join_api_url
+
+    assert join_url("http://localhost:8000", "/api/gis/capabilities") == "http://localhost:8000/api/gis/capabilities"
+    assert join_url("https://gridassetlink.dev/backend", "/api/gis/capabilities") == "https://gridassetlink.dev/backend/api/gis/capabilities"
+    assert join_url("https://gridassetlink.dev/backend/", "api/gis/capabilities") == "https://gridassetlink.dev/backend/api/gis/capabilities"
+    assert join_url("https://api.example.com/api", "/api/gis/capabilities") == "https://api.example.com/api/gis/capabilities"

@@ -115,6 +115,139 @@ The app does not infer real private fiber routes, relay channels, SCADA paths, p
 
 The dashboard includes public-reference transmission-line and verified-owner public substation ingestion pipelines, a deterministic synthetic substation generator, synthetic transmission structure numbering, synthetic OPGW generation, strands, splice closures, splice records, patch panels, and fiber assignments for ISO New England map planning demos.
 
+## GIS-Scale Synthetic Distribution Network
+
+GridAssetLink now includes an MVP architecture for tens of millions of synthetic telecom poles/support structures without loading raw pole inventories into the browser.
+
+Scale boundary:
+
+- Use PostGIS as the source of truth for million-scale assets.
+- Use `/api/tiles/{layer}/{z}/{x}/{y}.mvt` for MapLibre vector tiles.
+- Do not render millions of poles as React components.
+- Do not load full pole datasets into client state.
+- Do not use giant GeoJSON files as the production scale path.
+- All generated poles, spans, ADSS/OPGW references, splices, slack loops, handholes, mux sites, circuit routes, and fiber routes remain synthetic unless imported and explicitly marked verified.
+
+The FastAPI GIS endpoints support:
+
+- `GET /api/gis/capabilities`
+- `GET /api/gis/scale-health`
+- `GET /api/tiles/{layer}/{z}/{x}/{y}.mvt`
+- `GET /api/service-territories`
+- `POST /api/service-territories/import-geojson`
+- `POST /api/service-territories/{territory_id}/validate`
+- `GET /api/service-territories/{territory_id}/generation-preflight`
+- `POST /api/service-territories/{territory_id}/generation-preflight`
+- `GET /api/road-centerlines/summary`
+- `POST /api/road-centerlines/import-geojson`
+- `POST /api/service-territories/{territory_id}/generate-synthetic-assets`
+- `GET /api/generation-jobs/{job_key}/plan`
+- `POST /api/generation-jobs/{job_key}/pause`
+- `POST /api/generation-jobs/{job_key}/resume`
+- `POST /api/generation-jobs/{job_key}/cancel`
+- `POST /api/service-territories/{territory_id}/warm-tile-cache`
+- `POST /api/tiles/dirty`
+- `POST /api/tiles/dirty-by-geometry`
+- `POST /api/proposed-edits/{asset_type}`
+- `GET /api/assets/pole/{pole_id}`
+- `GET /api/assets/{asset_type}/{asset_id}`
+- `GET /api/search?type=pole&q=...`
+- `POST /api/trace/circuit`
+- `POST /api/trace/fiber`
+- `POST /api/trace/span-impact`
+
+Vector tile LOD rules:
+
+- Zoom 0-7: territory and summaries only.
+- Zoom 8-10: density/count tiles, no individual poles.
+- Zoom 11-13: cluster/vector aggregate tiles and simplified spans.
+- Zoom 14-15: road-level clusters and selected corridor summaries.
+- Zoom 16+: individual synthetic poles, spans, splice cases, handholes, slack loops, mux sites, and click-to-load details.
+
+Pole density and cluster tables are precomputed into Web Mercator tile bins at z8, z10, z12, z14, and z15. Low and mid zoom requests use aggregate source tables at the same or a higher source zoom, and aggregate tile serving filters by `tile_z/tile_x/tile_y` before the final geometry intersection. The map does not need to cluster or scan raw pole points before street zoom.
+
+The dashboard has MapLibre vector tile sources for territory, pole density, pole clusters, pole details, spans, fiber routes, splice cases, handholes, slack loops, mux sites, and circuit routes. Search for GIS-scale pole/fiber/circuit records is server-side and cancellable.
+
+Vector tiles carry only IDs, symbology, status, and minimal display fields. When a user clicks an individual GIS feature, the map calls `GET /api/assets/pole/{pole_id}` for poles or `GET /api/assets/{asset_type}/{asset_id}` for spans, fiber routes, circuit routes, splice cases, handholes, slack loops, and mux sites. Detail responses are selected-record payloads with capped related records; they are not raw network dumps.
+
+GIS search is intentionally indexed-column only. Pole searches use pole ID, road name, town, and county; fiber/circuit searches use route IDs and route names; splice/handhole/mux searches use their asset IDs plus route/pole references. The API escapes wildcard characters and does not scan `properties::text` on million-scale tables.
+
+Vector tiles enforce per-layer feature budgets so dense street-level tiles cannot grow without bound. The tile API reads at most `max_features + 1`, renders only the budgeted features, caches the MVT body with feature metadata, and returns `X-GIS-Feature-Count`, `X-GIS-Max-Features`, and `X-GIS-Tile-Truncated` headers.
+
+Trace behavior is server-side. Asset traces return bounded edge lists by asset ID, while node-to-node traces use a recursive PostGIS/PostgreSQL graph walk over `network_edges` with max-depth and max-edge guards, reverse-direction traversal, cycle protection, and trace-cache reuse. The browser receives only the ordered path and summary geometry for the selected trace.
+
+Generation flow:
+
+1. Import or draw a service territory polygon.
+2. Import public road centerline GeoJSON with `POST /api/road-centerlines/import-geojson`.
+3. Run preflight with `GET /api/service-territories/{territory_id}/generation-preflight`.
+4. Queue synthetic generation with `POST /api/service-territories/{territory_id}/generate-synthetic-assets`.
+5. Review the road-mile and spacing plan with `GET /api/generation-jobs/{job_key}/plan`.
+6. Run the background worker:
+
+```bash
+cd backend
+.venv\Scripts\python.exe -m app.jobs.synthetic_telecom_generation_worker --job-key gisgen-example --max-batches 10
+```
+
+The worker clips roads to the territory, excludes highway/ramp/rail/water/building-style records, places synthetic poles along road geometry with right-of-way offsets, generates adjacent spans, creates telecom strand and ADSS attachment records, places splice/slack/handhole/mux points, updates progress, and marks affected cached tiles dirty. It commits work batch-by-batch using `batch_size` as an estimated pole-record budget, stores `next_record_batch_id` / `completed_batch_count` for pause/resume, mirrors the legacy `next_road_offset` cursor for compatibility, and honors pause/resume/cancel controls between batches so a large generation run does not hold one giant transaction open. It is intentionally not run inside a normal API request.
+
+The map dashboard also includes a `Scale` drawer tab. That tab can import or manually edit a service territory GeoJSON polygon, import public road centerline GeoJSON, run generation preflight, queue a background generation job, show recent job status, and enable the GIS-scale vector layers. It stores only health, territory, preflight, and job summaries in React state; it does not fetch raw pole inventories.
+
+Generation preflight estimates clipped eligible road mileage, synthetic pole/span totals, road placement classes, target-fill percentage, worker batch count, and warnings before the job is queued. Queueing a generation job now refuses territories with no eligible clipped public road centerlines.
+
+Local 10M synthetic load:
+
+- A local portable PostgreSQL/PostGIS runtime can be used at `.local/postgis-runtime` with `DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:55432/telecomne_grid_10m`.
+- The loaded New England demo territory is based on public Census 2024 state boundaries and public TIGER/Line 2024 road centerline references.
+- The current synthetic demo load contains about 10.0M poles/support structures, 9.4M spans, 609k fiber routes, 24.3k carried synthetic services/circuit routes, 820k splice cases, 924k slack loops, 709k handholes, and 645k mux sites.
+- The LOD tables summarize the full pole load into z8/z10 density, z12/z14/z15 cluster, simplified span, and route-summary records so the dashboard can browse the territory without downloading raw pole inventories.
+- The full per-pole graph enrichment is intentionally optional for 10M+ bulk loads; route, span, fiber, splice, slack, handhole, mux, circuit-route, vector tile, search, and click-detail records are still generated and served.
+- These records are synthetic demo/planning data only. They do not represent real utility poles, telecom attachments, fiber routes, circuits, splice points, or operational records.
+
+Tile invalidation:
+
+- Use `POST /api/service-territories/{territory_id}/warm-tile-cache` to pre-render a capped set of service-territory, pole density, pole cluster, simplified span, or route-summary tiles. The default request warms only territory, pole density, and pole cluster layers through z15. Request span or route-summary layers only for zoom ranges that remain aggregate-safe; the warmer rejects raw street-level plans and is intentionally capped so it does not sweep an entire high-zoom territory.
+- Use `POST /api/tiles/dirty` when the caller already knows the exact `layer/z/x/y` tile.
+- Use `POST /api/tiles/dirty-by-geometry` after editing a pole, span, splice case, route, or proposed asset geometry. The API computes intersecting tiles for the requested layers and zoom range, marks only those cached vector tiles dirty, and dirties cached trace results. This avoids regenerating every tile in a service territory after a local edit.
+- Use `POST /api/proposed-edits/{asset_type}` for staged `pole`, `span`, or `fiber_route` edits. Proposed edits are written to `proposed_poles`, `proposed_spans`, or `proposed_fiber_routes`, must be fully covered by the service territory polygon, mark only intersecting layer tiles dirty, and do not mutate the base synthetic network.
+
+Scale health:
+
+- Use `GET /api/gis/scale-health` to inspect table-size estimates, tile cache status, trace cache status, recent generation jobs, service territory summaries, and architecture guardrails.
+- The health endpoint uses PostgreSQL catalog row estimates for huge feature tables instead of running raw `count(*)` over million-scale pole/span inventories.
+- Generation completion refreshes each territory's `summary_json.gis_scale` from precomputed LOD tables so dashboards can show synthetic pole/span/route summaries without scanning the raw inventory.
+
+The older static distribution pole sample is intentionally opt-in:
+
+```bash
+NEXT_PUBLIC_LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE=true npm run dev
+```
+
+Production deployments should leave that flag unset and provide a PostgreSQL/PostGIS `DATABASE_URL`, run Alembic migrations, and serve synthetic pole/support-structure data through vector tiles. The static sample is a small local demonstration fallback, not the scale architecture.
+
+Run the guardrail check from the frontend directory:
+
+```bash
+npm run perf:gis-guardrails
+```
+
+Run the API performance smoke check from the backend directory after starting the API:
+
+```bash
+cd backend
+.venv\Scripts\python.exe -m app.jobs.gis_scale_performance_check --base-url http://localhost:8000
+```
+
+For a deployment mounted under the website backend path:
+
+```bash
+cd backend
+.venv\Scripts\python.exe -m app.jobs.gis_scale_performance_check --base-url https://gridassetlink.dev/backend
+```
+
+This checks capabilities, representative MVT tile layers, ETags, cache headers, feature-budget headers, server-side search, and bounded trace responses. It fails if street-level pole tiles exceed the configured payload or latency budgets, and it never requests raw pole inventories.
+
 Run the full map data refresh from the frontend directory:
 
 ```bash

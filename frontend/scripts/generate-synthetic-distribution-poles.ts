@@ -1,15 +1,23 @@
 import type {
   Coordinate,
+  DistributionFiberAssignmentCollection,
   DistributionPoleCollection,
   DistributionPoleContinuityRecord,
+  DistributionPoleDensityCollection,
   DistributionPoleFiberRouteCollection,
+  DistributionPoleSplicePointCollection,
+  DistributionSlackLoopCollection,
   PatchPanel,
   PublicSubstationCollection,
 } from "../lib/types/assets";
 import {
   createSeededRandom,
+  DISTRIBUTION_FIBER_ASSIGNMENTS_PATH,
   DISTRIBUTION_POLE_CONTINUITY_PATH,
+  DISTRIBUTION_POLE_DENSITY_PATH,
   DISTRIBUTION_POLE_FIBER_PATH,
+  DISTRIBUTION_POLE_SLACK_LOOPS_PATH,
+  DISTRIBUTION_POLE_SPLICE_POINTS_PATH,
   DISTRIBUTION_POLES_META_PATH,
   DISTRIBUTION_POLES_PATH,
   distanceMiles,
@@ -25,7 +33,7 @@ import {
 
 const PUBLIC_SUBSTATIONS_PATH = `${OUTPUT_DIR}/iso-ne-public-substations.geojson`;
 const TARGET_DISPLAY_POLES = Number(process.env.DISTRIBUTION_POLE_SAMPLE_COUNT || 12000);
-const ESTIMATED_REGIONAL_POLE_SCALE = Number(process.env.DISTRIBUTION_POLE_SCALE_COUNT || 1250000);
+const ESTIMATED_REGIONAL_POLE_SCALE = Number(process.env.DISTRIBUTION_POLE_SCALE_COUNT || 2400000);
 const SEED = "gridassetlink-distribution-poles-v1";
 const NEW_ENGLAND_STATES = new Set(["CT", "ME", "MA", "NH", "RI", "VT"]);
 
@@ -40,6 +48,10 @@ async function main() {
 
   const poleFeatures: DistributionPoleCollection["features"] = [];
   const fiberFeatures: DistributionPoleFiberRouteCollection["features"] = [];
+  const densityFeatures: DistributionPoleDensityCollection["features"] = [];
+  const splicePointFeatures: DistributionPoleSplicePointCollection["features"] = [];
+  const slackLoopFeatures: DistributionSlackLoopCollection["features"] = [];
+  const assignmentFeatures: DistributionFiberAssignmentCollection["features"] = [];
   const continuityRecords: DistributionPoleContinuityRecord[] = [];
   const substationsToUse = candidateSubstations;
   const estimatedPerDisplayPole = Math.max(1, Math.round(ESTIMATED_REGIONAL_POLE_SCALE / TARGET_DISPLAY_POLES));
@@ -64,6 +76,7 @@ async function main() {
       const polesOnFeeder = Math.max(5, Math.min(poleCountForPath(feeder.coordinates, rng), Math.ceil(targetPolesForSubstation / feederCount)));
       const spacingMiles = Math.max(0.028, totalMiles(feeder.coordinates) / Math.max(1, polesOnFeeder - 1));
       const feederPoleIds: string[] = [];
+      const representedPoleCount = polesOnFeeder * estimatedPerDisplayPole;
 
       for (let sequence = 0; sequence < polesOnFeeder && poleFeatures.length < TARGET_DISPLAY_POLES; sequence += 1) {
         const baseCoordinate = interpolatePath(feeder.coordinates, sequence * spacingMiles);
@@ -99,6 +112,10 @@ async function main() {
             upstreamNetworkNodeId: substation.properties.id,
             upstreamPatchPanelId: parentPatchPanel?.id,
             continuityPathId: `DIST-CONT-${routeId}`,
+            representedPoleCount: estimatedPerDisplayPole,
+            splicePointIds: [],
+            slackLoopIds: [],
+            assignmentIds: [],
             serviceDropCount: sequence % 3 === 0 ? Math.floor(rng() * 8) : Math.floor(rng() * 3),
             status,
             synthetic: true,
@@ -113,6 +130,60 @@ async function main() {
         poleFeatures[index].properties.downstreamPoleId = poleFeatures[index + 1].properties.id;
       }
       if (!feederPoleIds.length) continue;
+      const routePoleFeatures = poleFeatures.slice(poleStartIndex);
+      const splicePointIds = createDistributionSplices({
+        routeId,
+        feederId,
+        streetPathId,
+        owner,
+        state: normalizeState(substation.properties.state),
+        fiberCount,
+        status,
+        routePoleFeatures,
+        splicePointFeatures,
+        rng,
+      });
+      const slackLoopIds = createDistributionSlackLoops({
+        routeId,
+        feederId,
+        owner,
+        state: normalizeState(substation.properties.state),
+        routePoleFeatures,
+        splicePointFeatures,
+        slackLoopFeatures,
+        rng,
+      });
+      const assignmentIds = createDistributionAssignments({
+        routeId,
+        feederId,
+        owner,
+        state: normalizeState(substation.properties.state),
+        fiberCount,
+        status,
+        serviceTypes,
+        routePoleFeatures,
+        splicePointIds,
+        slackLoopIds,
+        routeMiles: round(totalMiles(feeder.coordinates), 3),
+        assignmentFeatures,
+      });
+      routePoleFeatures.forEach((pole) => {
+        pole.properties.splicePointIds = splicePointFeatures
+          .filter((splice) => splice.properties.routeId === routeId && splice.properties.poleId === pole.properties.id)
+          .map((splice) => splice.properties.id);
+        pole.properties.slackLoopIds = slackLoopFeatures
+          .filter((slack) => slack.properties.routeId === routeId && slack.properties.poleId === pole.properties.id)
+          .map((slack) => slack.properties.id);
+        pole.properties.assignmentIds = assignmentIds;
+      });
+      splicePointFeatures
+        .filter((splice) => splice.properties.routeId === routeId)
+        .forEach((splice) => {
+          splice.properties.connectedAssignmentIds = assignmentIds;
+        });
+      const totalSlackFeet = slackLoopFeatures
+        .filter((slack) => slack.properties.routeId === routeId)
+        .reduce((sum, slack) => sum + slack.properties.slackFeet, 0);
 
       fiberFeatures.push({
         type: "Feature",
@@ -128,9 +199,14 @@ async function main() {
           placementModel: "synthetic_street_path",
           routeMiles: round(totalMiles(feeder.coordinates), 3),
           poleCount: feederPoleIds.length,
+          representedPoleCount,
           firstPoleId: feederPoleIds[0],
           lastPoleId: feederPoleIds[feederPoleIds.length - 1],
           samplePoleIds: sampleIds(feederPoleIds),
+          splicePointIds,
+          slackLoopIds,
+          assignmentIds,
+          totalSlackFeet,
           parentPatchPanelId: parentPatchPanel?.id,
           parentOpgwRouteId: parentPatchPanel?.fiberCableIds?.[0] ? `OPGW-${parentPatchPanel.fiberCableIds[0]}` : undefined,
           fiberCount,
@@ -141,6 +217,30 @@ async function main() {
           notes: "Synthetic distribution telecom feeder route following generated street paths. Not a real utility pole or fiber route.",
         },
         geometry: { type: "LineString", coordinates: feeder.coordinates.map(roundCoordinate) },
+      });
+      densityFeatures.push({
+        type: "Feature",
+        properties: {
+          id: `DIST-DENSITY-${String(densityFeatures.length + 1).padStart(5, "0")}`,
+          densityCellName: `${feederId} density summary`,
+          utilityOwner: owner,
+          state: normalizeState(substation.properties.state),
+          latitude: substation.geometry.coordinates[1],
+          longitude: substation.geometry.coordinates[0],
+          displayPoleCount: feederPoleIds.length,
+          representedPoleCount,
+          feederRouteCount: 1,
+          fiberRouteMiles: round(totalMiles(feeder.coordinates), 3),
+          splicePointCount: splicePointIds.length,
+          slackLoopCount: slackLoopIds.length,
+          assignmentCount: assignmentIds.length,
+          maxFiberCount: fiberCount,
+          statusSummary: status,
+          synthetic: true,
+          source: "synthetic-demo",
+          notes: "Optimized density point representing many synthetic distribution telecom poles for smooth million-scale map browsing.",
+        },
+        geometry: { type: "Point", coordinates: roundCoordinate(substation.geometry.coordinates) },
       });
 
       continuityRecords.push({
@@ -154,7 +254,12 @@ async function main() {
         endpointZType: "distribution_pole",
         endpointZId: feederPoleIds[feederPoleIds.length - 1],
         totalPoleCount: feederPoleIds.length,
+        representedPoleCount,
         samplePoleIds: sampleIds(feederPoleIds),
+        splicePointIds,
+        slackLoopIds,
+        assignmentIds,
+        totalSlackFeet,
         fiberCount,
         serviceTypesCarried: serviceTypes,
         continuityStatus: status === "proposed" ? "proposed" : status === "planned" ? "planned" : "complete_synthetic",
@@ -166,6 +271,10 @@ async function main() {
 
   await writeJson(DISTRIBUTION_POLES_PATH, { type: "FeatureCollection", features: poleFeatures });
   await writeJson(DISTRIBUTION_POLE_FIBER_PATH, { type: "FeatureCollection", features: fiberFeatures });
+  await writeJson(DISTRIBUTION_POLE_DENSITY_PATH, { type: "FeatureCollection", features: densityFeatures });
+  await writeJson(DISTRIBUTION_POLE_SPLICE_POINTS_PATH, { type: "FeatureCollection", features: splicePointFeatures });
+  await writeJson(DISTRIBUTION_POLE_SLACK_LOOPS_PATH, { type: "FeatureCollection", features: slackLoopFeatures });
+  await writeJson(DISTRIBUTION_FIBER_ASSIGNMENTS_PATH, { type: "FeatureCollection", features: assignmentFeatures });
   await writeJson(DISTRIBUTION_POLE_CONTINUITY_PATH, continuityRecords);
   await writeJson(DISTRIBUTION_POLES_META_PATH, {
     generatedAt: new Date().toISOString(),
@@ -174,6 +283,10 @@ async function main() {
     publicReferenceInput: "iso-ne-public-substations.geojson",
     displayPoleCount: poleFeatures.length,
     fiberRouteCount: fiberFeatures.length,
+    densityCellCount: densityFeatures.length,
+    distributionSplicePointCount: splicePointFeatures.length,
+    distributionSlackLoopCount: slackLoopFeatures.length,
+    distributionFiberAssignmentCount: assignmentFeatures.length,
     continuityRecordCount: continuityRecords.length,
     estimatedRegionalPoleScale: ESTIMATED_REGIONAL_POLE_SCALE,
     estimatedPolesRepresentedPerDisplayPole: estimatedPerDisplayPole,
@@ -261,6 +374,232 @@ function pickStatus(rng: () => number) {
   if (roll > 0.75) return "planned" as const;
   if (roll > 0.68) return "needs_field_verification" as const;
   return "in_service_synthetic" as const;
+}
+
+function createDistributionSplices({
+  routeId,
+  feederId,
+  streetPathId,
+  owner,
+  state,
+  fiberCount,
+  status,
+  routePoleFeatures,
+  splicePointFeatures,
+  rng,
+}: {
+  routeId: string;
+  feederId: string;
+  streetPathId: string;
+  owner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  fiberCount: 12 | 24 | 48 | 96;
+  status: "in_service_synthetic" | "planned" | "proposed" | "needs_field_verification";
+  routePoleFeatures: DistributionPoleCollection["features"];
+  splicePointFeatures: DistributionPoleSplicePointCollection["features"];
+  rng: () => number;
+}) {
+  const indexes = new Set<number>([0, Math.max(0, routePoleFeatures.length - 1)]);
+  let cursor = 5 + Math.floor(rng() * 7);
+  while (cursor < routePoleFeatures.length - 1) {
+    indexes.add(cursor);
+    cursor += 7 + Math.floor(rng() * 12);
+  }
+  if (routePoleFeatures.length > 9 && rng() > 0.35) indexes.add(Math.floor(routePoleFeatures.length / 2));
+  return [...indexes]
+    .sort((a, b) => a - b)
+    .map((poleIndex, localIndex) => {
+      const pole = routePoleFeatures[poleIndex];
+      const isTerminal = poleIndex === 0 || poleIndex === routePoleFeatures.length - 1;
+      const id = `DIST-SPLICE-${String(splicePointFeatures.length + 1).padStart(6, "0")}`;
+      const spliceType = isTerminal
+        ? "riser_terminal"
+        : pole.properties.telecomRole === "fiber_lateral"
+          ? "tap_splice"
+          : localIndex % 4 === 0
+            ? "branch_splice"
+            : "inline_splice";
+      const slackLoopFeet = isTerminal ? 180 + Math.round(rng() * 140) : 80 + Math.round(rng() * 180);
+      splicePointFeatures.push({
+        type: "Feature",
+        properties: {
+          id,
+          spliceName: `${pole.properties.poleNumber} ${spliceType.replaceAll("_", " ")}`,
+          routeId,
+          feederId,
+          streetPathId,
+          poleId: pole.properties.id,
+          poleNumber: pole.properties.poleNumber,
+          sequenceIndex: pole.properties.sequenceIndex,
+          utilityOwner: owner,
+          state,
+          latitude: pole.geometry.coordinates[1],
+          longitude: pole.geometry.coordinates[0],
+          spliceType,
+          spliceCount: Math.max(6, Math.min(fiberCount, 6 + Math.floor(rng() * fiberCount))),
+          slackLoopFeet,
+          connectedAssignmentIds: [],
+          status,
+          synthetic: true,
+          source: "synthetic-demo",
+          notes: "Synthetic distribution telecom splice point on a generated street-path pole route. Not a real field splice.",
+        },
+        geometry: { type: "Point", coordinates: pole.geometry.coordinates },
+      });
+      return id;
+    });
+}
+
+function createDistributionSlackLoops({
+  routeId,
+  feederId,
+  owner,
+  state,
+  routePoleFeatures,
+  splicePointFeatures,
+  slackLoopFeatures,
+  rng,
+}: {
+  routeId: string;
+  feederId: string;
+  owner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  routePoleFeatures: DistributionPoleCollection["features"];
+  splicePointFeatures: DistributionPoleSplicePointCollection["features"];
+  slackLoopFeatures: DistributionSlackLoopCollection["features"];
+  rng: () => number;
+}) {
+  const createdIds: string[] = [];
+  const routeSplices = splicePointFeatures.filter((splice) => splice.properties.routeId === routeId);
+  routeSplices.forEach((splice) => {
+    const id = `DIST-SLACK-${String(slackLoopFeatures.length + 1).padStart(6, "0")}`;
+    createdIds.push(id);
+    slackLoopFeatures.push({
+      type: "Feature",
+      properties: {
+        id,
+        slackName: `${splice.properties.poleNumber} splice slack`,
+        routeId,
+        feederId,
+        poleId: splice.properties.poleId,
+        poleNumber: splice.properties.poleNumber,
+        sequenceIndex: splice.properties.sequenceIndex,
+        utilityOwner: owner,
+        state,
+        latitude: splice.geometry.coordinates[1],
+        longitude: splice.geometry.coordinates[0],
+        slackType: splice.properties.spliceType === "riser_terminal" ? "riser_storage" : "splice_slack",
+        slackFeet: splice.properties.slackLoopFeet,
+        relatedSplicePointId: splice.properties.id,
+        status: splice.properties.status,
+        synthetic: true,
+        source: "synthetic-demo",
+        notes: "Synthetic slack storage loop for demo distribution fiber continuity planning.",
+      },
+      geometry: splice.geometry,
+    });
+  });
+  let cursor = 4 + Math.floor(rng() * 5);
+  while (cursor < routePoleFeatures.length - 2) {
+    const pole = routePoleFeatures[cursor];
+    const id = `DIST-SLACK-${String(slackLoopFeatures.length + 1).padStart(6, "0")}`;
+    createdIds.push(id);
+    slackLoopFeatures.push({
+      type: "Feature",
+      properties: {
+        id,
+        slackName: `${pole.properties.poleNumber} maintenance loop`,
+        routeId,
+        feederId,
+        poleId: pole.properties.id,
+        poleNumber: pole.properties.poleNumber,
+        sequenceIndex: pole.properties.sequenceIndex,
+        utilityOwner: owner,
+        state,
+        latitude: pole.geometry.coordinates[1],
+        longitude: pole.geometry.coordinates[0],
+        slackType: cursor % 3 === 0 ? "snowshoe_loop" : "maintenance_loop",
+        slackFeet: 60 + Math.round(rng() * 180),
+        status: pole.properties.status === "needs_field_verification" ? "needs_field_verification" : "in_service_synthetic",
+        synthetic: true,
+        source: "synthetic-demo",
+        notes: "Synthetic distribution slack loop placed on a generated street-path pole route.",
+      },
+      geometry: { type: "Point", coordinates: pole.geometry.coordinates },
+    });
+    cursor += 6 + Math.floor(rng() * 9);
+  }
+  return createdIds;
+}
+
+function createDistributionAssignments({
+  routeId,
+  feederId,
+  owner,
+  state,
+  fiberCount,
+  status,
+  serviceTypes,
+  routePoleFeatures,
+  splicePointIds,
+  slackLoopIds,
+  routeMiles,
+  assignmentFeatures,
+}: {
+  routeId: string;
+  feederId: string;
+  owner: string;
+  state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
+  fiberCount: 12 | 24 | 48 | 96;
+  status: "in_service_synthetic" | "planned" | "proposed" | "needs_field_verification";
+  serviceTypes: DistributionPoleContinuityRecord["serviceTypesCarried"];
+  routePoleFeatures: DistributionPoleCollection["features"];
+  splicePointIds: string[];
+  slackLoopIds: string[];
+  routeMiles: number;
+  assignmentFeatures: DistributionFiberAssignmentCollection["features"];
+}) {
+  const poleIds = routePoleFeatures.map((pole) => pole.properties.id);
+  const coordinates = routePoleFeatures.map((pole) => pole.geometry.coordinates);
+  return serviceTypes.map((serviceType, index) => {
+    const strandStart = ((index * 2) % Math.max(2, fiberCount - 1)) + 1;
+    const id = `DIST-ASSIGN-${String(assignmentFeatures.length + 1).padStart(6, "0")}`;
+    const criticality = serviceType === "Protection Pilot" || serviceType === "SCADA"
+      ? "critical"
+      : serviceType === "Distribution Automation"
+        ? "high"
+        : serviceType === "Spare"
+          ? "low"
+          : "normal";
+    assignmentFeatures.push({
+      type: "Feature",
+      properties: {
+        id,
+        assignmentName: `${serviceType} on ${feederId}`,
+        routeId,
+        feederId,
+        utilityOwner: owner,
+        state,
+        serviceType,
+        status: serviceType === "Spare" ? "reserved" : status === "proposed" ? "proposed" : status === "planned" ? "planned" : "active_synthetic",
+        criticality,
+        strandNumbers: [strandStart, Math.min(fiberCount, strandStart + 1)],
+        aEndPoleId: poleIds[0],
+        zEndPoleId: poleIds[poleIds.length - 1],
+        poleIds: sampleIds(poleIds),
+        splicePointIds,
+        slackLoopIds,
+        routeMiles,
+        estimatedLossDb: round(routeMiles * 0.25 + splicePointIds.length * 0.05 + slackLoopIds.length * 0.01 + 1, 2),
+        fiberCount,
+        synthetic: true,
+        source: "synthetic-demo",
+        notes: "Synthetic distribution fiber assignment carried along a generated pole-line feeder route.",
+      },
+      geometry: { type: "LineString", coordinates },
+    });
+    return id;
+  });
 }
 
 function pickServiceTypes(index: number, rng: () => number): DistributionPoleContinuityRecord["serviceTypesCarried"] {

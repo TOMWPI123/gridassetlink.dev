@@ -1,11 +1,17 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type {
+  DistributionFiberAssignmentCollection,
+  DistributionFiberAssignmentFeature,
   DistributionPoleCollection,
   DistributionPoleContinuityRecord,
   DistributionPoleFeature,
   DistributionPoleFiberRouteCollection,
   DistributionPoleFiberRouteFeature,
+  DistributionPoleSplicePointCollection,
+  DistributionPoleSplicePointFeature,
+  DistributionSlackLoopCollection,
+  DistributionSlackLoopFeature,
   PatchPanel,
 } from "@/lib/types/assets";
 
@@ -14,6 +20,9 @@ const DATA_DIR = path.join(process.cwd(), "public", "data");
 export type DistributionPoleNetworkData = {
   poles: DistributionPoleFeature[];
   fiberRoutes: DistributionPoleFiberRouteFeature[];
+  splicePoints: DistributionPoleSplicePointFeature[];
+  slackLoops: DistributionSlackLoopFeature[];
+  fiberAssignments: DistributionFiberAssignmentFeature[];
   continuityRecords: DistributionPoleContinuityRecord[];
   patchPanels: PatchPanel[];
 };
@@ -27,19 +36,26 @@ export type DistributionPoleContinuityView = {
   selectedPole?: DistributionPoleFeature;
   routePoles: DistributionPoleFeature[];
   samplePoles: DistributionPoleFeature[];
+  splicePoints: DistributionPoleSplicePointFeature[];
+  slackLoops: DistributionSlackLoopFeature[];
+  fiberAssignments: DistributionFiberAssignmentFeature[];
   parentPatchPanel?: PatchPanel;
   serviceTypes: string[];
   estimatedRouteMiles: number;
   estimatedLossDb: number;
   estimatedPoleScaleCount: number;
+  totalSlackFeet: number;
   criticalServiceCount: number;
   warning: string;
 };
 
 export async function loadDistributionPoleNetworkData(): Promise<DistributionPoleNetworkData> {
-  const [poles, fiberRoutes, continuityRecords, patchPanels] = await Promise.all([
+  const [poles, fiberRoutes, splicePoints, slackLoops, fiberAssignments, continuityRecords, patchPanels] = await Promise.all([
     readData<DistributionPoleCollection>("iso-ne-synthetic-distribution-poles.geojson", { type: "FeatureCollection", features: [] }),
     readData<DistributionPoleFiberRouteCollection>("iso-ne-synthetic-distribution-pole-fiber.geojson", { type: "FeatureCollection", features: [] }),
+    readData<DistributionPoleSplicePointCollection>("iso-ne-synthetic-distribution-splice-points.geojson", { type: "FeatureCollection", features: [] }),
+    readData<DistributionSlackLoopCollection>("iso-ne-synthetic-distribution-slack-loops.geojson", { type: "FeatureCollection", features: [] }),
+    readData<DistributionFiberAssignmentCollection>("iso-ne-synthetic-distribution-fiber-assignments.geojson", { type: "FeatureCollection", features: [] }),
     readData<DistributionPoleContinuityRecord[]>("iso-ne-synthetic-distribution-continuity.json", []),
     readData<PatchPanel[]>("iso-ne-synthetic-patch-panels.json", []),
   ]);
@@ -47,6 +63,9 @@ export async function loadDistributionPoleNetworkData(): Promise<DistributionPol
   return {
     poles: poles.features,
     fiberRoutes: fiberRoutes.features,
+    splicePoints: splicePoints.features,
+    slackLoops: slackLoops.features,
+    fiberAssignments: fiberAssignments.features,
     continuityRecords,
     patchPanels,
   };
@@ -80,6 +99,13 @@ export function buildDistributionPoleContinuityView(
     ? data.patchPanels.find((panel) => panel.id === route.properties.parentPatchPanelId)
     : undefined;
   const serviceTypes = [...new Set([...(continuityRecord?.serviceTypesCarried || []), ...route.properties.serviceTypesCarried])];
+  const routeSpliceIds = new Set(continuityRecord?.splicePointIds || route.properties.splicePointIds || []);
+  const routeSlackIds = new Set(continuityRecord?.slackLoopIds || route.properties.slackLoopIds || []);
+  const routeAssignmentIds = new Set(continuityRecord?.assignmentIds || route.properties.assignmentIds || []);
+  const splicePoints = data.splicePoints.filter((splice) => splice.properties.routeId === route.properties.routeId || routeSpliceIds.has(splice.properties.id));
+  const slackLoops = data.slackLoops.filter((slack) => slack.properties.routeId === route.properties.routeId || routeSlackIds.has(slack.properties.id));
+  const fiberAssignments = data.fiberAssignments.filter((assignment) => assignment.properties.routeId === route.properties.routeId || routeAssignmentIds.has(assignment.properties.id));
+  const totalSlackFeet = continuityRecord?.totalSlackFeet || route.properties.totalSlackFeet || slackLoops.reduce((sum, slack) => sum + slack.properties.slackFeet, 0);
 
   return {
     targetType,
@@ -90,21 +116,27 @@ export function buildDistributionPoleContinuityView(
     selectedPole,
     routePoles,
     samplePoles,
+    splicePoints,
+    slackLoops,
+    fiberAssignments,
     parentPatchPanel,
     serviceTypes,
     estimatedRouteMiles: route.properties.routeMiles,
-    estimatedLossDb: estimateDistributionLoss(route.properties.routeMiles, route.properties.poleCount),
+    estimatedLossDb: estimateDistributionLoss(route.properties.routeMiles, route.properties.poleCount, splicePoints.length, totalSlackFeet),
     estimatedPoleScaleCount: route.properties.estimatedPoleScaleCount,
+    totalSlackFeet,
     criticalServiceCount: serviceTypes.filter((service) => service === "SCADA" || service === "Protection Pilot" || service === "Distribution Automation").length,
     warning: continuityRecord?.warning || "Synthetic distribution telecom continuity only. Do not use for operations, dispatch, restoration, SCADA, protection, or CEII analysis.",
   };
 }
 
-function estimateDistributionLoss(routeMiles: number, poleCount: number) {
+function estimateDistributionLoss(routeMiles: number, poleCount: number, splicePointCount = 0, totalSlackFeet = 0) {
   const fiberLoss = routeMiles * 0.25;
   const connectorLoss = 1.0;
   const estimatedTapLoss = Math.min(2.4, Math.max(0.1, poleCount / 42) * 0.08);
-  return Number((fiberLoss + connectorLoss + estimatedTapLoss).toFixed(2));
+  const spliceLoss = splicePointCount * 0.05;
+  const slackLoss = totalSlackFeet / 5280 * 0.25;
+  return Number((fiberLoss + connectorLoss + estimatedTapLoss + spliceLoss + slackLoss).toFixed(2));
 }
 
 async function readData<T>(filename: string, fallback: T): Promise<T> {
