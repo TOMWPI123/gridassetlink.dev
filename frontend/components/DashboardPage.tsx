@@ -296,6 +296,12 @@ export function DashboardPage() {
   const [gisApiBase, setGisApiBase] = useState(API_BASE);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedGisSource = params.get("gisApiBase") || params.get("gisSource");
+    if (requestedGisSource) {
+      setGisApiBase(saveGisApiBase(requestedGisSource.toLowerCase() === "local" ? LOCAL_GIS_API_BASE : requestedGisSource));
+      return;
+    }
     setGisApiBase(getStoredGisApiBase());
   }, []);
 

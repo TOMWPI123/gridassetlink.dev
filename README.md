@@ -210,6 +210,7 @@ Live website local GIS bridge:
 - Open `https://gridassetlink.dev/dashboard?drawer=scale`.
 - Start the local FastAPI backend against the local 10M PostGIS database, for example with `DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:55432/telecomne_grid_10m`.
 - In the dashboard `Scale` drawer, use `Connect local 10M API` or enter `http://127.0.0.1:8000` as the GIS API URL.
+- To connect immediately from a bookmark, open `https://gridassetlink.dev/dashboard?drawer=scale&gisSource=local`.
 - The browser will request vector tiles, paginated GIS search, and click-detail records directly from the local API while the app shell remains hosted at `gridassetlink.dev`.
 - This does not upload the 10M database, generated tiles, or the local PostGIS data directory to Vercel. To host the 10M dataset fully in production, configure a managed PostgreSQL/PostGIS `DATABASE_URL` for the deployed backend and load the generated data there.
 
