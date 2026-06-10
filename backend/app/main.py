@@ -16,7 +16,7 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allo
 async def allow_local_gis_bridge_private_network(request: Request, call_next) -> Response:
     response = await call_next(request)
     origin = request.headers.get("origin", "")
-    if origin in settings.cors_origin_list and request.headers.get("access-control-request-private-network") == "true":
+    if origin in settings.cors_origin_list:
         response.headers["Access-Control-Allow-Private-Network"] = "true"
     return response
 
