@@ -698,7 +698,7 @@ export type FiberSplice = {
   fromStrandNumber: number;
   toCableId: string;
   toStrandNumber: number;
-  spliceType: "straight_through" | "express" | "branch" | "patch" | "open" | "reserved";
+  spliceType: "straight_through" | "express" | "branch" | "patch" | "open" | "reserved" | "termination" | "spare";
   lossDb?: number;
   status: "existing" | "planned" | "proposed" | "faulted";
   assignmentId?: string;

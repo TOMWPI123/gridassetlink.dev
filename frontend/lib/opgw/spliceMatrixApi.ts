@@ -80,7 +80,7 @@ export function allSpliceConnections(data: FiberContinuityData) {
       toBufferTube: tubeNumber(connection.toStrandNumber),
       toStrandColor: strandColor(connection.toStrandNumber),
       serviceId: service?.serviceId,
-      connectionStatus: connection.status === "faulted" ? "faulted" : connection.spliceType === "open" ? "open" : "connected",
+      connectionStatus: connection.status === "faulted" ? "faulted" : connection.spliceType === "open" ? "open" : connection.spliceType === "termination" ? "terminated" : connection.spliceType === "spare" ? "spare" : "connected",
       layerType,
       lossEstimateDb: connection.lossDb ?? 0,
       testResultDb: connection.status === "faulted" ? undefined : Number(((connection.lossDb ?? 0.06) + 0.01).toFixed(3)),
@@ -258,7 +258,7 @@ function proposedConnectionsFromPayload(payload: unknown, fallback: FiberSplice[
 }
 
 function normalizeSpliceType(value: unknown): FiberSplice["spliceType"] {
-  if (value === "straight_through" || value === "express" || value === "branch" || value === "patch" || value === "open" || value === "reserved") return value;
+  if (value === "straight_through" || value === "express" || value === "branch" || value === "patch" || value === "open" || value === "reserved" || value === "termination" || value === "spare") return value;
   return "straight_through";
 }
 
@@ -316,6 +316,12 @@ function validateProposedConnections(
     });
     if (row.spliceType === "open") {
       issues.push({ rule: "open_splice_breaks_continuity", severity: "warning", rowId, message: `${rowId} is open and will be shown as broken/incomplete proposed continuity.` });
+    }
+    if (row.spliceType === "termination") {
+      issues.push({ rule: "termination_requires_patch_panel_review", severity: "info", rowId, message: `${rowId} is a proposed termination and should be reviewed against patch-panel port assignments before commit.` });
+    }
+    if (row.spliceType === "spare") {
+      issues.push({ rule: "spare_marker_not_continuity", severity: "info", rowId, message: `${rowId} marks a proposed spare strand and is not treated as active continuity.` });
     }
     if (row.status === "faulted") {
       issues.push({ rule: "faulted_splice_warning", severity: "warning", rowId, message: `${rowId} is marked faulted for demo review.` });

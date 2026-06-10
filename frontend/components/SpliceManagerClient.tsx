@@ -22,6 +22,7 @@ type MatrixActionStatus = {
 };
 
 const fiberColors = ["Blue", "Orange", "Green", "Brown", "Slate", "White", "Red", "Black", "Yellow", "Violet", "Rose", "Aqua"];
+const proposedSpliceTypeOptions: ProposedSpliceType[] = ["straight_through", "express", "branch", "patch", "open", "reserved", "termination", "spare"];
 
 export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
   const searchParams = useSearchParams();
@@ -132,6 +133,38 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
     setSpliceRows((current) => [...nextRows, ...current]);
     setLayerFilter("proposed");
     await runMatrixAction("create", [...nextRows, ...proposedRows]);
+  }
+
+  async function createIndividualSplice(spliceType: ProposedSpliceType = editorSpliceType, notes?: string) {
+    const nextSplice = buildProposedSplice({
+      fromCableId: editorFromSection,
+      toCableId: editorToSection,
+      fromStrandNumber: editorStartStrand,
+      toStrandNumber: editorStartStrand,
+      spliceType,
+      notes: notes || `Local demo ${spliceType.replaceAll("_", " ")} strand splice. It does not change existing continuity until committed in a future workflow.`,
+    });
+    setSpliceRows((current) => [nextSplice, ...current]);
+    setLayerFilter("proposed");
+    await runMatrixAction("create", [nextSplice, ...proposedRows]);
+  }
+
+  async function createPatchPanelTermination() {
+    await createIndividualSplice("termination", "Local demo patch-panel termination marker. Review patch-panel port assignment before committing to existing continuity.");
+  }
+
+  async function markStrandSpare() {
+    const nextSplice = buildProposedSplice({
+      fromCableId: editorFromSection,
+      toCableId: editorFromSection,
+      fromStrandNumber: editorStartStrand,
+      toStrandNumber: editorStartStrand,
+      spliceType: "spare",
+      notes: "Local demo spare strand marker. It is not active continuity and does not change existing rows until committed.",
+    });
+    setSpliceRows((current) => [nextSplice, ...current]);
+    setLayerFilter("proposed");
+    await runMatrixAction("create", [nextSplice, ...proposedRows]);
   }
 
   function deleteProposedSplice(spliceId: string) {
@@ -311,7 +344,7 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
                     const incomingColor = fiberColors[(splice.fromStrandNumber - 1) % fiberColors.length];
                     const outgoingColor = fiberColors[(splice.toStrandNumber - 1) % fiberColors.length];
                     const layer = splice.status === "existing" ? "existing" : "proposed";
-                    const connectionStatus = splice.status === "faulted" ? "faulted" : splice.spliceType === "open" ? "open" : "connected";
+                    const connectionStatus = splice.status === "faulted" ? "faulted" : splice.spliceType === "open" ? "open" : splice.spliceType === "termination" ? "terminated" : splice.spliceType === "spare" ? "spare" : "connected";
                     const carriedService = serviceForAssignment(splice.assignmentId, view);
                     const hasAssignedService = Boolean(carriedService);
                     return (
@@ -445,7 +478,7 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
               <label>
                 <span>Splice type</span>
                 <select value={editorSpliceType} onChange={(event) => setEditorSpliceType(event.target.value as ProposedSpliceType)}>
-                  {["straight_through", "express", "branch", "patch", "open", "reserved"].map((spliceType) => <option value={spliceType} key={spliceType}>{spliceType.replaceAll("_", " ")}</option>)}
+                  {proposedSpliceTypeOptions.map((spliceType) => <option value={spliceType} key={spliceType}>{spliceType.replaceAll("_", " ")}</option>)}
                 </select>
               </label>
               <label>
@@ -458,10 +491,16 @@ export function SpliceManagerClient({ view }: SpliceManagerClientProps) {
               </label>
             </div>
             <div className="splice-action-stack">
+              <button type="button" onClick={() => createIndividualSplice()}><Plus size={15} />Create individual strand splice</button>
               <button type="button" onClick={() => createProposedRange()}><Plus size={15} />Create splice range</button>
+              <button type="button" onClick={() => createIndividualSplice("branch")}>Create branch splice</button>
+              <button type="button" onClick={() => createIndividualSplice("termination", "Local demo termination marker. Review field termination and patch panel documentation before commit.")}>Create termination</button>
+              <button type="button" onClick={createPatchPanelTermination}>Create patch panel termination</button>
               <button type="button" onClick={() => createProposedRange("reserved")}>Mark range reserved</button>
+              <button type="button" onClick={markStrandSpare}>Mark strand spare</button>
               <button type="button" onClick={() => createProposedRange("open", "faulted")}>Mark range damaged/open</button>
               <button type="button" onClick={createProposedSpliceAndMatrix}><Plus size={15} />Auto add one splice</button>
+              <button type="button" onClick={() => runMatrixAction("create")}>Save proposed matrix</button>
               <button type="button" onClick={() => runMatrixAction("validate")}>Validate proposed matrix</button>
               <button type="button" onClick={() => runMatrixAction("approve")}>Approve proposed matrix</button>
               <button type="button" onClick={() => runMatrixAction("commit")}>Commit proposed matrix</button>
