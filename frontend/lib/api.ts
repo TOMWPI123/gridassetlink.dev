@@ -21,7 +21,7 @@ export function canWrite(): boolean { return true; }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  headers.set("Content-Type", headers.get("Content-Type") || "application/json");
+  maybeAttachJsonContentType(headers, init.body);
   maybeAttachAuth(headers);
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers, cache: "no-store" });
   if (!response.ok) {
@@ -77,7 +77,7 @@ export function buildApiUrl(apiBase: string, path: string): string {
 
 export async function fetchFromApiBase<T>(apiBase: string, path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  headers.set("Content-Type", headers.get("Content-Type") || "application/json");
+  maybeAttachJsonContentType(headers, init.body);
   maybeAttachAuth(headers);
   const requestUrl = buildApiUrl(apiBase, path);
   const response = await fetch(requestUrl, { ...init, headers, cache: "no-store" });
@@ -117,6 +117,11 @@ function maybeAttachAuth(headers: Headers) {
   if (!AUTH_ENABLED) return;
   const session = getSession();
   if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
+}
+
+function maybeAttachJsonContentType(headers: Headers, body: BodyInit | null | undefined) {
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  if (!isFormData) headers.set("Content-Type", headers.get("Content-Type") || "application/json");
 }
 
 function isExpiredTokenResponse(response: Response, detail: string) {

@@ -194,6 +194,15 @@ The worker clips roads to the territory, excludes highway/ramp/rail/water/buildi
 
 The map dashboard also includes a `Scale` drawer tab. That tab can import or manually edit a service territory GeoJSON polygon, import public road centerline GeoJSON, run generation preflight, queue a background generation job, show recent job status, and enable the GIS-scale vector layers. It stores only health, territory, preflight, and job summaries in React state; it does not fetch raw pole inventories.
 
+Website import from your computer:
+
+- Open `https://gridassetlink.dev/dashboard?drawer=scale`.
+- Use `Use website backend` as the GIS API source.
+- Choose a service territory GeoJSON or public road centerline GeoJSON file from your computer.
+- Use `Upload boundary file` or `Upload road file`. The browser sends the file to the configured website API, which imports it into managed PostGIS when `DATABASE_URL` is configured.
+- Use the upload workflow for boundary and public road-reference inputs, then queue synthetic generation. Do not upload raw 10M pole inventories, tile caches, relay/protection settings, private fiber routes, or CEII-restricted records through the browser.
+- The API also exposes multipart endpoints at `POST /api/service-territories/import-geojson-file` and `POST /api/road-centerlines/import-geojson-file`.
+
 Generation preflight estimates clipped eligible road mileage, synthetic pole/span totals, road placement classes, target-fill percentage, worker batch count, and warnings before the job is queued. Queueing a generation job now refuses territories with no eligible clipped public road centerlines.
 
 Local 10M synthetic load:

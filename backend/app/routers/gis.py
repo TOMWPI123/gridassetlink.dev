@@ -5,7 +5,7 @@ import json
 from uuid import uuid4
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -23,6 +23,7 @@ from app.services.gis_vector_tiles import (
 )
 
 router = APIRouter(prefix="/api", tags=["gis-scale"])
+MAX_GEOJSON_UPLOAD_BYTES = 50 * 1024 * 1024
 
 
 class ServiceTerritoryImport(BaseModel):
@@ -112,6 +113,14 @@ def gis_capabilities() -> dict[str, Any]:
             "default_local_api_url": "http://127.0.0.1:8000",
             "browser_usage": "The hosted frontend can read synthetic GIS tiles/search/details from a locally running API when CORS allows https://gridassetlink.dev.",
             "upload_boundary": "The 10M PostGIS database is not uploaded through the browser; use a local API bridge or a managed production PostGIS DATABASE_URL.",
+        },
+        "website_import": {
+            "supported": True,
+            "service_territory_upload_endpoint": "/api/service-territories/import-geojson-file",
+            "road_centerline_upload_endpoint": "/api/road-centerlines/import-geojson-file",
+            "max_geojson_upload_mb": MAX_GEOJSON_UPLOAD_BYTES // (1024 * 1024),
+            "usage": "Choose GeoJSON files from your computer while on gridassetlink.dev. Files are uploaded to the configured website API and imported into managed PostGIS when available.",
+            "scale_boundary": "Upload service territory and public road reference files here, then queue the background synthetic generation job. Do not upload raw 10M pole inventories to the browser.",
         },
         "level_of_detail": {
             "zoom_0_7": "territory boundary, summaries, major corridors; no individual poles",
@@ -378,6 +387,24 @@ def import_service_territory(payload: ServiceTerritoryImport) -> dict[str, Any]:
     return {"postgis_configured": True, "territory": row, "synthetic_generation_allowed": row["boundary_status"] == "validated"}
 
 
+@router.post("/service-territories/import-geojson-file", status_code=status.HTTP_201_CREATED)
+async def import_service_territory_file(
+    file: UploadFile = File(...),
+    name: str = Form("Synthetic service territory"),
+    source_type: Literal["uploaded_geojson", "stored_postgis_polygon", "public_boundary", "manual_drawn_polygon"] = Form("uploaded_geojson"),
+    source_reference: str | None = Form(None),
+) -> dict[str, Any]:
+    geojson = await _read_uploaded_geojson(file)
+    return import_service_territory(
+        ServiceTerritoryImport(
+            name=name,
+            source_type=source_type,
+            source_reference=source_reference or file.filename or "browser file upload",
+            geojson=geojson,
+        )
+    )
+
+
 @router.get("/road-centerlines/summary")
 def road_centerline_summary(service_territory_id: int | None = Query(default=None)) -> dict[str, Any]:
     if not is_postgis_engine(engine):
@@ -486,6 +513,26 @@ def import_road_centerlines(payload: RoadCenterlineImport) -> dict[str, Any]:
         "excluded": sum(1 for row in rows if row["excluded"]),
         "synthetic_generation_note": "Road centerlines are public/reference inputs only. Generated telecom assets remain synthetic and are clipped to service territory during the worker job.",
     }
+
+
+@router.post("/road-centerlines/import-geojson-file", status_code=status.HTTP_201_CREATED)
+async def import_road_centerlines_file(
+    file: UploadFile = File(...),
+    source_name: str = Form("dashboard GeoJSON road centerlines"),
+    source_reference: str | None = Form(None),
+    service_territory_id: int | None = Form(None),
+    max_features: int = Form(50_000),
+) -> dict[str, Any]:
+    geojson = await _read_uploaded_geojson(file)
+    return import_road_centerlines(
+        RoadCenterlineImport(
+            source_name=source_name,
+            source_reference=source_reference or file.filename or "browser file upload",
+            service_territory_id=service_territory_id,
+            geojson=geojson,
+            max_features=max_features,
+        )
+    )
 
 
 @router.post("/service-territories/{territory_id}/validate")
@@ -1722,6 +1769,26 @@ def _extract_line_features(geojson: dict[str, Any], max_features: int) -> list[d
     if not line_features:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No LineString or MultiLineString road features found")
     return line_features
+
+
+async def _read_uploaded_geojson(file: UploadFile) -> dict[str, Any]:
+    content = await file.read(MAX_GEOJSON_UPLOAD_BYTES + 1)
+    if len(content) > MAX_GEOJSON_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"GeoJSON upload is limited to {MAX_GEOJSON_UPLOAD_BYTES // (1024 * 1024)} MB. Use a managed PostGIS loader or chunked import for larger public road datasets.",
+        )
+    try:
+        text_payload = content.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GeoJSON upload must be UTF-8 encoded text") from error
+    try:
+        geojson = json.loads(text_payload)
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid GeoJSON JSON: {error.msg}") from error
+    if not isinstance(geojson, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GeoJSON upload must be a JSON object")
+    return geojson
 
 
 def _road_class(properties: dict[str, Any]) -> str:

@@ -259,6 +259,8 @@ def test_gis_scale_capabilities_empty_tile_and_search() -> None:
     assert "poles" in payload["layers"]
     assert "slack_loops" in payload["layers"]
     assert payload["synthetic_boundary"]
+    assert payload["website_import"]["service_territory_upload_endpoint"] == "/api/service-territories/import-geojson-file"
+    assert payload["website_import"]["road_centerline_upload_endpoint"] == "/api/road-centerlines/import-geojson-file"
     assert any("Geometry-aware" in row for row in payload["cache_strategy"])
 
     health = client.get("/api/gis/scale-health")
@@ -369,6 +371,33 @@ def test_gis_scale_capabilities_empty_tile_and_search() -> None:
     )
     assert proposed_edit.status_code == 201
     assert proposed_edit.json()["postgis_configured"] is False
+
+
+def test_gis_scale_browser_file_upload_imports_are_postgis_gated() -> None:
+    territory_geojson = b'{"type":"Polygon","coordinates":[[[-72,42],[-71.9,42],[-71.9,42.1],[-72,42.1],[-72,42]]]}'
+    territory_upload = client.post(
+        "/api/service-territories/import-geojson-file",
+        data={"name": "Unit test uploaded territory", "source_type": "uploaded_geojson", "source_reference": "unit-test.geojson"},
+        files={"file": ("unit-test.geojson", territory_geojson, "application/geo+json")},
+    )
+    assert territory_upload.status_code == 201
+    assert territory_upload.json()["postgis_configured"] is False
+
+    roads_geojson = b'{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"Demo Road","highway":"residential"},"geometry":{"type":"LineString","coordinates":[[-72,42],[-71.99,42.01]]}}]}'
+    road_upload = client.post(
+        "/api/road-centerlines/import-geojson-file",
+        data={"service_territory_id": "1", "source_name": "unit test roads", "source_reference": "roads.geojson", "max_features": "100"},
+        files={"file": ("roads.geojson", roads_geojson, "application/geo+json")},
+    )
+    assert road_upload.status_code == 201
+    assert road_upload.json()["postgis_configured"] is False
+
+    invalid_upload = client.post(
+        "/api/service-territories/import-geojson-file",
+        data={"name": "Bad upload"},
+        files={"file": ("bad.geojson", b"not json", "application/geo+json")},
+    )
+    assert invalid_upload.status_code == 400
 
 
 def test_gis_tile_lod_plans_keep_raw_poles_at_street_zoom_only() -> None:

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Workflow } from "lucide-react";
+import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Upload, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { appNavGroups } from "@/components/navigation";
 import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
@@ -71,6 +71,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
 };
 
 const LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE = process.env.NEXT_PUBLIC_LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE === "true";
+const MAX_BROWSER_GEOJSON_PREVIEW_BYTES = 2 * 1024 * 1024;
 
 const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   ...initialStreetLayers,
@@ -2221,6 +2222,8 @@ function GisScaleControlPanel({
   const [territoryName, setTerritoryName] = useState("Synthetic service territory");
   const [territoryText, setTerritoryText] = useState("");
   const [roadText, setRoadText] = useState("");
+  const [territoryFile, setTerritoryFile] = useState<File | null>(null);
+  const [roadFile, setRoadFile] = useState<File | null>(null);
   const [targetPoleCount, setTargetPoleCount] = useState(10_000_000);
   const [batchSize, setBatchSize] = useState(50_000);
   const [preflight, setPreflight] = useState<GisScalePreflightPayload | null>(null);
@@ -2287,9 +2290,16 @@ function GisScaleControlPanel({
     void loadHealth();
   }, [loadHealth]);
 
-  async function handleFileText(file: File | null, setter: (value: string) => void) {
+  async function handleGeojsonFile(file: File | null, setFile: (value: File | null) => void, setter: (value: string) => void) {
     if (!file) return;
-    setter(await file.text());
+    setFile(file);
+    if (file.size <= MAX_BROWSER_GEOJSON_PREVIEW_BYTES) {
+      setter(await file.text());
+      setMessage(`${file.name} is ready for direct website upload and loaded into the paste editor.`);
+    } else {
+      setter("");
+      setMessage(`${file.name} is ready for direct website upload. It is too large for the browser preview, so it will be sent as a file.`);
+    }
   }
 
   function parseGeoJsonText(value: string) {
@@ -2323,6 +2333,36 @@ function GisScaleControlPanel({
     }
   }
 
+  async function uploadTerritoryFile() {
+    if (!territoryFile) {
+      setMessage("Choose a service territory GeoJSON file from this computer first.");
+      return;
+    }
+    setBusy("Uploading service territory file");
+    try {
+      const formData = new FormData();
+      formData.set("file", territoryFile);
+      formData.set("name", territoryName || territoryFile.name.replace(/\.(geo)?json$/i, ""));
+      formData.set("source_type", "uploaded_geojson");
+      formData.set("source_reference", territoryFile.name);
+      const payload = await fetchFromApiBase<{ territory?: GisScaleTerritory; postgis_configured?: boolean }>(gisApiBase, "/api/service-territories/import-geojson-file", {
+        method: "POST",
+        body: formData,
+      });
+      if (payload.territory?.id) {
+        setSelectedTerritoryId(String(payload.territory.id));
+        setMessage(`Uploaded and imported territory ${payload.territory.name || payload.territory.id} into ${normalizeApiBase(gisApiBase)}.`);
+      } else {
+        setMessage(payload.postgis_configured === false ? "PostGIS is required on the website backend before uploaded territory files can be imported." : "Territory file upload completed without a returned record.");
+      }
+      await loadHealth();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function importRoads() {
     if (!selectedTerritoryId) {
       setMessage("Select or import a service territory before importing road centerlines.");
@@ -2341,6 +2381,36 @@ function GisScaleControlPanel({
         }),
       });
       setMessage(payload.postgis_configured === false ? "PostGIS is required before importing road centerlines." : `Imported/updated ${formatCompactCount(payload.imported_or_updated || 0)} roads; ${formatCompactCount(payload.excluded || 0)} excluded.`);
+      await loadHealth();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function uploadRoadFile() {
+    if (!selectedTerritoryId) {
+      setMessage("Select or import a service territory before importing road centerlines.");
+      return;
+    }
+    if (!roadFile) {
+      setMessage("Choose a public road centerline GeoJSON file from this computer first.");
+      return;
+    }
+    setBusy("Uploading road centerline file");
+    try {
+      const formData = new FormData();
+      formData.set("file", roadFile);
+      formData.set("service_territory_id", selectedTerritoryId);
+      formData.set("source_name", "dashboard GeoJSON road centerlines");
+      formData.set("source_reference", roadFile.name);
+      formData.set("max_features", "250000");
+      const payload = await fetchFromApiBase<{ imported_or_updated?: number; excluded?: number; postgis_configured?: boolean }>(gisApiBase, "/api/road-centerlines/import-geojson-file", {
+        method: "POST",
+        body: formData,
+      });
+      setMessage(payload.postgis_configured === false ? "PostGIS is required on the website backend before uploaded road files can be imported." : `Uploaded and imported ${formatCompactCount(payload.imported_or_updated || 0)} roads; ${formatCompactCount(payload.excluded || 0)} excluded.`);
       await loadHealth();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -2438,11 +2508,11 @@ function GisScaleControlPanel({
       </div>
 
       <div className="dashboard-gis-section">
-        <div className="dashboard-gis-section-title">Local computer GIS source</div>
+        <div className="dashboard-gis-section-title">Website import target</div>
         <article className="dashboard-gis-card">
-          <strong>{usingWebsiteBackend ? "Website backend" : "Local computer bridge"}</strong>
+          <strong>{usingWebsiteBackend ? "Website backend" : "Advanced local bridge"}</strong>
           <span>{normalizedGisApiBase}</span>
-          <span>{usingWebsiteBackend ? "Production backend fallback. Configure managed PostGIS for hosted data." : "Live gridassetlink.dev is reading GIS tiles, search, and details from this computer."}</span>
+          <span>{usingWebsiteBackend ? "Files selected on this computer upload to the gridassetlink.dev backend and import into managed PostGIS when configured." : "Uploads and map tiles are pointed at this API source instead of the website backend."}</span>
         </article>
         <label className="dashboard-gis-field">
           <span>GIS API URL</span>
@@ -2450,11 +2520,11 @@ function GisScaleControlPanel({
         </label>
         <div className="dashboard-gis-actions">
           <button type="button" onClick={() => onGisApiBaseChange(gisApiBaseDraft)} disabled={Boolean(busy)}>Use this source</button>
-          <button type="button" onClick={() => onGisApiBaseChange(LOCAL_GIS_API_BASE)} disabled={Boolean(busy)}>Connect local 10M API</button>
           <button type="button" onClick={onResetGisApiBase} disabled={Boolean(busy)}>Use website backend</button>
+          <button type="button" onClick={() => onGisApiBaseChange(LOCAL_GIS_API_BASE)} disabled={Boolean(busy)}>Advanced: local bridge</button>
           <button type="button" onClick={loadHealth} disabled={Boolean(busy)}>Test connection</button>
         </div>
-        <p className="dashboard-gis-message">For local import, keep the FastAPI backend running on your computer with the 10M PostGIS database. The live site calls that local API from your browser; it does not upload or copy the database to Vercel.</p>
+        <p className="dashboard-gis-message">Use the website backend to import GeoJSON files from this computer into the hosted GIS database. Use the local bridge only for private development or a database that intentionally stays on this machine.</p>
       </div>
 
       <div className="dashboard-gis-status-grid">
@@ -2502,24 +2572,30 @@ function GisScaleControlPanel({
       ) : null}
 
       <div className="dashboard-gis-section">
-        <div className="dashboard-gis-section-title">1. Import or edit service territory GeoJSON</div>
+        <div className="dashboard-gis-section-title">1. Import service territory from this computer</div>
         <label className="dashboard-gis-field">
           <span>Territory name</span>
           <input value={territoryName} onChange={(event) => setTerritoryName(event.currentTarget.value)} />
         </label>
-        <input type="file" accept=".geojson,.json,application/json" onChange={(event) => void handleFileText(event.currentTarget.files?.[0] || null, setTerritoryText)} />
+        <input type="file" accept=".geojson,.json,application/json" onChange={(event) => void handleGeojsonFile(event.currentTarget.files?.[0] || null, setTerritoryFile, setTerritoryText)} />
+        {territoryFile ? <p className="dashboard-gis-message">Selected: {territoryFile.name} ({formatCompactCount(territoryFile.size)} bytes)</p> : null}
         <textarea value={territoryText} onChange={(event) => setTerritoryText(event.currentTarget.value)} placeholder="Paste Polygon, MultiPolygon, Feature, or FeatureCollection GeoJSON" />
         <div className="dashboard-gis-actions">
-          <button type="button" onClick={() => void importTerritory("uploaded_geojson")} disabled={Boolean(busy)}>Import boundary</button>
+          <button type="button" onClick={() => void uploadTerritoryFile()} disabled={Boolean(busy)}><Upload size={13} />Upload boundary file</button>
+          <button type="button" onClick={() => void importTerritory("uploaded_geojson")} disabled={Boolean(busy)}>Import pasted boundary</button>
           <button type="button" onClick={() => void importTerritory("manual_drawn_polygon")} disabled={Boolean(busy)}>Save manual edit</button>
         </div>
       </div>
 
       <div className="dashboard-gis-section">
-        <div className="dashboard-gis-section-title">2. Import public road centerlines clipped during worker run</div>
-        <input type="file" accept=".geojson,.json,application/json" onChange={(event) => void handleFileText(event.currentTarget.files?.[0] || null, setRoadText)} />
+        <div className="dashboard-gis-section-title">2. Import public road centerlines from this computer</div>
+        <input type="file" accept=".geojson,.json,application/json" onChange={(event) => void handleGeojsonFile(event.currentTarget.files?.[0] || null, setRoadFile, setRoadText)} />
+        {roadFile ? <p className="dashboard-gis-message">Selected: {roadFile.name} ({formatCompactCount(roadFile.size)} bytes)</p> : null}
         <textarea value={roadText} onChange={(event) => setRoadText(event.currentTarget.value)} placeholder="Paste public road LineString/MultiLineString GeoJSON. Highways, ramps, rail, water, and unsuitable classes are excluded." />
-        <button type="button" onClick={() => void importRoads()} disabled={Boolean(busy)}>Import road centerlines</button>
+        <div className="dashboard-gis-actions">
+          <button type="button" onClick={() => void uploadRoadFile()} disabled={Boolean(busy)}><Upload size={13} />Upload road file</button>
+          <button type="button" onClick={() => void importRoads()} disabled={Boolean(busy)}>Import pasted roads</button>
+        </div>
       </div>
 
       <div className="dashboard-gis-section">
