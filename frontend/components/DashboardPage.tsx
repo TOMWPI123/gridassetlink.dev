@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AlertTriangle, Cable, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { appNavGroups } from "@/components/navigation";
 import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
 import { seedMapNodes } from "@/data/nodeParameters";
@@ -16,7 +16,7 @@ import { LinkedAssetDetailPanel } from "@/components/map/LinkedAssetDetailPanel"
 import { MapLayerControlPanel } from "@/components/map/MapLayerControlPanel";
 import { MissingMapLocationPanel, type MissingMapLocation } from "@/components/map/MissingMapLocationPanel";
 import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
-import { StreetLevelAssetMap, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
+import { StreetLevelAssetMap, type ContinuityHighlight, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
 import type { Coordinate, DashboardMapMode, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
@@ -212,6 +212,8 @@ export function DashboardPage() {
   const [rightMode, setRightMode] = useState<RightDrawerMode>("modules");
   const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  const [continuityHighlight, setContinuityHighlight] = useState<ContinuityHighlight | undefined>();
+  const deepLinkFocusApplied = useRef(false);
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
   const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => dashboardStreetLayers);
@@ -471,11 +473,15 @@ export function DashboardPage() {
   );
   const mapOpgwSplicePoints = useMemo(
     () => {
+      if (isolatedOpgwSection) {
+        const endpointIds = new Set([isolatedOpgwSection.properties.fromSplicePointId, isolatedOpgwSection.properties.toSplicePointId]);
+        return visibleOpgwSplicePoints.filter((splicePoint) => endpointIds.has(splicePoint.properties.splicePointId));
+      }
       if (isolatedOpgwSplicePointId) return visibleOpgwSplicePoints.filter((splicePoint) => splicePoint.properties.splicePointId === isolatedOpgwSplicePointId);
       if (activeIsolatedOpgwRouteId) return visibleOpgwSplicePoints.filter((splicePoint) => splicePoint.properties.opgwRouteId === activeIsolatedOpgwRouteId);
       return visibleOpgwSplicePoints;
     },
-    [activeIsolatedOpgwRouteId, isolatedOpgwSplicePointId, visibleOpgwSplicePoints],
+    [activeIsolatedOpgwRouteId, isolatedOpgwSection, isolatedOpgwSplicePointId, visibleOpgwSplicePoints],
   );
   const opgwPlanningMetrics = useMemo(
     () => buildOpgwPlanningMetrics(visibleOpgwCables, fiberStrands, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints),
@@ -753,6 +759,21 @@ export function DashboardPage() {
   }
 
   function handleMapSelect(selection: StreetMapSelection) {
+    const nextHighlight = continuityHighlightForSelection(selection);
+    if (nextHighlight) {
+      setContinuityHighlight(nextHighlight);
+      setStreetLayers((current) => ({
+        ...current,
+        syntheticOpgwCables: true,
+        opgwRoutes: true,
+        opgwCableSections: true,
+        opgwSplicePoints: true,
+        fiberAssignments: true,
+        criticalRidingCircuits: true,
+      }));
+    } else {
+      setContinuityHighlight(undefined);
+    }
     setSelectedAsset(selection);
     setRightMode("details");
     setRightCollapsed(false);
@@ -779,9 +800,17 @@ export function DashboardPage() {
     setIsolatedOpgwRouteId(route.properties.opgwRouteId);
     setIsolatedOpgwSectionId(null);
     setIsolatedOpgwSplicePointId(null);
+    setContinuityHighlight({
+      label: route.properties.routeName,
+      assignmentIds: [],
+      cableIds: visibleOpgwCables.filter((cable) => opgwRouteIdForDashboardCable(cable) === route.properties.opgwRouteId).map((cable) => cable.properties.id),
+      routeIds: [route.properties.opgwRouteId],
+      sectionIds: visibleOpgwCableSections.filter((section) => section.properties.opgwRouteId === route.properties.opgwRouteId).map((section) => section.properties.cableSectionId),
+      splicePointIds: visibleOpgwSplicePoints.filter((point) => point.properties.opgwRouteId === route.properties.opgwRouteId).map((point) => point.properties.splicePointId),
+    });
     setSelectedAsset(selection);
     setFocusRequest({ selection, sequence: Date.now() });
-    setStreetLayers((current) => isolatedOpgwLayerState(current, ["opgwRoutes", "opgwSplicePoints"]));
+    setStreetLayers((current) => isolatedOpgwLayerState(current, ["opgwRoutes", "opgwCableSections", "opgwSplicePoints"]));
     setRightMode("layers");
     setRightCollapsed(false);
     showToast(`Showing OPGW transmission line ${route.properties.transmissionLineId} with splice points.`);
@@ -797,9 +826,10 @@ export function DashboardPage() {
     setIsolatedOpgwRouteId(section.properties.opgwRouteId);
     setIsolatedOpgwSectionId(section.properties.cableSectionId);
     setIsolatedOpgwSplicePointId(null);
+    setContinuityHighlight(buildContinuityHighlightForCableSection(section));
     setSelectedAsset(selection);
     setFocusRequest({ selection, sequence: Date.now() });
-    setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwCableSections"));
+    setStreetLayers((current) => isolatedOpgwLayerState(current, ["opgwRoutes", "opgwCableSections", "opgwSplicePoints"]));
     setRightMode("layers");
     setRightCollapsed(false);
     showToast(`Showing only cable section ${section.properties.cableSectionId}.`);
@@ -815,18 +845,192 @@ export function DashboardPage() {
     setIsolatedOpgwRouteId(splicePoint.properties.opgwRouteId);
     setIsolatedOpgwSectionId(null);
     setIsolatedOpgwSplicePointId(splicePoint.properties.splicePointId);
+    setContinuityHighlight(buildContinuityHighlightForSplicePoint(splicePoint));
     setSelectedAsset(selection);
     setFocusRequest({ selection, sequence: Date.now() });
-    setStreetLayers((current) => isolatedOpgwLayerState(current, "opgwSplicePoints"));
+    setStreetLayers((current) => isolatedOpgwLayerState(current, ["opgwRoutes", "opgwCableSections", "opgwSplicePoints"]));
     setRightMode("layers");
     setRightCollapsed(false);
     showToast(`Showing only splice point ${splicePoint.properties.splicePointId}.`);
   }
 
+  function continuityHighlightForSelection(selection: StreetMapSelection): ContinuityHighlight | undefined {
+    if (selection.kind === "opgw_splice_point") return buildContinuityHighlightForSplicePoint(selection.record);
+    if (selection.kind === "opgw_cable") return buildContinuityHighlightForCable(selection.record);
+    if (selection.kind === "opgw_cable_section") return buildContinuityHighlightForCableSection(selection.record);
+    if (selection.kind === "fiber_assignment") return buildContinuityHighlightForAssignment(selection.record);
+    return undefined;
+  }
+
+  function buildContinuityHighlightForService(service: SyntheticService): ContinuityHighlight {
+    const assignmentIds = uniqueStrings([service.primaryPathAssignmentId, service.backupPathAssignmentId]);
+    const cableIds = new Set(service.continuityCableIds || []);
+    visibleFiberAssignments
+      .filter((assignment) => assignmentIds.includes(assignment.id))
+      .forEach((assignment) => assignment.cableIds.forEach((cableId) => cableIds.add(cableId)));
+    const routeIds = routeIdsForCableIds(cableIds);
+    const sectionIds = visibleOpgwCableSections
+      .filter((section) => routeIds.has(section.properties.opgwRouteId))
+      .map((section) => section.properties.cableSectionId);
+    const splicePointIds = new Set(service.continuitySplicePointIds || []);
+    service.continuitySpliceClosureIds?.forEach((closureId) => {
+      const point = visibleOpgwSplicePoints.find((item) => item.properties.closureId === closureId);
+      if (point) splicePointIds.add(point.properties.splicePointId);
+    });
+    visibleOpgwCableSections
+      .filter((section) => sectionIds.includes(section.properties.cableSectionId))
+      .forEach((section) => {
+        splicePointIds.add(section.properties.fromSplicePointId);
+        splicePointIds.add(section.properties.toSplicePointId);
+      });
+    return {
+      label: service.serviceId,
+      serviceId: service.serviceId,
+      assignmentIds,
+      cableIds: Array.from(cableIds),
+      routeIds: Array.from(routeIds),
+      sectionIds,
+      splicePointIds: Array.from(splicePointIds),
+    };
+  }
+
+  function buildContinuityHighlightForCable(cable: OpgwCableFeature): ContinuityHighlight {
+    const routeId = opgwRouteIdForDashboardCable(cable);
+    const sections = visibleOpgwCableSections.filter((section) => section.properties.opgwRouteId === routeId);
+    const sectionIds = sections.map((section) => section.properties.cableSectionId);
+    const splicePointIds = splicePointIdsFromSections(sections);
+    const assignmentIds = visibleFiberAssignments
+      .filter((assignment) => assignment.cableIds.includes(cable.properties.id))
+      .map((assignment) => assignment.id);
+    syntheticServices
+      .filter((service) => service.continuityCableIds?.includes(cable.properties.id))
+      .forEach((service) => uniqueStrings([service.primaryPathAssignmentId, service.backupPathAssignmentId]).forEach((assignmentId) => assignmentIds.push(assignmentId)));
+    return {
+      label: cable.properties.cableName,
+      assignmentIds: uniqueStrings(assignmentIds),
+      cableIds: [cable.properties.id],
+      routeIds: [routeId],
+      sectionIds,
+      splicePointIds,
+    };
+  }
+
+  function buildContinuityHighlightForCableSection(section: OpgwCableSectionFeature): ContinuityHighlight {
+    const cableIds = visibleOpgwCables
+      .filter((cable) => opgwRouteIdForDashboardCable(cable) === section.properties.opgwRouteId)
+      .map((cable) => cable.properties.id);
+    const assignmentIds = visibleFiberAssignments
+      .filter((assignment) => assignment.cableIds.some((cableId) => cableIds.includes(cableId)))
+      .map((assignment) => assignment.id);
+    return {
+      label: section.properties.cableSectionId,
+      assignmentIds,
+      cableIds,
+      routeIds: [section.properties.opgwRouteId],
+      sectionIds: [section.properties.cableSectionId],
+      splicePointIds: [section.properties.fromSplicePointId, section.properties.toSplicePointId],
+    };
+  }
+
+  function buildContinuityHighlightForSplicePoint(splicePoint: OpgwSplicePointFeature): ContinuityHighlight {
+    const directSections = visibleOpgwCableSections.filter((section) =>
+      section.properties.fromSplicePointId === splicePoint.properties.splicePointId
+      || section.properties.toSplicePointId === splicePoint.properties.splicePointId
+      || splicePoint.properties.associatedCableSectionIds.includes(section.properties.cableSectionId)
+    );
+    const routeIds = new Set([splicePoint.properties.opgwRouteId, ...directSections.map((section) => section.properties.opgwRouteId)]);
+    const cableIds = visibleOpgwCables
+      .filter((cable) => routeIds.has(opgwRouteIdForDashboardCable(cable)))
+      .map((cable) => cable.properties.id);
+    const services = syntheticServices.filter((service) => {
+      if (service.continuitySplicePointIds?.includes(splicePoint.properties.splicePointId)) return true;
+      if (splicePoint.properties.closureId && service.continuitySpliceClosureIds?.includes(splicePoint.properties.closureId)) return true;
+      return service.continuityCableIds?.some((cableId) => cableIds.includes(cableId)) || false;
+    });
+    const assignmentIds = uniqueStrings([
+      ...services.flatMap((service) => [service.primaryPathAssignmentId, service.backupPathAssignmentId]),
+      ...visibleFiberAssignments
+        .filter((assignment) => assignment.cableIds.some((cableId) => cableIds.includes(cableId)))
+        .map((assignment) => assignment.id),
+    ]);
+    const splicePointIds = new Set([splicePoint.properties.splicePointId, ...splicePointIdsFromSections(directSections)]);
+    services.forEach((service) => {
+      service.continuitySplicePointIds?.forEach((pointId) => splicePointIds.add(pointId));
+      service.continuitySpliceClosureIds?.forEach((closureId) => {
+        const point = visibleOpgwSplicePoints.find((item) => item.properties.closureId === closureId);
+        if (point) splicePointIds.add(point.properties.splicePointId);
+      });
+    });
+    return {
+      label: splicePoint.properties.splicePointId,
+      assignmentIds,
+      cableIds,
+      routeIds: Array.from(routeIds),
+      sectionIds: directSections.map((section) => section.properties.cableSectionId),
+      splicePointIds: Array.from(splicePointIds),
+    };
+  }
+
+  function buildContinuityHighlightForAssignment(assignment: FiberAssignment): ContinuityHighlight {
+    const cableIds = new Set(assignment.cableIds);
+    const routeIds = routeIdsForCableIds(cableIds);
+    const sections = visibleOpgwCableSections.filter((section) => routeIds.has(section.properties.opgwRouteId));
+    return {
+      label: assignment.assignmentName,
+      assignmentIds: [assignment.id],
+      cableIds: Array.from(cableIds),
+      routeIds: Array.from(routeIds),
+      sectionIds: sections.map((section) => section.properties.cableSectionId),
+      splicePointIds: splicePointIdsFromSections(sections),
+    };
+  }
+
+  function routeIdsForCableIds(cableIds: Set<string>) {
+    return new Set(
+      visibleOpgwCables
+        .filter((cable) => cableIds.has(cable.properties.id))
+        .map((cable) => opgwRouteIdForDashboardCable(cable)),
+    );
+  }
+
+  useEffect(() => {
+    if (deepLinkFocusApplied.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const splicePointId = params.get("splicePoint");
+    const cableId = params.get("cable");
+    const serviceId = params.get("service");
+
+    if (splicePointId) {
+      if (!visibleOpgwSplicePoints.length) return;
+      if (!visibleOpgwSplicePoints.some((feature) => feature.properties.splicePointId === splicePointId)) return;
+      deepLinkFocusApplied.current = true;
+      focusOpgwSplicePointLayer(splicePointId);
+      return;
+    }
+
+    if (cableId || serviceId) {
+      if (!visibleOpgwCables.length) return;
+      const service = serviceId ? syntheticServices.find((item) => item.serviceId === serviceId) : undefined;
+      const targetCableId = cableId || service?.continuityCableIds?.[0];
+      const cable = visibleOpgwCables.find((feature) => feature.properties.id === targetCableId || feature.properties.cableName === targetCableId);
+      if (!cable) return;
+      const selection: StreetMapSelection = { kind: "opgw_cable", id: cable.properties.id, label: cable.properties.cableName, record: cable };
+      deepLinkFocusApplied.current = true;
+      setContinuityHighlight(service ? buildContinuityHighlightForService(service) : buildContinuityHighlightForCable(cable));
+      setSelectedAsset(selection);
+      setFocusRequest({ selection, sequence: Date.now() });
+      setStreetLayers((current) => ({ ...current, syntheticOpgwCables: true, opgwRoutes: true, opgwCableSections: true, opgwSplicePoints: true, fiberAssignments: true, criticalRidingCircuits: true }));
+      setRightMode("layers");
+      setRightCollapsed(false);
+      showToast(`Showing map context for ${serviceId || cable.properties.id}.`);
+    }
+  }, [syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints]);
+
   function clearOpgwLayerIsolation() {
     setIsolatedOpgwRouteId(null);
     setIsolatedOpgwSectionId(null);
     setIsolatedOpgwSplicePointId(null);
+    setContinuityHighlight(undefined);
     setStreetLayers((current) => ({ ...current, opgwRoutes: true, opgwCableSections: true, opgwSplicePoints: true }));
     showToast("OPGW route visibility filter cleared.");
   }
@@ -1016,6 +1220,7 @@ export function DashboardPage() {
         placementHint={placementHint}
         command={mapCommand}
         focusRequest={focusRequest}
+        continuityHighlight={continuityHighlight}
         onMapClick={handleMapClick}
         onSelect={handleMapSelect}
         onStatusChange={handleMapStatusChange}
@@ -1241,6 +1446,15 @@ export function DashboardPage() {
         <AlertTriangle size={15} />
         <span>Dashboard map shows public HIFLD lines, verified-owner public substation nodes, public FCC references, and synthetic demo OPGW, structures, strand capacity, assignments, splice closures, and patch panels. Synthetic OPGW assumptions are not active fiber. Do not enter CEII, SCADA, relay, protection, telecom, or private fiber-route data.</span>
       </div>
+      {continuityHighlight ? (
+        <div className="dashboard-continuity-chip" role="status" aria-live="polite">
+          <span>
+            <strong>Continuity Highlight</strong>
+            {continuityHighlight.label}
+          </span>
+          <button type="button" onClick={() => setContinuityHighlight(undefined)}>Clear</button>
+        </div>
+      ) : null}
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
   );
@@ -1259,6 +1473,18 @@ function FilterSelect({ label, value, options, onChange, displayLabel = formatFi
 
 function formatFilterOption(value: string) {
   return value === "all" ? "All" : value;
+}
+
+function uniqueStrings(values: Array<string | undefined | null>) {
+  return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function opgwRouteIdForDashboardCable(cable: OpgwCableFeature) {
+  return `OPGW-${cable.properties.lineId.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "TL-DEMO"}`;
+}
+
+function splicePointIdsFromSections(sections: OpgwCableSectionFeature[]) {
+  return uniqueStrings(sections.flatMap((section) => [section.properties.fromSplicePointId, section.properties.toSplicePointId]));
 }
 
 function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Record<StreetMapLayerKey, boolean>) {

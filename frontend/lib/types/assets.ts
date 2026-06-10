@@ -775,6 +775,7 @@ export type FiberContinuityPath = {
   totalRouteMiles: number;
   totalCableSections: number;
   totalTransmissionLines: number;
+  totalSpanSegments: number;
   totalSplicePoints: number;
   totalPatchPanels: number;
   totalEstimatedLossDb: number;

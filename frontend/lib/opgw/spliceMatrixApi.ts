@@ -113,18 +113,28 @@ export function buildDemoMutationResponse(action: string, payload: unknown, view
 export function validateProposedMatrix(splicePointId: string, data: FiberContinuityData, payload: unknown) {
   const matrices = matricesForSplicePoint(splicePointId, data);
   if (!matrices) return null;
-  const proposedConnections = matrices.proposedMatrix.connections;
+  const proposedConnections = proposedConnectionsFromPayload(payload, matrices.proposedMatrix.connections);
   const duplicateActive = findDuplicateActiveStrands([...matrices.existingMatrix.connections, ...proposedConnections]);
+  const validationIssues = validateProposedConnections(proposedConnections, matrices.existingMatrix.connections, matrices.view, data);
   const continuityWarnings = matrices.view.continuityPaths.flatMap((path) => path.warningSummary);
   return {
     splicePointId: matrices.view.splicePoint.properties.splicePointId,
     spliceClosureId: matrices.view.closure?.properties.id || matrices.view.splicePoint.properties.closureId,
-    validForDemoPreview: duplicateActive.length === 0,
+    validForDemoPreview: duplicateActive.length === 0 && validationIssues.filter((issue) => issue.severity === "critical").length === 0,
     persisted: false,
     syntheticFlag: true,
     proposedConnectionCount: proposedConnections.length,
     duplicateActiveStrandWarnings: duplicateActive,
+    validationIssues,
     continuityWarnings,
+    validatedRules: [
+      "A strand cannot have two active service assignments unless explicitly modeled as a branch splice.",
+      "A strand cannot connect to retired, faulted, or superseded cable sections.",
+      "A proposed splice cannot overwrite an existing splice until committed.",
+      "Existing splice rows are read-only in this demo.",
+      "Proposed continuity is a preview and is not shown as existing continuity.",
+      "Synthetic services remain clearly labeled as demo data.",
+    ],
     payload,
     message: "Validation is a synthetic preview. Proposed splices are not committed to existing continuity.",
   };
@@ -185,15 +195,117 @@ function connectionKey(row: FiberSplice) {
   return `${row.fromCableId}:${row.fromStrandNumber}->${row.toCableId}:${row.toStrandNumber}:${row.spliceType}`;
 }
 
+function endpointKeys(row: FiberSplice) {
+  return [`${row.fromCableId}:${row.fromStrandNumber}`, `${row.toCableId}:${row.toStrandNumber}`];
+}
+
+function proposedConnectionsFromPayload(payload: unknown, fallback: FiberSplice[]) {
+  if (!payload || typeof payload !== "object") return fallback;
+  const record = payload as Record<string, unknown>;
+  const rawConnections = Array.isArray(record.proposedConnections) ? record.proposedConnections : undefined;
+  if (!rawConnections) return fallback;
+  return rawConnections
+    .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object"))
+    .map((row, index) => ({
+      id: String(row.id || `PROP-PAYLOAD-${String(index + 1).padStart(3, "0")}`),
+      spliceClosureId: String(row.spliceClosureId || record.spliceClosureId || ""),
+      fromCableId: String(row.fromCableId || ""),
+      fromStrandNumber: Number(row.fromStrandNumber || 0),
+      toCableId: String(row.toCableId || ""),
+      toStrandNumber: Number(row.toStrandNumber || 0),
+      spliceType: normalizeSpliceType(row.spliceType),
+      lossDb: typeof row.lossDb === "number" ? row.lossDb : Number(row.lossDb || 0),
+      status: normalizeSpliceStatus(row.status),
+      assignmentId: typeof row.assignmentId === "string" ? row.assignmentId : undefined,
+      notes: typeof row.notes === "string" ? row.notes : "Submitted proposed splice row.",
+    }));
+}
+
+function normalizeSpliceType(value: unknown): FiberSplice["spliceType"] {
+  if (value === "straight_through" || value === "express" || value === "branch" || value === "patch" || value === "open" || value === "reserved") return value;
+  return "straight_through";
+}
+
+function normalizeSpliceStatus(value: unknown): FiberSplice["status"] {
+  if (value === "existing" || value === "planned" || value === "proposed" || value === "faulted") return value;
+  return "proposed";
+}
+
+function validateProposedConnections(
+  proposedRows: FiberSplice[],
+  existingRows: FiberSplice[],
+  view: SpliceManagerViewModel,
+  data: FiberContinuityData,
+) {
+  const issues: Array<{ rule: string; severity: "info" | "warning" | "critical"; message: string; rowId?: string }> = [];
+  const validCableSectionIds = new Set(data.opgwCableSections.map((section) => section.properties.cableSectionId));
+  const validCableIds = new Set(data.opgwCables.map((cable) => cable.properties.id));
+  const retiredOrFaultedSections = new Set(
+    data.opgwCableSections
+      .filter((section) => ["faulted", "retired", "superseded"].includes(section.properties.installStatus))
+      .map((section) => section.properties.cableSectionId),
+  );
+  const existingConnectionKeys = new Set(existingRows.map(connectionKey));
+  const existingEndpoints = new Map<string, FiberSplice>();
+  existingRows.forEach((row) => endpointKeys(row).forEach((key) => existingEndpoints.set(key, row)));
+
+  if (!proposedRows.length) {
+    issues.push({ rule: "proposed_matrix_editable", severity: "warning", message: "No proposed splice rows were submitted for validation." });
+  }
+
+  proposedRows.forEach((row) => {
+    const rowId = row.id;
+    if (row.status === "existing") {
+      issues.push({ rule: "existing_read_only", severity: "critical", rowId, message: `${rowId} is marked existing. Existing splice rows are read-only in this demo.` });
+    }
+    if (!row.fromCableId || !row.toCableId || row.fromStrandNumber < 1 || row.toStrandNumber < 1) {
+      issues.push({ rule: "complete_required_fields", severity: "critical", rowId, message: `${rowId} is missing cable or strand information.` });
+    }
+    [row.fromCableId, row.toCableId].forEach((cableOrSectionId) => {
+      if (!validCableSectionIds.has(cableOrSectionId) && !validCableIds.has(cableOrSectionId)) {
+        issues.push({ rule: "valid_cable_reference", severity: "critical", rowId, message: `${rowId} references unknown cable or cable section ${cableOrSectionId}.` });
+      }
+      if (retiredOrFaultedSections.has(cableOrSectionId)) {
+        issues.push({ rule: "no_retired_or_faulted_section", severity: "critical", rowId, message: `${rowId} references retired, faulted, or superseded cable section ${cableOrSectionId}.` });
+      }
+    });
+    if (existingConnectionKeys.has(connectionKey(row))) {
+      issues.push({ rule: "proposed_duplicate_existing", severity: "info", rowId, message: `${rowId} matches an existing splice row and will be treated as unchanged until committed.` });
+    }
+    endpointKeys(row).forEach((key) => {
+      const existingRow = existingEndpoints.get(key);
+      if (existingRow && existingRow.spliceType !== "branch" && row.spliceType !== "branch" && connectionKey(existingRow) !== connectionKey(row)) {
+        issues.push({ rule: "no_overwrite_existing_until_commit", severity: "critical", rowId, message: `${rowId} uses active existing endpoint ${key}; use a branch splice or commit workflow before replacing existing continuity.` });
+      }
+    });
+    if (row.spliceType === "open") {
+      issues.push({ rule: "open_splice_breaks_continuity", severity: "warning", rowId, message: `${rowId} is open and will be shown as broken/incomplete proposed continuity.` });
+    }
+    if (row.status === "faulted") {
+      issues.push({ rule: "faulted_splice_warning", severity: "warning", rowId, message: `${rowId} is marked faulted for demo review.` });
+    }
+  });
+
+  if (view.continuityPaths.some((path) => path.totalTransmissionLines > 1)) {
+    issues.push({ rule: "cross_line_trace_supported", severity: "info", message: "At least one affected synthetic service crosses multiple transmission lines; validate end-to-end continuity before field work." });
+  }
+  issues.push({ rule: "synthetic_boundary", severity: "info", message: "Validation is synthetic/demo only and does not prove real utility fiber, SCADA, relay, protection, or telecom routing." });
+  return issues;
+}
+
 function findDuplicateActiveStrands(rows: FiberSplice[]) {
-  const seen = new Set<string>();
+  const seen = new Map<string, FiberSplice[]>();
   const warnings: string[] = [];
   rows
     .filter((row) => row.status === "existing" || row.status === "planned" || row.status === "proposed")
     .forEach((row) => {
-      const key = `${row.fromCableId}:${row.fromStrandNumber}`;
-      if (seen.has(key)) warnings.push(`Strand ${key} appears in multiple active/proposed splice rows.`);
-      seen.add(key);
+      Array.from(new Set(endpointKeys(row))).forEach((key) => {
+        const existingRows = seen.get(key) || [];
+        if (existingRows.some((existingRow) => existingRow.id !== row.id && existingRow.spliceType !== "branch" && row.spliceType !== "branch")) {
+          warnings.push(`Strand ${key} appears in multiple active/proposed splice rows.`);
+        }
+        seen.set(key, [...existingRows, row]);
+      });
     });
-  return warnings;
+  return Array.from(new Set(warnings));
 }

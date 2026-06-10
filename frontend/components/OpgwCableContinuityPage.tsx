@@ -23,6 +23,7 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
         <SummaryCard label="Fiber Count" value={`${cable.fiberCount}F`} />
         <SummaryCard label="Route Miles" value={view.totals.routeMiles.toFixed(2)} />
         <SummaryCard label="Cable Sections" value={view.totals.cableSections.toLocaleString()} />
+        <SummaryCard label="Span Segments" value={view.totals.spans.toLocaleString()} />
         <SummaryCard label="Splice Closures" value={view.totals.spliceClosures.toLocaleString()} />
         <SummaryCard label="Services Carried" value={view.totals.services.toLocaleString()} />
         <SummaryCard label="Estimated Loss" value={`${view.totals.estimatedLossDb.toFixed(2)} dB`} />
@@ -143,6 +144,7 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
                       <div><dt>Status</dt><dd><StatusPill value={service.operationalStatus} /></dd></div>
                       <div><dt>Criticality</dt><dd><StatusPill value={service.criticality} /></dd></div>
                       <div><dt>Loss</dt><dd>{path ? `${path.totalEstimatedLossDb.toFixed(2)} dB` : "-"}</dd></div>
+                      <div><dt>Spans</dt><dd>{path?.totalSpanSegments ?? "-"}</dd></div>
                       <div><dt>Splices</dt><dd>{path?.totalSplicePoints ?? "-"}</dd></div>
                     </dl>
                     {path ? (

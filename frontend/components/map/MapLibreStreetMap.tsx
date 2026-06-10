@@ -3,7 +3,7 @@
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Coordinate, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
-import type { FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
+import type { ContinuityHighlight, FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 import { buildClosureToSplicePointId, buildSpliceNodeMetrics } from "@/lib/opgw/continuityEngine";
 
@@ -34,6 +34,7 @@ type MapLibreStreetMapProps = {
   activeTool: MapDrawingTool;
   command: MapCommand | null;
   focusRequest: FocusRequest | null;
+  continuityHighlight?: ContinuityHighlight;
   onMapClick: (coordinate: Coordinate) => void;
   onSelect: (selection: StreetMapSelection) => void;
   onStatusChange: (status: "loading" | "active" | "error", message?: string) => void;
@@ -151,6 +152,7 @@ export function MapLibreStreetMap({
   activeTool,
   command,
   focusRequest,
+  continuityHighlight,
   onMapClick,
   onSelect,
   onStatusChange,
@@ -168,8 +170,8 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, patchPanels, planningRegions, layers),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, patchPanels, planningRegions, layers],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, patchPanels, planningRegions, layers, continuityHighlight),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, patchPanels, planningRegions, layers, continuityHighlight],
   );
   const lookup = useMemo(
     () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, patchPanels, planningRegions),
@@ -538,9 +540,9 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     type: "line",
     source: sourceIds.opgwCableSections,
     paint: {
-      "line-color": "#041012",
-      "line-width": ["+", opgwFiberCountWidthExpression() as never, 3.2],
-      "line-opacity": 0.7,
+      "line-color": ["case", ["get", "isContinuityHighlight"], "#e9feff", "#041012"],
+      "line-width": ["case", ["get", "isContinuityHighlight"], ["+", opgwFiberCountWidthExpression() as never, 6], ["+", opgwFiberCountWidthExpression() as never, 3.2]],
+      "line-opacity": ["case", ["get", "isContinuityHighlight"], 0.96, 0.7],
     },
   });
   map.addLayer({
@@ -548,9 +550,9 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     type: "line",
     source: sourceIds.opgwCableSections,
     paint: {
-      "line-color": opgwCableSectionColorExpression() as never,
-      "line-width": opgwFiberCountWidthExpression() as never,
-      "line-opacity": 0.95,
+      "line-color": ["case", ["get", "isContinuityHighlight"], "#28f3ff", opgwCableSectionColorExpression() as never],
+      "line-width": ["case", ["get", "isContinuityHighlight"], ["+", opgwFiberCountWidthExpression() as never, 3.2], opgwFiberCountWidthExpression() as never],
+      "line-opacity": ["case", ["get", "isContinuityHighlight"], 1, 0.95],
       "line-dasharray": opgwCableSectionDashExpression() as never,
     },
   });
@@ -572,10 +574,10 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     source: sourceIds.opgwSplicePoints,
     filter: ["!", ["has", "point_count"]],
     paint: {
-      "circle-radius": ["match", ["get", "spliceType"], "substation_deadend", 7.6, "tap", 6.8, 5.8],
-      "circle-color": ["match", ["get", "spliceType"], "substation_deadend", "#2f8cff", "tap", "#f5a524", "#9b7cff"],
-      "circle-stroke-color": "#f7f3ff",
-      "circle-stroke-width": 1.4,
+      "circle-radius": ["case", ["get", "isContinuityHighlight"], 10.8, ["match", ["get", "spliceType"], "substation_deadend", 7.6, "tap", 6.8, 5.8]],
+      "circle-color": ["case", ["get", "isContinuityHighlight"], "#28f3ff", ["match", ["get", "spliceType"], "substation_deadend", "#2f8cff", "tap", "#f5a524", "#9b7cff"]],
+      "circle-stroke-color": ["case", ["get", "isContinuityHighlight"], "#ffffff", "#f7f3ff"],
+      "circle-stroke-width": ["case", ["get", "isContinuityHighlight"], 3, 1.4],
     },
   });
   map.addLayer({
@@ -602,16 +604,20 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     id: "synthetic-opgw-cables-casing",
     type: "line",
     source: sourceIds.opgwCables,
-    paint: { "line-color": "#031012", "line-width": 7.2, "line-opacity": 0.72 },
+    paint: {
+      "line-color": ["case", ["get", "isContinuityHighlight"], "#e9feff", "#031012"],
+      "line-width": ["case", ["get", "isContinuityHighlight"], 11.2, 7.2],
+      "line-opacity": ["case", ["get", "isContinuityHighlight"], 0.92, 0.72],
+    },
   });
   map.addLayer({
     id: "synthetic-opgw-cables",
     type: "line",
     source: sourceIds.opgwCables,
     paint: {
-      "line-color": opgwStatusColorExpression() as never,
-      "line-width": opgwFiberCountWidthExpression() as never,
-      "line-opacity": 0.88,
+      "line-color": ["case", ["get", "isContinuityHighlight"], "#28f3ff", opgwStatusColorExpression() as never],
+      "line-width": ["case", ["get", "isContinuityHighlight"], ["+", opgwFiberCountWidthExpression() as never, 3.2], opgwFiberCountWidthExpression() as never],
+      "line-opacity": ["case", ["get", "isContinuityHighlight"], 1, 0.88],
       "line-dasharray": opgwStatusDashExpression() as never,
     },
   });
@@ -648,9 +654,9 @@ function addPlanningSourcesAndLayers(map: MapLibreMap) {
     type: "line",
     source: sourceIds.fiberAssignments,
     paint: {
-      "line-color": ["case", ["get", "isCritical"], "#ff5b5b", ["match", ["get", "status"], "active", "#6effff", "reserved", "#efc95f", "planned", "#ffd85f", "proposed", "#ff4fd8", "#9bd6ff"]],
-      "line-width": ["case", ["get", "isCritical"], ["interpolate", ["linear"], ["zoom"], 5, 5.5, 10, 9.5], ["interpolate", ["linear"], ["zoom"], 5, 3.4, 10, 7]],
-      "line-opacity": ["case", ["get", "isCritical"], 0.86, ["match", ["get", "status"], "reserved", 0.82, 0.68]],
+      "line-color": ["case", ["get", "isContinuityHighlight"], "#ffffff", ["get", "isCritical"], "#ff5b5b", ["match", ["get", "status"], "active", "#6effff", "reserved", "#efc95f", "planned", "#ffd85f", "proposed", "#ff4fd8", "#9bd6ff"]],
+      "line-width": ["case", ["get", "isContinuityHighlight"], ["interpolate", ["linear"], ["zoom"], 5, 7.5, 10, 12], ["get", "isCritical"], ["interpolate", ["linear"], ["zoom"], 5, 5.5, 10, 9.5], ["interpolate", ["linear"], ["zoom"], 5, 3.4, 10, 7]],
+      "line-opacity": ["case", ["get", "isContinuityHighlight"], 0.96, ["get", "isCritical"], 0.86, ["match", ["get", "status"], "reserved", 0.82, 0.68]],
       "line-dasharray": ["case", ["get", "isCritical"], ["literal", [1.4, 0.8]], ["literal", [1, 0]]],
     },
   });
@@ -1075,6 +1081,14 @@ type CableAssignmentStats = {
   openWorkOrders: number;
 };
 
+type ContinuityHighlightSets = {
+  routeIds: Set<string>;
+  cableIds: Set<string>;
+  sectionIds: Set<string>;
+  splicePointIds: Set<string>;
+  assignmentIds: Set<string>;
+};
+
 function opgwPlanningStatus(feature: OpgwCableFeature): OpgwPlanningStatus {
   if (feature.properties.status === "planned") return "planned";
   if (feature.properties.status === "proposed") return "design";
@@ -1181,6 +1195,40 @@ function isCriticalFiberAssignment(assignment: FiberAssignment) {
     || assignment.serviceType === "SCADA";
 }
 
+function buildContinuityHighlightSets(
+  continuityHighlight: ContinuityHighlight | undefined,
+  opgwCables: OpgwCableFeature[],
+  opgwCableSections: OpgwCableSectionFeature[],
+) {
+  const routeIds = new Set(continuityHighlight?.routeIds || []);
+  const cableIds = new Set(continuityHighlight?.cableIds || []);
+  const sectionIds = new Set(continuityHighlight?.sectionIds || []);
+  const splicePointIds = new Set(continuityHighlight?.splicePointIds || []);
+  const assignmentIds = new Set(continuityHighlight?.assignmentIds || []);
+
+  opgwCables.forEach((cable) => {
+    if (cableIds.has(cable.properties.id)) routeIds.add(opgwRouteIdForCable(cable));
+  });
+  opgwCableSections.forEach((section) => {
+    if (sectionIds.has(section.properties.cableSectionId)) {
+      routeIds.add(section.properties.opgwRouteId);
+      splicePointIds.add(section.properties.fromSplicePointId);
+      splicePointIds.add(section.properties.toSplicePointId);
+    }
+    if (routeIds.has(section.properties.opgwRouteId)) {
+      sectionIds.add(section.properties.cableSectionId);
+      splicePointIds.add(section.properties.fromSplicePointId);
+      splicePointIds.add(section.properties.toSplicePointId);
+    }
+  });
+
+  return { routeIds, cableIds, sectionIds, splicePointIds, assignmentIds };
+}
+
+function opgwRouteIdForCable(cable: OpgwCableFeature) {
+  return `OPGW-${cable.properties.lineId.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "TL-DEMO"}`;
+}
+
 function buildDatasets(
   substations: Substation[],
   nodes: MapNode[],
@@ -1204,10 +1252,12 @@ function buildDatasets(
   patchPanels: PatchPanel[],
   planningRegions: PlanningRegion[],
   layers: Record<StreetMapLayerKey, boolean>,
+  continuityHighlight?: ContinuityHighlight,
 ) {
   const structureById = new Map(transmissionStructures.map((feature) => [feature.properties.id, feature]));
   const cableById = new Map(opgwCables.map((feature) => [feature.properties.id, feature]));
   const publicLineById = new Map(publicTransmissionLines.map((feature) => [feature.properties.id, feature]));
+  const continuitySets = buildContinuityHighlightSets(continuityHighlight, opgwCables, opgwCableSections);
   const strandStatsByCable = buildCableStrandStats(opgwCables, fiberStrands);
   const assignmentStatsByCable = buildCableAssignmentStats(fiberAssignments);
   const spliceClosureCountByCable = buildCableSpliceClosureCounts(spliceClosures);
@@ -1361,12 +1411,14 @@ function buildDatasets(
       geometry: feature.geometry,
     }))) : emptyCollection,
     opgwRoutes: layers.assumedOpgwRoutes || layers.opgwRoutes || layers.opgwOutageImpact ? collection(opgwRoutes.flatMap((feature) => {
+      const isContinuityHighlight = continuitySets.routeIds.has(feature.properties.opgwRouteId);
       const visible =
         (layers.assumedOpgwRoutes && isAssumedOpgwStatus(feature.properties.routeStatus))
         || (layers.plannedOpgwFiber && isPlannedOpgwStatus(feature.properties.routeStatus))
         || (layers.verifiedOpgwFiber && isVerifiedOpgwStatus(feature.properties.routeStatus))
         || layers.opgwRoutes
-        || (layers.opgwOutageImpact && feature.properties.outageImpactCount > 0);
+        || (layers.opgwOutageImpact && feature.properties.outageImpactCount > 0)
+        || isContinuityHighlight;
       if (!visible) return [];
       return [{
         type: "Feature" as const,
@@ -1388,18 +1440,22 @@ function buildDatasets(
           criticalCircuits: feature.properties.criticalRidingCircuits,
           synthetic: true,
           warning: feature.properties.warning,
+          isContinuityHighlight,
+          continuityLabel: continuityHighlight?.label || null,
         },
         geometry: feature.geometry,
       }];
     })) : emptyCollection,
     opgwCableSections: layers.opgwCableSections || layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.availableStrandCapacity || layers.opgwOutageImpact ? collection(opgwCableSections.flatMap((feature) => {
+      const isContinuityHighlight = continuitySets.sectionIds.has(feature.properties.cableSectionId) || continuitySets.routeIds.has(feature.properties.opgwRouteId);
       const statusVisible =
         layers.opgwCableSections
         || (layers.assumedOpgwRoutes && feature.properties.installStatus === "assumed")
         || (layers.plannedOpgwFiber && ["proposed", "planned", "installed_synthetic"].includes(feature.properties.installStatus))
         || (layers.verifiedOpgwFiber && feature.properties.installStatus === "verified")
         || (layers.availableStrandCapacity && feature.properties.availableStrands <= 12)
-        || (layers.opgwOutageImpact && feature.properties.assignedServices > 0 && feature.properties.availableStrands <= 12);
+        || (layers.opgwOutageImpact && feature.properties.assignedServices > 0 && feature.properties.availableStrands <= 12)
+        || isContinuityHighlight;
       if (!statusVisible) return [];
       return [{
         type: "Feature" as const,
@@ -1424,6 +1480,8 @@ function buildDatasets(
           assignedServices: feature.properties.assignedServices,
           synthetic: true,
           warning: feature.properties.warning,
+          isContinuityHighlight,
+          continuityLabel: continuityHighlight?.label || null,
         },
         geometry: feature.geometry,
       }];
@@ -1459,6 +1517,7 @@ function buildDatasets(
     })) : emptyCollection,
     opgwSplicePoints: layers.opgwSplicePoints || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers ? collection(opgwSplicePoints.flatMap((feature) => {
       const metrics = spliceMetricsByPoint.get(feature.properties.splicePointId);
+      const isContinuityHighlight = continuitySets.splicePointIds.has(feature.properties.splicePointId);
       const hasExisting = (metrics?.activeSyntheticServices || 0) > 0 || feature.properties.status === "synthetic_assumption" || feature.properties.status === "verified";
       const hasProposed = (metrics?.proposedSyntheticServices || 0) > 0 || feature.properties.status === "planned";
       if (layers.existingFiberSplices && !layers.opgwSplicePoints && !layers.compareSpliceLayers && !hasExisting) return [];
@@ -1486,12 +1545,16 @@ function buildDatasets(
         associatedCableSections: feature.properties.associatedCableSectionIds.length,
         warning: "Synthetic splice point only. Not proof of real OPGW, SCADA, relay, protection, or private telecom routing.",
         synthetic: true,
+        isContinuityHighlight,
+        continuityLabel: continuityHighlight?.label || null,
       },
       geometry: feature.geometry,
       }];
     })) : emptyCollection,
     opgwCables: collection(opgwCables.flatMap((feature) => {
       const status = opgwPlanningStatus(feature);
+      const featureRouteId = opgwRouteIdForCable(feature);
+      const isContinuityHighlight = continuitySets.cableIds.has(feature.properties.id) || continuitySets.routeIds.has(featureRouteId);
       const confidenceLevel = opgwConfidenceLevel(feature);
       const strandStats = strandStatsByCable.get(feature.properties.id) || fallbackStrandStats(feature.properties.fiberCount);
       const assignmentStats = assignmentStatsByCable.get(feature.properties.id) || emptyAssignmentStats();
@@ -1505,7 +1568,7 @@ function buildDatasets(
         || (layers.verifiedOpgwFiber && isVerifiedOpgwStatus(status));
       const capacityLayerVisible = layers.availableStrandCapacity;
       const outageLayerVisible = layers.opgwOutageImpact && hasOutageImpact;
-      if (!routeLayerVisible && !capacityLayerVisible && !outageLayerVisible) return [];
+      if (!routeLayerVisible && !capacityLayerVisible && !outageLayerVisible && !isContinuityHighlight) return [];
       const startStructure = structureById.get(feature.properties.startStructureId)?.properties;
       const endStructure = structureById.get(feature.properties.endStructureId)?.properties;
       const line = publicLineById.get(feature.properties.lineId)?.properties;
@@ -1542,6 +1605,8 @@ function buildDatasets(
           showOutageImpact: outageLayerVisible,
           synthetic: true,
           warning: "Synthetic planning assumption only. Not active fiber. Requires engineer/as-built verification.",
+          isContinuityHighlight,
+          continuityLabel: continuityHighlight?.label || null,
         },
         geometry: feature.geometry,
       }];
@@ -1581,7 +1646,8 @@ function buildDatasets(
       }];
     })) : emptyCollection,
     fiberAssignments: layers.fiberAssignments || layers.criticalRidingCircuits ? collection(fiberAssignments.flatMap((assignment) => {
-      if (layers.criticalRidingCircuits && !layers.fiberAssignments && !isCriticalFiberAssignment(assignment)) return [];
+      const isContinuityHighlight = continuitySets.assignmentIds.has(assignment.id);
+      if (layers.criticalRidingCircuits && !layers.fiberAssignments && !isCriticalFiberAssignment(assignment) && !isContinuityHighlight) return [];
       const coordinates = assignment.cableIds
         .map((cableId) => cableById.get(cableId))
         .filter(Boolean)
@@ -1598,6 +1664,8 @@ function buildDatasets(
           isCritical: isCriticalFiberAssignment(assignment),
           estimatedLossDb: assignment.estimatedLossDb || 0,
           synthetic: true,
+          isContinuityHighlight,
+          continuityLabel: continuityHighlight?.label || null,
         },
         geometry: coordinates.length === 1
           ? { type: "LineString" as const, coordinates: coordinates[0] }

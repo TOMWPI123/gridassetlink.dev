@@ -31,6 +31,16 @@ export type MapCommand =
 
 export type FocusRequest = { selection: StreetMapSelection; sequence: number };
 
+export type ContinuityHighlight = {
+  label: string;
+  serviceId?: string;
+  assignmentIds: string[];
+  cableIds: string[];
+  routeIds?: string[];
+  sectionIds?: string[];
+  splicePointIds: string[];
+};
+
 type StreetLevelAssetMapProps = {
   activeMap: TransmissionMap;
   substations: Substation[];
@@ -59,6 +69,7 @@ type StreetLevelAssetMapProps = {
   placementHint?: string;
   command: MapCommand | null;
   focusRequest: FocusRequest | null;
+  continuityHighlight?: ContinuityHighlight;
   onMapClick: (coordinate: Coordinate) => void;
   onSelect: (selection: StreetMapSelection) => void;
   onStatusChange: (status: "loading" | "active" | "error", message?: string) => void;
@@ -97,6 +108,7 @@ export function StreetLevelAssetMap({
   placementHint,
   command,
   focusRequest,
+  continuityHighlight,
   onMapClick,
   onSelect,
   onStatusChange,
@@ -131,6 +143,7 @@ export function StreetLevelAssetMap({
           activeTool={activeTool}
           command={command}
           focusRequest={focusRequest}
+          continuityHighlight={continuityHighlight}
           onMapClick={onMapClick}
           onSelect={onSelect}
           onStatusChange={onStatusChange}
