@@ -997,6 +997,7 @@ export function DashboardPage() {
     if (deepLinkFocusApplied.current) return;
     const params = new URLSearchParams(window.location.search);
     const splicePointId = params.get("splicePoint");
+    const cableSectionId = params.get("cableSection") || params.get("cableSectionId");
     const cableId = params.get("cable");
     const serviceId = params.get("service");
 
@@ -1005,6 +1006,14 @@ export function DashboardPage() {
       if (!visibleOpgwSplicePoints.some((feature) => feature.properties.splicePointId === splicePointId)) return;
       deepLinkFocusApplied.current = true;
       focusOpgwSplicePointLayer(splicePointId);
+      return;
+    }
+
+    if (cableSectionId) {
+      if (!visibleOpgwCableSections.length) return;
+      if (!visibleOpgwCableSections.some((feature) => feature.properties.cableSectionId === cableSectionId)) return;
+      deepLinkFocusApplied.current = true;
+      focusOpgwCableSectionLayer(cableSectionId);
       return;
     }
 

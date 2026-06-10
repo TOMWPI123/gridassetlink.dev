@@ -225,6 +225,79 @@ function matrixFiberCapacity(rows: FiberSplice[]) {
   return Math.max(0, ...rows.map((row) => Math.max(row.fromStrandNumber, row.toStrandNumber)));
 }
 
+export type ContinuityTraceLayerType = "existing" | "proposed" | "compare";
+
+export type ContinuityTraceInput = {
+  serviceId?: string;
+  assignmentId?: string;
+  strandId?: string;
+  cableSectionId?: string;
+  splicePointId?: string;
+  spliceClosureId?: string;
+  layerType?: ContinuityTraceLayerType;
+};
+
+export function resolveContinuityTraceServices(input: ContinuityTraceInput, data: FiberContinuityData) {
+  const matched = new Map<string, SyntheticService>();
+  const add = (service: SyntheticService | undefined) => {
+    if (service) matched.set(service.serviceId, service);
+  };
+
+  if (input.serviceId) add(data.syntheticServices.find((service) => service.serviceId === decodeURIComponent(input.serviceId || "")));
+  if (input.assignmentId) {
+    const assignmentId = decodeURIComponent(input.assignmentId);
+    data.syntheticServices
+      .filter((service) => service.primaryPathAssignmentId === assignmentId || service.backupPathAssignmentId === assignmentId)
+      .forEach(add);
+  }
+  if (input.strandId) {
+    const strandId = decodeURIComponent(input.strandId);
+    const strand = (data.fiberStrands || []).find((item) => item.id === strandId);
+    if (strand?.assignmentId) {
+      data.syntheticServices
+        .filter((service) => service.primaryPathAssignmentId === strand.assignmentId || service.backupPathAssignmentId === strand.assignmentId)
+        .forEach(add);
+    }
+    if (strand?.cableId) addServicesForTraceCableIds(new Set([strand.cableId]), data.syntheticServices, matched);
+  }
+  if (input.cableSectionId) {
+    const cableSectionId = decodeURIComponent(input.cableSectionId);
+    const section = data.opgwCableSections.find((item) => item.properties.cableSectionId === cableSectionId);
+    if (section) addServicesForTraceCableSection(section.properties.opgwRouteId, data, matched);
+  }
+  if (input.splicePointId) buildSpliceManagerView(input.splicePointId, data)?.services.forEach(add);
+  if (input.spliceClosureId) buildSpliceManagerView(input.spliceClosureId, data)?.services.forEach(add);
+
+  return filterContinuityTraceServicesByLayer(Array.from(matched.values()), input.layerType);
+}
+
+export function resolveSelectedSplicePointIdForTrace(input: ContinuityTraceInput, data: FiberContinuityData) {
+  if (input.splicePointId) return buildSpliceManagerView(input.splicePointId, data)?.header.splicePointId || decodeURIComponent(input.splicePointId);
+  if (input.spliceClosureId) return buildSpliceManagerView(input.spliceClosureId, data)?.header.splicePointId;
+  return undefined;
+}
+
+export function filterContinuityTraceServicesByLayer(services: SyntheticService[], layerType: ContinuityTraceLayerType | undefined) {
+  if (!layerType || layerType === "compare") return services;
+  if (layerType === "existing") return services.filter((service) => service.layerType === "existing");
+  return services.filter((service) => service.layerType === "proposed" || service.operationalStatus === "planned" || service.operationalStatus === "proposed");
+}
+
+function addServicesForTraceCableSection(routeId: string, data: FiberContinuityData, matched: Map<string, SyntheticService>) {
+  const cableIds = new Set(
+    data.opgwCables
+      .filter((cable) => opgwRouteIdForCable(cable) === routeId)
+      .map((cable) => cable.properties.id),
+  );
+  addServicesForTraceCableIds(cableIds, data.syntheticServices, matched);
+}
+
+function addServicesForTraceCableIds(cableIds: Set<string>, services: SyntheticService[], matched: Map<string, SyntheticService>) {
+  services
+    .filter((service) => service.continuityCableIds?.some((cableId) => cableIds.has(cableId)))
+    .forEach((service) => matched.set(service.serviceId, service));
+}
+
 export function traceSyntheticService(service: SyntheticService, data: FiberContinuityData, selectedSplicePointId?: string): FiberContinuityPath {
   const assignment = service.primaryPathAssignmentId ? data.fiberAssignments.find((item) => item.id === service.primaryPathAssignmentId) : undefined;
   const continuityCableIds = service.continuityCableIds?.length ? service.continuityCableIds : assignment?.cableIds || [];

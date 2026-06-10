@@ -2,7 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/Badges";
 import { FiberTracePage as LegacyCircuitFiberTracePage } from "@/components/CircuitWorkflowPages";
-import { buildSpliceManagerView, traceSyntheticService } from "@/lib/opgw/continuityEngine";
+import {
+  buildSpliceManagerView,
+  resolveContinuityTraceServices,
+  resolveSelectedSplicePointIdForTrace,
+  traceSyntheticService,
+  type ContinuityTraceInput,
+  type ContinuityTraceLayerType,
+} from "@/lib/opgw/continuityEngine";
 import { buildOpgwCableContinuityView } from "@/lib/opgw/cableContinuity";
 import { loadSyntheticFiberContinuityData } from "@/lib/opgw/staticSyntheticData";
 import type { FiberContinuityPath, SyntheticService } from "@/lib/types/assets";
@@ -15,11 +22,16 @@ export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams;
   const splicePointId = firstQueryValue(params?.splicePoint);
   const spliceClosureId = firstQueryValue(params?.spliceClosure);
-  const serviceId = firstQueryValue(params?.service);
-  const cableId = firstQueryValue(params?.cable);
+  const serviceId = firstQueryValue(params?.service) || firstQueryValue(params?.serviceId);
+  const assignmentId = firstQueryValue(params?.assignment) || firstQueryValue(params?.assignmentId);
+  const strandId = firstQueryValue(params?.strand) || firstQueryValue(params?.strandId);
+  const cableSectionId = firstQueryValue(params?.cableSection) || firstQueryValue(params?.cableSectionId);
+  const cableId = firstQueryValue(params?.cable) || firstQueryValue(params?.cableId);
+  const layerType = normalizeLayerType(firstQueryValue(params?.layer) || firstQueryValue(params?.layerType));
   const spliceTargetId = splicePointId || spliceClosureId;
+  const genericTraceInput: ContinuityTraceInput = { assignmentId, strandId, cableSectionId, layerType };
 
-  if (!spliceTargetId && !serviceId && !cableId) return <LegacyCircuitFiberTracePage />;
+  if (!spliceTargetId && !serviceId && !assignmentId && !strandId && !cableSectionId && !cableId) return <LegacyCircuitFiberTracePage />;
 
   const data = await loadSyntheticFiberContinuityData();
 
@@ -67,6 +79,38 @@ export default async function Page({ searchParams }: PageProps) {
           ["Layer", service.layerType],
         ]}
         mapHref={`/dashboard?drawer=layers&service=${encodeURIComponent(service.serviceId)}`}
+      />
+    );
+  }
+
+  if (assignmentId || strandId || cableSectionId) {
+    const services = resolveContinuityTraceServices(genericTraceInput, data);
+    if (!services.length) notFound();
+    const selectedSplicePointId = resolveSelectedSplicePointIdForTrace(genericTraceInput, data);
+    const paths = services.map((service) => traceSyntheticService(service, data, selectedSplicePointId));
+    const targetLabel = assignmentId
+      ? `assignment ${assignmentId}`
+      : strandId
+        ? `strand ${strandId}`
+        : `cable section ${cableSectionId}`;
+    return (
+      <OpgwFiberTraceView
+        title={`Fiber Continuity for ${targetLabel}`}
+        subtitle={`${services.length} synthetic carried service${services.length === 1 ? "" : "s"} matched this trace input`}
+        services={services}
+        paths={paths}
+        warnings={unique(paths.flatMap((path) => path.warningSummary))}
+        contextRows={[
+          ["Trace input", assignmentId ? "Assignment" : strandId ? "Strand" : "Cable section"],
+          ["Target", assignmentId || strandId || cableSectionId || "-"],
+          ["Layer", layerType || "compare"],
+          ["Matched services", String(services.length)],
+          ["Path count", String(paths.length)],
+          ["Synthetic source", "demo continuity resolver"],
+        ]}
+        mapHref={cableSectionId
+          ? `/dashboard?drawer=layers&cableSection=${encodeURIComponent(cableSectionId)}`
+          : `/dashboard?drawer=layers&service=${encodeURIComponent(services[0].serviceId)}`}
       />
     );
   }
@@ -236,4 +280,13 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 
 function firstQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeLayerType(value: string | undefined): ContinuityTraceLayerType | undefined {
+  if (value === "existing" || value === "proposed" || value === "compare") return value;
+  return undefined;
+}
+
+function unique<T>(values: T[]) {
+  return Array.from(new Set(values.filter(Boolean)));
 }
