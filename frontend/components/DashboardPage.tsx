@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, PencilRuler, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Upload, Workflow } from "lucide-react";
+import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, PencilRuler, Plus, RadioTower, Route, Search, Send, SlidersHorizontal, TableProperties, Terminal, Upload, Workflow, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { appNavGroups } from "@/components/navigation";
 import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
@@ -21,9 +21,11 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type ContinuityHighlight, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, DesignAssetField, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, DesignAgentTool, DesignAgentToolRunResult, DesignAssetBlueprint, DesignAssetField, DesignAssetFieldType, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignBlueprintInstallResult, DesignMaterializationBatchResult, DesignMaterializationResult, DesignModuleBlueprint, DesignModuleEntity, DesignModuleSnapshotMaterializeResult, DesignModuleSnapshotResult, DesignRebuildAudit, DesignRebuildPackage, DesignRebuildPackageImportResult, DesignTerminalCommandResult, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const MAP_EDITING_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MAP_EDITING === "true";
+const designFieldTypeOptions: DesignAssetFieldType[] = ["string", "textarea", "number", "integer", "boolean", "date", "enum", "json"];
+const designGeometryTypeOptions: DesignAssetGeometryType[] = ["table_only", "point", "line", "polygon"];
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
@@ -116,6 +118,18 @@ type DashboardLayerSummary = {
   enabled: boolean;
   moduleHref: string;
   safety: string;
+};
+type DashboardTerminalMessage = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  text: string;
+  details?: string[];
+};
+type DashboardTerminalContextAsset = {
+  id: string;
+  label: string;
+  kind: StreetMapSelection["kind"] | "typed_reference";
+  coordinates?: Coordinate;
 };
 type DashboardContinuitySummary = {
   label: string;
@@ -247,8 +261,9 @@ export function DashboardPage() {
   const [transmissionLines] = useState(seedTransmissionLines);
   const [planningRegions] = useState(seedPlanningRegions);
   const [activeTool, setActiveTool] = useState<MapDrawingTool>("select");
-  const [designModeEnabled, setDesignModeEnabled] = useState(MAP_EDITING_ENABLED);
+  const [designModeEnabled, setDesignModeEnabled] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<StreetMapSelection | null>(null);
+  const [mapWindowClosed, setMapWindowClosed] = useState(false);
   const [draftSubstation, setDraftSubstation] = useState<Substation | null>(null);
   const [draftNode, setDraftNode] = useState<MapNode | null>(null);
   const [placementTarget, setPlacementTarget] = useState<MissingMapLocation | null>(null);
@@ -307,6 +322,16 @@ export function DashboardPage() {
   const [pendingDesignGeometry, setPendingDesignGeometry] = useState<DesignAssetGeoJsonGeometry | null>(null);
   const [designDrawingCoordinates, setDesignDrawingCoordinates] = useState<Coordinate[]>([]);
   const [designAssetMessage, setDesignAssetMessage] = useState("");
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalInput, setTerminalInput] = useState("");
+  const [terminalBusy, setTerminalBusy] = useState(false);
+  const [terminalHistory, setTerminalHistory] = useState<DashboardTerminalMessage[]>(() => [
+    {
+      id: "terminal-welcome",
+      role: "system",
+      text: "Command terminal ready. Use synthetic/demo data only. Try: Build new pole between Meadow-Road-Str-0060 and Meadow-Road-Str-0049 and add a splice to the pole.",
+    },
+  ]);
   const [gisApiBase, setGisApiBase] = useState(API_BASE);
   const designFeaturesEnabled = MAP_EDITING_ENABLED || designModeEnabled;
 
@@ -504,7 +529,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
-    if (drawer && ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "design"].includes(drawer)) {
+    if (drawer && ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments"].includes(drawer)) {
       setRightMode(drawer as RightDrawerMode);
       setRightCollapsed(false);
     }
@@ -1103,7 +1128,7 @@ export function DashboardPage() {
     }
     setSelectedAsset(selection);
     setFocusRequest({ selection: focusTargetForSelection(selection), sequence: Date.now() });
-    setRightMode(selection.kind === "design_asset_record" ? "design" : "details");
+    setRightMode("details");
     setRightCollapsed(false);
   }
 
@@ -1146,7 +1171,7 @@ export function DashboardPage() {
     }
     if (selection.kind === "design_asset_record") {
       setStreetLayers((current) => ({ ...current, designAssets: true }));
-      setRightMode("design");
+      setRightMode("details");
       setRightCollapsed(false);
     }
     focusSelection(selection);
@@ -1196,7 +1221,7 @@ export function DashboardPage() {
       if (isDesignDrawingTool(activeTool)) setActiveTool("select");
       setSelectedAsset(selection);
       setStreetLayers((current) => ({ ...current, designAssets: true }));
-      setRightMode("design");
+      setRightMode("details");
       setRightCollapsed(false);
       return;
     }
@@ -1776,6 +1801,129 @@ export function DashboardPage() {
     window.setTimeout(() => setToast(""), 3800);
   }
 
+  async function submitTerminalCommand() {
+    const command = terminalInput.trim();
+    if (!command || terminalBusy) return;
+    const userMessage: DashboardTerminalMessage = {
+      id: `terminal-user-${Date.now()}`,
+      role: "user",
+      text: command,
+    };
+    setTerminalHistory((current) => [...current.slice(-18), userMessage]);
+    setTerminalInput("");
+    setTerminalBusy(true);
+    try {
+      const result = await fetchFromApiBase<DesignTerminalCommandResult>(API_BASE, "/api/design-assets/terminal-command", {
+        method: "POST",
+        body: JSON.stringify({
+          command,
+          materialize: true,
+          context: buildTerminalContext(command),
+        }),
+      });
+      const assistantMessage = terminalMessageFromResult(result);
+      setTerminalHistory((current) => [...current.slice(-18), assistantMessage]);
+      if (result.actions.length) {
+        setStreetLayers((current) => ({ ...current, designAssets: true }));
+        const refreshed = await refreshDesignAssetsForTerminal();
+        const createdKey = [...result.actions].reverse().find((action) => action.record_key)?.record_key;
+        const createdRecord = createdKey ? refreshed.find((record) => record.record_key === createdKey) : undefined;
+        if (createdRecord?.geometry || createdRecord?.geometry_json) {
+          const selection: StreetMapSelection = { kind: "design_asset_record", id: String(createdRecord.id), label: createdRecord.display_label || createdRecord.record_key, record: createdRecord };
+          setSelectedAsset(selection);
+          setFocusRequest({ selection, sequence: Date.now() });
+          setRightMode("details");
+          setRightCollapsed(false);
+        }
+      }
+      showToast(result.needs_input ? "Command terminal needs more parameters." : result.summary);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setTerminalHistory((current) => [...current.slice(-18), { id: `terminal-error-${Date.now()}`, role: "assistant", text: "I could not complete that command.", details: [message] }]);
+      showToast("Command terminal error.");
+    } finally {
+      setTerminalBusy(false);
+    }
+  }
+
+  async function refreshDesignAssetsForTerminal() {
+    const payload = await fetchFromApiBase<DesignAssetMapPayload>(API_BASE, "/api/design-assets/map-records");
+    const records = payload.records || [];
+    setDesignAssetTypes(payload.asset_types || []);
+    setDesignAssetRecords(records);
+    setSelectedDesignAssetTypeSlug((current) => current || payload.asset_types?.[0]?.slug || "");
+    setDesignAssetMessage(payload.synthetic_data_notice || "Command-created records use synthetic/demo planning data only.");
+    return records;
+  }
+
+  function terminalMessageFromResult(result: DesignTerminalCommandResult): DashboardTerminalMessage {
+    const details = [
+      ...result.answers.map((answer) => `${answer.entity} ${answer.id}: ${answer.summary}`),
+      ...result.actions.map((action) => `${action.action.replaceAll("_", " ")}: ${action.label || action.record_key || action.status}${action.materialization?.entity ? ` -> ${action.materialization.entity} ${action.materialization.action}` : ""}`),
+      ...result.parameter_prompts.map((prompt) => `${prompt.field}: ${prompt.question}`),
+    ];
+    return {
+      id: `terminal-assistant-${Date.now()}`,
+      role: "assistant",
+      text: result.summary,
+      details,
+    };
+  }
+
+  function buildTerminalContext(command: string) {
+    return {
+      operating_mode: operatingMode,
+      search,
+      active_layers: dashboardLayerSummaries.filter((layer) => layer.enabled).map((layer) => layer.key),
+      selected_asset: selectedAsset ? terminalContextForSelection(selectedAsset) : null,
+      reference_assets: extractTerminalReferenceLabels(command).flatMap((label) => {
+        const asset = findTerminalReferenceAsset(label);
+        return asset ? [asset] : [{ id: label, label, kind: "typed_reference" as const }];
+      }),
+    };
+  }
+
+  function findTerminalReferenceAsset(label: string): DashboardTerminalContextAsset | null {
+    const lowered = label.toLowerCase();
+    const structure = visibleTransmissionStructures.find((feature) => [feature.properties.id, feature.properties.structureNumber].some((value) => String(value).toLowerCase() === lowered));
+    if (structure) {
+      return { id: structure.properties.id, label: structure.properties.structureNumber, kind: "transmission_structure", coordinates: structure.geometry.coordinates };
+    }
+    const distributionPole = visibleDistributionPoles.find((feature) => [feature.properties.id, feature.properties.poleNumber].some((value) => String(value).toLowerCase() === lowered));
+    if (distributionPole) {
+      return { id: distributionPole.properties.id, label: distributionPole.properties.poleNumber, kind: "distribution_pole", coordinates: distributionPole.geometry.coordinates };
+    }
+    const splicePoint = visibleOpgwSplicePoints.find((feature) => [feature.properties.splicePointId, feature.properties.structureNumber].some((value) => String(value).toLowerCase() === lowered));
+    if (splicePoint) {
+      return { id: splicePoint.properties.splicePointId, label: splicePoint.properties.splicePointId, kind: "opgw_splice_point", coordinates: splicePoint.geometry.coordinates };
+    }
+    const designRecord = visibleDesignAssetRecords.find((record) => [record.record_key, record.display_label].some((value) => String(value).toLowerCase() === lowered));
+    const designCoordinates = designRecord ? firstCoordinateFromDesignGeometry(designRecord.geometry || designRecord.geometry_json) : undefined;
+    if (designRecord) {
+      return { id: String(designRecord.id), label: designRecord.display_label || designRecord.record_key, kind: "design_asset_record", coordinates: designCoordinates };
+    }
+    return null;
+  }
+
+  function terminalContextForSelection(selection: StreetMapSelection): DashboardTerminalContextAsset {
+    return {
+      id: selection.id,
+      label: selection.label,
+      kind: selection.kind,
+      coordinates: terminalCoordinatesForSelection(selection),
+    };
+  }
+
+  function handleTerminalKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void submitTerminalCommand();
+    }
+    if (event.key === "Escape") {
+      setTerminalOpen(false);
+    }
+  }
+
   function updateFiberStrands(cableId: string, strandNumbers: number[], status: FiberStrand["status"], assignmentId?: string) {
     const selected = new Set(strandNumbers);
     setFiberStrands((current) => current.map((strand) => {
@@ -1822,47 +1970,61 @@ export function DashboardPage() {
 
   return (
     <main className={`dashboard-map-page map-first dashboard-mode-${mode}`} data-map-status={mapStatus}>
-      <StreetLevelAssetMap
-        activeMap={activeMap}
-        substations={visibleSubstations}
-        nodes={visibleNodes}
-        transmissionLines={visibleTransmissionLines}
-        publicTransmissionLines={layerFilteredPublicTransmissionLines}
-        publicSubstations={layerFilteredPublicSubstations}
-        fccUtilityTowers={layerFilteredFccUtilityTowers}
-        fccMicrowaveLinks={layerFilteredFccMicrowaveLinks}
-        syntheticSubstations={visibleSyntheticSubstations}
-        transmissionStructures={layerFilteredTransmissionStructures}
-        opgwCables={visibleOpgwCables}
-        opgwRoutes={mapOpgwRoutes}
-        opgwCableSections={mapOpgwCableSections}
-        opgwSpanSegments={visibleOpgwSpanSegments}
-        opgwSplicePoints={mapOpgwSplicePoints}
-        spliceClosures={layerFilteredSpliceClosures}
-        fiberSplices={fiberSplices}
-        fiberStrands={fiberStrands}
-        fiberAssignments={visibleFiberAssignments}
-        syntheticServices={syntheticServices}
-        distributionPoleDensity={layerFilteredDistributionPoleDensity}
-        distributionPoles={layerFilteredDistributionPoles}
-        distributionPoleFiberRoutes={layerFilteredDistributionFiberRoutes}
-        distributionSplicePoints={layerFilteredDistributionSplicePoints}
-        distributionSlackLoops={layerFilteredDistributionSlackLoops}
-        distributionFiberAssignments={layerFilteredDistributionFiberAssignments}
-        patchPanels={visiblePatchPanels}
-        designAssetRecords={streetLayers.designAssets ? visibleDesignAssetMapRecords : []}
-        planningRegions={visiblePlanningRegions}
-        layers={streetLayers}
-        gisApiBase={gisApiBase}
-        activeTool={activeTool}
-        placementHint={placementHint}
-        command={mapCommand}
-        focusRequest={focusRequest}
-        continuityHighlight={continuityHighlight}
-        onMapClick={handleMapClick}
-        onSelect={handleMapSelect}
-        onStatusChange={handleMapStatusChange}
-      />
+      {mapWindowClosed ? (
+        <section className="dashboard-map-closed-panel" aria-label="Dashboard map closed">
+          <div>
+            <X size={20} />
+            <strong>Dashboard map window closed</strong>
+            <span>The command terminal and module drawers are still available. Reopen the map when you want to browse assets again.</span>
+          </div>
+          <button type="button" onClick={() => {
+            setMapWindowClosed(false);
+            window.setTimeout(() => issueMapCommand("resize"), 50);
+          }}>Open Dashboard Map</button>
+        </section>
+      ) : (
+        <StreetLevelAssetMap
+          activeMap={activeMap}
+          substations={visibleSubstations}
+          nodes={visibleNodes}
+          transmissionLines={visibleTransmissionLines}
+          publicTransmissionLines={layerFilteredPublicTransmissionLines}
+          publicSubstations={layerFilteredPublicSubstations}
+          fccUtilityTowers={layerFilteredFccUtilityTowers}
+          fccMicrowaveLinks={layerFilteredFccMicrowaveLinks}
+          syntheticSubstations={visibleSyntheticSubstations}
+          transmissionStructures={layerFilteredTransmissionStructures}
+          opgwCables={visibleOpgwCables}
+          opgwRoutes={mapOpgwRoutes}
+          opgwCableSections={mapOpgwCableSections}
+          opgwSpanSegments={visibleOpgwSpanSegments}
+          opgwSplicePoints={mapOpgwSplicePoints}
+          spliceClosures={layerFilteredSpliceClosures}
+          fiberSplices={fiberSplices}
+          fiberStrands={fiberStrands}
+          fiberAssignments={visibleFiberAssignments}
+          syntheticServices={syntheticServices}
+          distributionPoleDensity={layerFilteredDistributionPoleDensity}
+          distributionPoles={layerFilteredDistributionPoles}
+          distributionPoleFiberRoutes={layerFilteredDistributionFiberRoutes}
+          distributionSplicePoints={layerFilteredDistributionSplicePoints}
+          distributionSlackLoops={layerFilteredDistributionSlackLoops}
+          distributionFiberAssignments={layerFilteredDistributionFiberAssignments}
+          patchPanels={visiblePatchPanels}
+          designAssetRecords={streetLayers.designAssets ? visibleDesignAssetMapRecords : []}
+          planningRegions={visiblePlanningRegions}
+          layers={streetLayers}
+          gisApiBase={gisApiBase}
+          activeTool={activeTool}
+          placementHint={placementHint}
+          command={mapCommand}
+          focusRequest={focusRequest}
+          continuityHighlight={continuityHighlight}
+          onMapClick={handleMapClick}
+          onSelect={handleMapSelect}
+          onStatusChange={handleMapStatusChange}
+        />
+      )}
 
       <div className="dashboard-floating-topbar">
         <div className="dashboard-compact-brand">
@@ -1883,14 +2045,6 @@ export function DashboardPage() {
               {label}
             </button>
           ))}
-          <button
-            type="button"
-            className={designModeEnabled && rightMode === "design" ? "active design-mode" : "design-mode"}
-            onClick={handleDesignModeClick}
-          >
-            <PencilRuler size={12} />
-            Design Mode
-          </button>
         </div>
         <div className="dashboard-map-global-search-wrap">
           <div className="dashboard-map-global-search-shell">
@@ -1937,7 +2091,12 @@ export function DashboardPage() {
       <div className="dashboard-top-right-toolbar" aria-label="Map toolbar">
         <button type="button" onClick={() => issueMapCommand("resetIsoNe")}><LocateFixed size={15} />Reset to ISO-NE</button>
         <button type="button" onClick={() => issueMapCommand("fitActiveMap")}><Maximize2 size={15} />Fit active map</button>
+        <button type="button" onClick={() => setMapWindowClosed(true)}><X size={15} />Close map</button>
       </div>
+
+      <aside className="dashboard-side-layer-digest" aria-label="Active map layers">
+        <LayerSummaryDigest layerSummaries={dashboardLayerSummaries} compact title="Active Map Layers" />
+      </aside>
 
       <aside className={`dashboard-right-floating-drawer ${rightCollapsed ? "collapsed" : ""}`} aria-label="Dashboard details drawer">
         <button className="dashboard-panel-collapse right" type="button" onClick={() => setRightCollapsed((current) => !current)}>
@@ -1953,7 +2112,6 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "scale" ? "active" : ""} onClick={() => setRightMode("scale")}><Database size={14} />Scale</button>
               <button type="button" className={rightMode === "sources" ? "active" : ""} onClick={() => setRightMode("sources")}><TableProperties size={14} />Sources</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
-              {designFeaturesEnabled ? <button type="button" className={rightMode === "design" ? "active" : ""} onClick={handleDesignModeClick}><PencilRuler size={14} />Design</button> : null}
               <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
             </div>
             <div className="dashboard-drawer-body">
@@ -2074,35 +2232,6 @@ export function DashboardPage() {
               ) : null}
               {rightMode === "sources" ? <DashboardDataSourcesPanel /> : null}
               {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} onClose={handleCloseAssetDetail} /> : null}
-              {rightMode === "design" ? (
-                <DesignEditDrawer
-                  enabled={designFeaturesEnabled}
-                  assetTypes={designAssetTypes}
-                  records={visibleDesignAssetRecords}
-                  selectedRecord={selectedAsset?.kind === "design_asset_record" ? selectedAsset.record : null}
-                  selectedTypeSlug={selectedDesignAssetTypeSlug}
-                  pendingGeometry={pendingDesignGeometry}
-                  activeTool={activeTool}
-                  drawingVertexCount={designDrawingCoordinates.length}
-                  message={designAssetMessage}
-                  onSelectedTypeSlugChange={setSelectedDesignAssetTypeSlug}
-                  onPendingGeometryChange={setPendingDesignGeometry}
-                  onBeginDrawing={beginDesignDrawing}
-                  onFinishDrawing={finishDesignDrawing}
-                  onCancelDraft={cancelDesignDraft}
-                  onNewRecord={startNewDesignRecord}
-                  onRefresh={loadDesignAssets}
-                  onSelectRecord={(record) => {
-                    const selection: StreetMapSelection = { kind: "design_asset_record", id: String(record.id), label: record.display_label || record.record_key, record };
-                    setPendingDesignGeometry(null);
-                    setDesignDrawingCoordinates([]);
-                    if (isDesignDrawingTool(activeTool)) setActiveTool("select");
-                    setSelectedAsset(selection);
-                    setFocusRequest({ selection, sequence: Date.now() });
-                  }}
-                  onNotify={showToast}
-                />
-              ) : null}
               {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} onUpdateStrands={updateFiberStrands} /> : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
               {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
@@ -2149,6 +2278,47 @@ export function DashboardPage() {
           <button type="button" onClick={() => setContinuityHighlight(undefined)}>Clear</button>
         </div>
       ) : null}
+      <div className={`dashboard-command-terminal ${terminalOpen ? "open" : ""}`} aria-label="Dashboard command terminal">
+        {!terminalOpen ? (
+          <button className="dashboard-command-terminal-toggle" type="button" onClick={() => setTerminalOpen(true)}>
+            <Terminal size={16} />
+            Command Terminal
+          </button>
+        ) : (
+          <section className="dashboard-command-terminal-panel">
+            <div className="dashboard-command-terminal-header">
+              <span><Terminal size={15} /><strong>Dashboard Command Terminal</strong></span>
+              <button type="button" onClick={() => setTerminalOpen(false)} aria-label="Close command terminal"><X size={15} /></button>
+            </div>
+            <div className="dashboard-command-terminal-history" aria-live="polite">
+              {terminalHistory.map((message) => (
+                <article className={`terminal-message ${message.role}`} key={message.id}>
+                  <span>{message.role}</span>
+                  <p>{message.text}</p>
+                  {message.details?.length ? (
+                    <ul>
+                      {message.details.slice(0, 8).map((detail) => <li key={detail}>{detail}</li>)}
+                    </ul>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+            <div className="dashboard-command-terminal-entry">
+              <input
+                value={terminalInput}
+                onChange={(event) => setTerminalInput(event.currentTarget.value)}
+                onKeyDown={handleTerminalKeyDown}
+                placeholder="Type a command: add splice can to my pole, rename pole X to Y, how many strands on cable..."
+                disabled={terminalBusy}
+              />
+              <button type="button" onClick={() => void submitTerminalCommand()} disabled={terminalBusy || !terminalInput.trim()}>
+                <Send size={14} />
+                {terminalBusy ? "Working" : "Run"}
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
   );
@@ -2212,6 +2382,46 @@ function formatFilterOption(value: string) {
 
 function uniqueStrings(values: Array<string | undefined | null>) {
   return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function extractTerminalReferenceLabels(command: string) {
+  return uniqueStrings(Array.from(command.matchAll(/\b[A-Za-z0-9][A-Za-z0-9_.:-]*(?:-STR-\d{2,6}|-POLE-\d{2,6}|-SPLICE-\d{2,6})\b/gi)).map((match) => match[0]));
+}
+
+function terminalCoordinatesForSelection(selection: StreetMapSelection): Coordinate | undefined {
+  if (selection.kind === "public_substation" || selection.kind === "fcc_utility_tower" || selection.kind === "synthetic_substation" || selection.kind === "transmission_structure" || selection.kind === "opgw_splice_point" || selection.kind === "splice_closure" || selection.kind === "distribution_pole_density" || selection.kind === "distribution_pole" || selection.kind === "distribution_splice_point" || selection.kind === "distribution_slack_loop") {
+    return selection.record.geometry.coordinates as Coordinate;
+  }
+  if (selection.kind === "design_asset_record") return firstCoordinateFromDesignGeometry(selection.record.geometry || selection.record.geometry_json);
+  if (selection.kind === "patch_panel") return undefined;
+  if ("longitude" in selection.record && "latitude" in selection.record) {
+    const longitude = Number(selection.record.longitude);
+    const latitude = Number(selection.record.latitude);
+    if (Number.isFinite(longitude) && Number.isFinite(latitude)) return [longitude, latitude];
+  }
+  if (selection.kind === "opgw_cable" || selection.kind === "opgw_route" || selection.kind === "opgw_cable_section" || selection.kind === "opgw_span_segment" || selection.kind === "distribution_pole_fiber" || selection.kind === "distribution_fiber_assignment" || selection.kind === "fcc_microwave_link" || selection.kind === "public_transmission_line") {
+    const coordinates = "coordinates" in selection.record.geometry ? selection.record.geometry.coordinates : [];
+    return firstCoordinateFromAnyGeometry(coordinates);
+  }
+  return undefined;
+}
+
+function firstCoordinateFromDesignGeometry(geometry: DesignAssetGeoJsonGeometry | null | undefined): Coordinate | undefined {
+  if (!geometry) return undefined;
+  return firstCoordinateFromAnyGeometry(geometry.coordinates);
+}
+
+function firstCoordinateFromAnyGeometry(value: unknown): Coordinate | undefined {
+  if (Array.isArray(value) && value.length >= 2 && typeof value[0] === "number" && typeof value[1] === "number") {
+    return [value[0], value[1]];
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const coordinate = firstCoordinateFromAnyGeometry(item);
+      if (coordinate) return coordinate;
+    }
+  }
+  return undefined;
 }
 
 function opgwRouteIdForDashboardCable(cable: OpgwCableFeature) {
@@ -3018,7 +3228,7 @@ function ModulesDrawer({ pathname, layerSummaries }: { pathname: string; layerSu
   );
 }
 
-function LayerSummaryDigest({ layerSummaries, compact = false }: { layerSummaries: DashboardLayerSummary[]; compact?: boolean }) {
+function LayerSummaryDigest({ layerSummaries, compact = false, title = "Layer information" }: { layerSummaries: DashboardLayerSummary[]; compact?: boolean; title?: string }) {
   const activeLayers = layerSummaries.filter((layer) => layer.enabled);
   const visibleFeatures = activeLayers.reduce((sum, layer) => sum + layer.visible, 0);
   const publicLayers = activeLayers.filter((layer) => layer.category === "Public reference");
@@ -3029,7 +3239,7 @@ function LayerSummaryDigest({ layerSummaries, compact = false }: { layerSummarie
       <div className="dashboard-layer-digest-title">
         <Layers size={15} />
         <span>
-          <strong>Layer information</strong>
+          <strong>{title}</strong>
           <small>{activeLayers.length} active map layers / {formatCompactCount(visibleFeatures)} visible features</small>
         </span>
       </div>
@@ -3627,7 +3837,7 @@ function DesignEditDrawer({
   onSelectRecord: (record: DesignAssetRecord) => void;
   onNotify: (message: string) => void;
 }) {
-  const [mode, setMode] = useState<"record" | "type">("record");
+  const [mode, setMode] = useState<"record" | "type" | "blueprint">("record");
   const [recordKey, setRecordKey] = useState("");
   const [displayLabel, setDisplayLabel] = useState("");
   const [recordStatus, setRecordStatus] = useState<DesignAssetRecord["status"]>("proposed");
@@ -3638,14 +3848,37 @@ function DesignEditDrawer({
   const [assetDisplayName, setAssetDisplayName] = useState("");
   const [assetDescription, setAssetDescription] = useState("");
   const [assetGeometryType, setAssetGeometryType] = useState<DesignAssetGeometryType>("point");
+  const [assetFieldDrafts, setAssetFieldDrafts] = useState<DesignAssetField[]>(defaultObjectTypeFields);
   const [assetFieldsText, setAssetFieldsText] = useState(defaultDesignAssetFieldsText());
   const [assetStyleText, setAssetStyleText] = useState(JSON.stringify({ color: "#55d6ff", radius: 8, lineWidth: 3, fillOpacity: 0.18 }, null, 2));
+  const [moduleBlueprints, setModuleBlueprints] = useState<DesignModuleBlueprint[]>([]);
+  const [agentTools, setAgentTools] = useState<DesignAgentTool[]>([]);
+  const [moduleEntities, setModuleEntities] = useState<DesignModuleEntity[]>([]);
+  const [selectedModuleSnapshotEntities, setSelectedModuleSnapshotEntities] = useState<string[]>(["substations", "devices", "device-ports", "fiber-cables", "fiber-strands", "splice-closures", "fiber-splices", "patch-panels", "patch-panel-ports", "fiber-assignments", "circuits", "work-orders"]);
+  const [moduleSnapshotLimit, setModuleSnapshotLimit] = useState("500");
+  const [rebuildAudit, setRebuildAudit] = useState<DesignRebuildAudit | null>(null);
+  const [selectedAgentToolKey, setSelectedAgentToolKey] = useState("");
+  const [agentToolRecordKey, setAgentToolRecordKey] = useState("");
+  const [agentToolDisplayLabel, setAgentToolDisplayLabel] = useState("");
+  const [agentToolMaterialize, setAgentToolMaterialize] = useState(true);
+  const [agentToolPropertiesText, setAgentToolPropertiesText] = useState("{}");
+  const [agentToolGeometryText, setAgentToolGeometryText] = useState("");
+  const [blueprintText, setBlueprintText] = useState("");
+  const [blueprintImportMode, setBlueprintImportMode] = useState<"upsert" | "skip_existing">("upsert");
   const [busy, setBusy] = useState("");
   const [localMessage, setLocalMessage] = useState("");
   const activeType = assetTypes.find((item) => item.slug === selectedTypeSlug) || assetTypes[0];
   const fields = activeType?.fields_json?.length ? activeType.fields_json : activeType?.fields || [];
   const drawingForActiveType = Boolean(activeType && activeType.geometry_type !== "table_only" && activeTool === designToolForGeometryType(activeType.geometry_type));
   const pendingGeometryMatches = Boolean(activeType && pendingGeometry && geometryTypeMatchesDesignGeometry(activeType.geometry_type, pendingGeometry));
+  const orderedAgentTools = useMemo(() => {
+    const order = ["create-database-object", "create-pole", "create-device", "create-device-port", "create-splice", "create-fiber-splice", "create-fiber-span", "create-fiber-strand", "create-patch-panel", "create-patch-panel-port", "create-circuit", "create-fiber-assignment"];
+    const orderIndex = new Map(order.map((key, index) => [key, index]));
+    return [...agentTools].sort((a, b) => (orderIndex.get(a.tool_key) ?? 99) - (orderIndex.get(b.tool_key) ?? 99) || a.label.localeCompare(b.label));
+  }, [agentTools]);
+  const activeAgentDesignTool = orderedAgentTools.find((tool) => tool.tool_key === selectedAgentToolKey) || orderedAgentTools[0];
+  const agentToolSupportsMaterialize = Boolean(activeAgentDesignTool?.supports_materialize);
+  const pendingGeometryMatchesAgentTool = Boolean(activeAgentDesignTool && pendingGeometry && geometryTypeMatchesDesignGeometry(activeAgentDesignTool.geometry_type, pendingGeometry));
 
   useEffect(() => {
     if (!activeType && assetTypes[0]) onSelectedTypeSlugChange(assetTypes[0].slug);
@@ -3677,6 +3910,30 @@ function DesignEditDrawer({
     setGeometryText(JSON.stringify(pendingGeometry, null, 2));
   }, [activeType, pendingGeometry]);
 
+  useEffect(() => {
+    setAssetFieldsText(JSON.stringify(assetFieldDrafts, null, 2));
+  }, [assetFieldDrafts]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    Promise.all([
+      fetchFromApiBase<DesignModuleBlueprint[]>(API_BASE, "/api/design-assets/module-blueprints"),
+      fetchFromApiBase<DesignAgentTool[]>(API_BASE, "/api/design-assets/agent-tools"),
+      fetchFromApiBase<DesignModuleEntity[]>(API_BASE, "/api/design-assets/module-entities"),
+    ])
+      .then(([blueprints, tools, entities]) => {
+        setModuleBlueprints(blueprints);
+        setAgentTools(tools);
+        setModuleEntities(entities);
+      })
+      .catch((error) => setLocalMessage(error instanceof Error ? error.message : String(error)));
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!orderedAgentTools.length || selectedAgentToolKey) return;
+    applyAgentToolExample(orderedAgentTools[0]);
+  }, [orderedAgentTools, selectedAgentToolKey]);
+
   if (!enabled) {
     return (
       <section className="dashboard-design-panel">
@@ -3690,7 +3947,7 @@ function DesignEditDrawer({
   }
 
   async function createAssetType() {
-    setBusy("Creating asset type");
+    setBusy("Creating object type");
     try {
       const fieldsPayload = JSON.parse(assetFieldsText) as DesignAssetField[];
       const stylePayload = JSON.parse(assetStyleText) as Record<string, unknown>;
@@ -3709,8 +3966,8 @@ function DesignEditDrawer({
       });
       onSelectedTypeSlugChange(payload.slug);
       await onRefresh();
-      setLocalMessage(`Created asset type ${payload.display_name}.`);
-      onNotify(`Created schema type ${payload.display_name}.`);
+      setLocalMessage(`Created object type ${payload.display_name}.`);
+      onNotify(`Created object type ${payload.display_name}.`);
     } catch (error) {
       setLocalMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -3720,10 +3977,10 @@ function DesignEditDrawer({
 
   async function saveRecord() {
     if (!activeType) {
-      setLocalMessage("Create or select an asset type first.");
+      setLocalMessage("Create or select an object type first.");
       return;
     }
-    setBusy(selectedRecord ? "Updating record" : "Creating record");
+    setBusy(selectedRecord ? "Updating object" : "Creating object");
     try {
       const geometry = activeType.geometry_type === "table_only" ? null : JSON.parse(geometryText) as DesignAssetGeoJsonGeometry;
       const payload = await fetchFromApiBase<DesignAssetRecord>(API_BASE, selectedRecord ? `/api/design-assets/records/${selectedRecord.id}` : "/api/design-assets/records", {
@@ -3744,7 +4001,7 @@ function DesignEditDrawer({
       onPendingGeometryChange(null);
       onSelectRecord(payload);
       setLocalMessage(`Saved ${payload.display_label}.`);
-      onNotify(`Saved editable planning asset ${payload.display_label}.`);
+      onNotify(`Saved editable planning object ${payload.display_label}.`);
     } catch (error) {
       setLocalMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -3760,7 +4017,286 @@ function DesignEditDrawer({
       await fetchFromApiBase<DesignAssetRecord>(API_BASE, `/api/design-assets/records/${selectedRecord.id}`, { method: "DELETE" });
       await onRefresh();
       setLocalMessage(`Archived ${selectedRecord.display_label}.`);
-      onNotify(`Archived editable planning asset ${selectedRecord.display_label}.`);
+      onNotify(`Archived editable planning object ${selectedRecord.display_label}.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function installModuleBlueprint(blueprintKey: string) {
+    setBusy("Installing module blueprint");
+    try {
+      const result = await fetchFromApiBase<DesignBlueprintInstallResult>(API_BASE, `/api/design-assets/module-blueprints/${blueprintKey}/install`, {
+        method: "POST",
+        body: JSON.stringify({ mode: "upsert" }),
+      });
+      await onRefresh();
+      setLocalMessage(`Installed ${result.created_asset_types} new and updated ${result.updated_asset_types} object types. ${result.installed_asset_type_slugs.length} schema types are now available in Design Mode.`);
+      onNotify("Installed Design Mode rebuild schemas.");
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function exportDesignBlueprint() {
+    setBusy("Exporting blueprint");
+    try {
+      const blueprint = await fetchFromApiBase<DesignAssetBlueprint>(API_BASE, "/api/design-assets/blueprint?include_records=true");
+      setBlueprintText(JSON.stringify(blueprint, null, 2));
+      setLocalMessage(`Exported ${blueprint.asset_types.length} object types and ${blueprint.records.length} records into a portable Design Mode blueprint.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function exportRebuildPackage() {
+    setBusy("Exporting rebuild package");
+    try {
+      const rebuildPackage = await fetchFromApiBase<DesignRebuildPackage>(API_BASE, "/api/design-assets/rebuild-package?include_records=true");
+      setBlueprintText(JSON.stringify(rebuildPackage, null, 2));
+      setLocalMessage(`Exported rebuild package with ${rebuildPackage.blueprint.asset_types.length} object types, ${rebuildPackage.blueprint.records.length} records, and ${rebuildPackage.snapshot_summary.snapshot_record_count} module snapshot records.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function importDesignBlueprint() {
+    setBusy("Importing blueprint");
+    try {
+      const payload = JSON.parse(blueprintText) as DesignAssetBlueprint | DesignRebuildPackage;
+      if (isDesignRebuildPackage(payload)) {
+        const result = await fetchFromApiBase<DesignRebuildPackageImportResult>(API_BASE, "/api/design-assets/rebuild-package/import", {
+          method: "POST",
+          body: JSON.stringify({ ...payload, mode: blueprintImportMode }),
+        });
+        await onRefresh();
+        setLocalMessage(`Imported rebuild package: ${result.blueprint_import.created_asset_types} object types created, ${result.blueprint_import.updated_asset_types} updated, ${result.blueprint_import.created_records} records created, ${result.blueprint_import.updated_records} updated.`);
+        onNotify("Imported Design Mode rebuild package.");
+        return;
+      }
+      const result = await fetchFromApiBase<DesignBlueprintInstallResult>(API_BASE, "/api/design-assets/blueprint/import", {
+        method: "POST",
+        body: JSON.stringify({ ...payload, mode: blueprintImportMode }),
+      });
+      await onRefresh();
+      setLocalMessage(`Imported blueprint: ${result.created_asset_types} object types created, ${result.updated_asset_types} updated, ${result.created_records} records created, ${result.updated_records} updated.`);
+      onNotify("Imported Design Mode blueprint.");
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function importRebuildPackageAndReplay() {
+    setBusy("Importing and replaying rebuild package");
+    try {
+      const payload = JSON.parse(blueprintText) as DesignRebuildPackage;
+      if (!isDesignRebuildPackage(payload)) throw new Error("Paste a Design Mode rebuild package JSON before replaying.");
+      const result = await fetchFromApiBase<DesignRebuildPackageImportResult>(API_BASE, "/api/design-assets/rebuild-package/import", {
+        method: "POST",
+        body: JSON.stringify({
+          ...payload,
+          mode: blueprintImportMode,
+          replay_snapshots: true,
+          replay_options: {
+            entities: selectedModuleSnapshotEntities,
+            limit: Number.parseInt(moduleSnapshotLimit, 10) || 500,
+            preserve_ids: true,
+            normalize_user_refs: true,
+          },
+        }),
+      });
+      await onRefresh();
+      setLocalMessage(`Imported package and replayed ${result.replay_result?.materialized_count || 0} module snapshot record${(result.replay_result?.materialized_count || 0) === 1 ? "" : "s"} into backend tables; ${result.replay_result?.error_count || 0} errors.`);
+      onNotify("Imported rebuild package and replayed module snapshots.");
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function applyAgentToolExample(tool: DesignAgentTool) {
+    setSelectedAgentToolKey(tool.tool_key);
+    setAgentToolPropertiesText(JSON.stringify(tool.example_properties || {}, null, 2));
+    setAgentToolGeometryText(tool.example_geometry ? JSON.stringify(tool.example_geometry, null, 2) : "");
+    setAgentToolRecordKey("");
+    setAgentToolDisplayLabel("");
+    setAgentToolMaterialize(Boolean(tool.supports_materialize));
+  }
+
+  function usePendingGeometryForAgentTool() {
+    if (!activeAgentDesignTool || !pendingGeometryMatchesAgentTool || !pendingGeometry) return;
+    setAgentToolGeometryText(JSON.stringify(pendingGeometry, null, 2));
+    setLocalMessage(`Loaded staged map geometry into ${activeAgentDesignTool.label}.`);
+  }
+
+  async function runAgentToolFromDashboard() {
+    if (!activeAgentDesignTool) {
+      setLocalMessage("Select a Design Mode creation tool first.");
+      return;
+    }
+    setBusy(`Creating ${activeAgentDesignTool.label}`);
+    try {
+      const properties = JSON.parse(agentToolPropertiesText) as unknown;
+      if (!properties || typeof properties !== "object" || Array.isArray(properties)) {
+        throw new Error("Properties JSON must be an object.");
+      }
+      let geometry: DesignAssetGeoJsonGeometry | null = null;
+      if (activeAgentDesignTool.geometry_type !== "table_only") {
+        const geometryDraft = agentToolGeometryText.trim();
+        if (!geometryDraft) throw new Error(`${activeAgentDesignTool.label} requires GeoJSON geometry. Draw on the map or paste geometry JSON.`);
+        geometry = JSON.parse(geometryDraft) as DesignAssetGeoJsonGeometry;
+      }
+      const result = await fetchFromApiBase<DesignAgentToolRunResult>(API_BASE, `/api/design-assets/agent-tools/${activeAgentDesignTool.tool_key}/run`, {
+        method: "POST",
+        body: JSON.stringify({
+          record_key: agentToolRecordKey.trim() || undefined,
+          display_label: agentToolDisplayLabel.trim() || undefined,
+          properties,
+          geometry,
+          materialize: agentToolMaterialize && agentToolSupportsMaterialize,
+        }),
+      });
+      await onRefresh();
+      onPendingGeometryChange(null);
+      onSelectRecord(result.record);
+      const materializationText = result.materialization?.action && result.materialization.action !== "skipped"
+        ? ` Materialized into ${result.materialization.entity}.`
+        : agentToolSupportsMaterialize && agentToolMaterialize
+          ? " Backend materialization was skipped."
+          : " Stored as a Design Mode record.";
+      setLocalMessage(`${result.record_action === "created" ? "Created" : "Updated"} ${result.record.display_label}.${materializationText}`);
+      onNotify(`${result.record_action === "created" ? "Created" : "Updated"} ${activeAgentDesignTool.label}.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function toggleModuleSnapshotEntity(entity: string) {
+    setSelectedModuleSnapshotEntities((current) => current.includes(entity) ? current.filter((item) => item !== entity) : [...current, entity]);
+  }
+
+  function selectCommonModuleSnapshotEntities() {
+    const common = ["substations", "devices", "device-ports", "transmission-lines", "regional-substations", "regional-transmission-lines", "regional-structures", "fiber-cables", "fiber-segments", "fiber-strands", "splice-closures", "splice-trays", "fiber-splices", "patch-panels", "patch-panel-ports", "fiber-assignments", "circuits", "circuit-paths", "circuit-path-elements", "work-orders", "work-order-tasks"];
+    const available = new Set(moduleEntities.map((entity) => entity.entity));
+    setSelectedModuleSnapshotEntities(common.filter((entity) => available.has(entity)));
+  }
+
+  function selectAllModuleSnapshotEntities() {
+    setSelectedModuleSnapshotEntities(moduleEntities.map((entity) => entity.entity));
+  }
+
+  async function captureModuleSnapshot() {
+    if (!selectedModuleSnapshotEntities.length) {
+      setLocalMessage("Select at least one backend module table to capture.");
+      return;
+    }
+    setBusy("Capturing module snapshot");
+    try {
+      const result = await fetchFromApiBase<DesignModuleSnapshotResult>(API_BASE, "/api/design-assets/module-snapshot", {
+        method: "POST",
+        body: JSON.stringify({
+          entities: selectedModuleSnapshotEntities,
+          limit_per_entity: Number.parseInt(moduleSnapshotLimit, 10) || 500,
+          mode: "upsert",
+        }),
+      });
+      await onRefresh();
+      setLocalMessage(`Captured ${result.captured_count} backend module rows into Design Mode snapshot records across ${result.entities.length} table${result.entities.length === 1 ? "" : "s"}.`);
+      onNotify("Captured backend module data into Design Mode records.");
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function replayModuleSnapshot() {
+    setBusy("Replaying module snapshot");
+    try {
+      const result = await fetchFromApiBase<DesignModuleSnapshotMaterializeResult>(API_BASE, "/api/design-assets/module-snapshot/materialize", {
+        method: "POST",
+        body: JSON.stringify({
+          entities: selectedModuleSnapshotEntities,
+          limit: Number.parseInt(moduleSnapshotLimit, 10) || 500,
+          mode: "upsert",
+          preserve_ids: true,
+          normalize_user_refs: true,
+        }),
+      });
+      await onRefresh();
+      setLocalMessage(`Replayed ${result.materialized_count} Design Mode snapshot record${result.materialized_count === 1 ? "" : "s"} into backend tables; ${result.skipped_count} skipped, ${result.error_count} errors.`);
+      onNotify("Replayed Design Mode module snapshot into backend tables.");
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function runRebuildAudit() {
+    const entities = selectedModuleSnapshotEntities.length ? selectedModuleSnapshotEntities.join(",") : "all";
+    setBusy("Running rebuild audit");
+    try {
+      const result = await fetchFromApiBase<DesignRebuildAudit>(API_BASE, `/api/design-assets/rebuild-audit?entities=${encodeURIComponent(entities)}&record_limit=${encodeURIComponent(moduleSnapshotLimit)}`);
+      setRebuildAudit(result);
+      setLocalMessage(result.rebuild_ready
+        ? `Rebuild audit passed for ${result.totals.entity_count} table${result.totals.entity_count === 1 ? "" : "s"}: ${result.totals.snapshot_record_count} snapshot records are replay-ready.`
+        : `Rebuild audit found ${result.totals.missing_snapshot_entity_count} missing, ${result.totals.partial_entity_count} partial, and ${result.totals.needs_review_entity_count} needs-review table${result.totals.needs_review_entity_count === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function materializeSelectedRecord(modeValue: "upsert" | "skip_existing" = "upsert") {
+    if (!selectedRecord) {
+      setLocalMessage("Select a Design Mode object first.");
+      return;
+    }
+    setBusy("Materializing selected object");
+    try {
+      const result = await fetchFromApiBase<DesignMaterializationResult>(API_BASE, `/api/design-assets/records/${selectedRecord.id}/materialize`, {
+        method: "POST",
+        body: JSON.stringify({ mode: modeValue }),
+      });
+      setLocalMessage(result.action === "skipped"
+        ? `Skipped ${selectedRecord.display_label}: ${result.reason || "no backend materialization rule"}`
+        : `Materialized ${selectedRecord.display_label} into ${result.entity} #${result.entity_id}.`);
+      onNotify("Materialized Design Mode object into backend module data.");
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function materializeActiveType(modeValue: "upsert" | "skip_existing" = "upsert") {
+    if (!activeType) {
+      setLocalMessage("Select an object type first.");
+      return;
+    }
+    setBusy("Materializing object type");
+    try {
+      const result = await fetchFromApiBase<DesignMaterializationBatchResult>(API_BASE, "/api/design-assets/materialize", {
+        method: "POST",
+        body: JSON.stringify({ asset_type_slug: activeType.slug, mode: modeValue }),
+      });
+      setLocalMessage(`Materialized ${result.materialized_count} ${activeType.display_name} object${result.materialized_count === 1 ? "" : "s"} into backend tables; ${result.skipped_count} skipped, ${result.error_count} errors.`);
+      onNotify("Materialized Design Mode object type into backend module data.");
     } catch (error) {
       setLocalMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -3770,6 +4306,72 @@ function DesignEditDrawer({
 
   function updateProperty(fieldName: string, value: string) {
     setPropertiesDraft((current) => ({ ...current, [fieldName]: value }));
+  }
+
+  function updateAssetDisplayName(value: string) {
+    setAssetDisplayName(value);
+    if (!assetSlug.trim()) setAssetSlug(slugFromLabel(value));
+  }
+
+  function applyAssetTemplate(template: "database-object" | "map-point" | "fiber-span") {
+    if (template === "database-object") {
+      setAssetSlug("custom-database-object");
+      setAssetDisplayName("Custom database object");
+      setAssetDescription("Table-only synthetic/demo object type for arbitrary planning data.");
+      setAssetGeometryType("table_only");
+      setAssetFieldDrafts(defaultObjectTypeFields());
+      setAssetStyleText("{}");
+      return;
+    }
+    if (template === "fiber-span") {
+      setAssetSlug("custom-fiber-span");
+      setAssetDisplayName("Custom fiber span");
+      setAssetDescription("Line-based synthetic/demo object type for fiber, cable, span, or route planning.");
+      setAssetGeometryType("line");
+      setAssetFieldDrafts(defaultFiberSpanFields());
+      setAssetStyleText(JSON.stringify({ color: "#6ee7b7", lineWidth: 4 }, null, 2));
+      return;
+    }
+    setAssetSlug("custom-map-object");
+    setAssetDisplayName("Custom map object");
+    setAssetDescription("Point-based synthetic/demo object type for map nodes, equipment, issues, or planning notes.");
+    setAssetGeometryType("point");
+    setAssetFieldDrafts(defaultMapPointFields());
+    setAssetStyleText(JSON.stringify({ color: "#55d6ff", radius: 8, fillOpacity: 0.22 }, null, 2));
+  }
+
+  function updateAssetField(index: number, patch: Partial<DesignAssetField>) {
+    setAssetFieldDrafts((current) => current.map((field, fieldIndex) => (fieldIndex === index ? { ...field, ...patch } : field)));
+  }
+
+  function updateAssetFieldType(index: number, type: DesignAssetFieldType) {
+    setAssetFieldDrafts((current) => current.map((field, fieldIndex) => {
+      if (fieldIndex !== index) return field;
+      return {
+        ...field,
+        type,
+        enum_options: type === "enum" ? field.enum_options?.length ? field.enum_options : ["proposed", "planned", "active"] : [],
+      };
+    }));
+  }
+
+  function addAssetField() {
+    setAssetFieldDrafts((current) => [...current, blankDesignField(current.length + 1)]);
+  }
+
+  function removeAssetField(index: number) {
+    setAssetFieldDrafts((current) => current.filter((_, fieldIndex) => fieldIndex !== index));
+  }
+
+  function syncFieldBuilderFromJson() {
+    try {
+      const parsed = JSON.parse(assetFieldsText) as DesignAssetField[];
+      if (!Array.isArray(parsed)) throw new Error("Fields JSON must be a list.");
+      setAssetFieldDrafts(parsed);
+      setLocalMessage("Loaded advanced fields JSON into the visual field builder.");
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    }
   }
 
   return (
@@ -3787,28 +4389,244 @@ function DesignEditDrawer({
       <div className="dashboard-design-tabs">
         <button type="button" className={mode === "record" ? "active" : ""} onClick={() => setMode("record")}>Records</button>
         <button type="button" className={mode === "type" ? "active" : ""} onClick={() => setMode("type")}>Type Designer</button>
+        <button type="button" className={mode === "blueprint" ? "active" : ""} onClick={() => setMode("blueprint")}>Blueprints</button>
       </div>
 
-      {mode === "type" ? (
+      {mode === "blueprint" ? (
         <div className="dashboard-design-form">
-          <label><span>Slug</span><input value={assetSlug} onChange={(event) => setAssetSlug(event.currentTarget.value)} placeholder="custom-planning-asset" /></label>
-          <label><span>Display name</span><input value={assetDisplayName} onChange={(event) => setAssetDisplayName(event.currentTarget.value)} placeholder="Custom planning asset" /></label>
+          <div className="dashboard-design-row-title">
+            <strong>Rebuild database from Design Mode</strong>
+            <span>Install schemas that mirror module and layer data, export the current Design Mode database, or import a blueprint into a blank instance.</span>
+          </div>
+          <div className="dashboard-design-blueprint-list">
+            {moduleBlueprints.map((blueprint) => (
+              <article className="dashboard-design-blueprint-card" key={blueprint.key}>
+                <div>
+                  <strong>{blueprint.display_name}</strong>
+                  <span>{blueprint.description}</span>
+                </div>
+                <div className="dashboard-design-blueprint-meta">
+                  <span>{blueprint.asset_type_count} object types</span>
+                  <span>{blueprint.record_count} starter records</span>
+                </div>
+                <div className="dashboard-design-blueprint-slugs">
+                  {blueprint.asset_types.map((assetType) => <span key={assetType.slug}>{assetType.slug}</span>)}
+                </div>
+                <button className="telecom-map-button full-width" type="button" onClick={() => void installModuleBlueprint(blueprint.key)} disabled={Boolean(busy)}>Install rebuild schemas</button>
+              </article>
+            ))}
+            {!moduleBlueprints.length ? <p className="dashboard-gis-message">No module blueprint bundles are available from the API yet.</p> : null}
+          </div>
+          <div className="dashboard-source-boundary">
+            <p>Blueprints are for synthetic/demo planning schemas and records. They do not convert assumptions into operational data and must not contain real CEII, protection settings, credentials, private fiber routes, or operational access information.</p>
+          </div>
+          <div className="dashboard-design-row-title">
+            <strong>Capture module data into Design Mode</strong>
+            <span>Snapshot existing backend module rows as full-fidelity Design Mode records, export them in a blueprint, then replay them into a blank instance when needed.</span>
+          </div>
+          <div className="dashboard-design-quick-add">
+            <div className="dashboard-gis-actions">
+              <button type="button" onClick={selectCommonModuleSnapshotEntities}>Select rebuild core</button>
+              <button type="button" onClick={selectAllModuleSnapshotEntities}>Select all snapshot tables</button>
+              <button type="button" onClick={() => setSelectedModuleSnapshotEntities([])}>Clear</button>
+            </div>
+            <label className="dashboard-design-inline-select"><span>Rows per table</span><input type="number" min="1" max="5000" value={moduleSnapshotLimit} onChange={(event) => setModuleSnapshotLimit(event.currentTarget.value)} /></label>
+            <div className="dashboard-design-entity-grid" aria-label="Backend module snapshot entities">
+              {moduleEntities.map((entity) => {
+                const checked = selectedModuleSnapshotEntities.includes(entity.entity);
+                return (
+                  <button type="button" key={entity.entity} className={checked ? "active" : ""} onClick={() => toggleModuleSnapshotEntity(entity.entity)}>
+                    <strong>{entity.entity}</strong>
+                    <span>{entity.record_count} rows / {entity.fields.length} fields</span>
+                  </button>
+                );
+              })}
+            </div>
+            {!moduleEntities.length ? <p className="dashboard-gis-message">No backend module entity metadata is available from the API yet.</p> : null}
+            <div className="dashboard-gis-actions">
+              <button className="telecom-map-button" type="button" onClick={() => void captureModuleSnapshot()} disabled={Boolean(busy) || !selectedModuleSnapshotEntities.length}>Capture selected module rows</button>
+              <button type="button" onClick={() => void replayModuleSnapshot()} disabled={Boolean(busy) || !selectedModuleSnapshotEntities.length}>Replay selected snapshots to backend</button>
+              <button type="button" onClick={() => void runRebuildAudit()} disabled={Boolean(busy)}>Run rebuild audit</button>
+            </div>
+            <p className="dashboard-gis-message">Snapshot replay preserves row IDs by default so related fibers, splices, ports, circuits, and work-order references can be rebuilt together. User-account references are normalized to the current demo user or cleared.</p>
+            {rebuildAudit ? (
+              <div className="dashboard-design-audit">
+                <div className="dashboard-design-audit-summary">
+                  <span>{rebuildAudit.rebuild_ready ? "Replay ready" : "Needs capture/review"}</span>
+                  <span>{rebuildAudit.totals.snapshot_record_count} snapshots</span>
+                  <span>{rebuildAudit.totals.backend_record_count} backend rows</span>
+                  <span>{rebuildAudit.totals.missing_snapshot_entity_count} missing</span>
+                  <span>{rebuildAudit.totals.partial_entity_count} partial</span>
+                  <span>{rebuildAudit.totals.invalid_snapshot_count} invalid</span>
+                </div>
+                <div className="dashboard-design-audit-table">
+                  {rebuildAudit.rows.slice(0, 18).map((row) => (
+                    <div key={row.entity}>
+                      <strong>{row.entity}</strong>
+                      <span>{row.coverage_status}</span>
+                      <span>{row.snapshot_record_count}/{row.backend_record_count}</span>
+                      <span>{row.missing_model_field_count ? `${row.missing_model_field_count} fields missing` : "fields captured"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="dashboard-design-row-title">
+            <strong>Quick add objects from Design Mode</strong>
+            <span>Create poles, devices, ports, splice points, splice rows, spans/cables, strands, patch panels, circuits, fiber assignments, or any table-only database object directly from the dashboard UI.</span>
+          </div>
+          <div className="dashboard-design-tool-picker">
+            {orderedAgentTools.map((tool) => (
+              <button type="button" key={tool.tool_key} className={activeAgentDesignTool?.tool_key === tool.tool_key ? "active" : ""} onClick={() => applyAgentToolExample(tool)}>
+                <strong>{tool.label}</strong>
+                <span>{tool.geometry_type === "table_only" ? "database object" : tool.geometry_type} / {tool.supports_materialize ? tool.backend_entity : "Design Mode only"}</span>
+              </button>
+            ))}
+          </div>
+          {activeAgentDesignTool ? (
+            <div className="dashboard-design-quick-add">
+              <div className="dashboard-design-row-title">
+                <strong>{activeAgentDesignTool.label}</strong>
+                <span>{activeAgentDesignTool.description}</span>
+              </div>
+              <label><span>Creation tool</span><select value={activeAgentDesignTool.tool_key} onChange={(event) => {
+                const nextTool = orderedAgentTools.find((tool) => tool.tool_key === event.currentTarget.value);
+                if (nextTool) applyAgentToolExample(nextTool);
+              }}>
+                {orderedAgentTools.map((tool) => <option key={tool.tool_key} value={tool.tool_key}>{tool.label}</option>)}
+              </select></label>
+              <label><span>Record key override</span><input value={agentToolRecordKey} onChange={(event) => setAgentToolRecordKey(event.currentTarget.value)} placeholder="Leave blank to use the object ID" /></label>
+              <label><span>Display label override</span><input value={agentToolDisplayLabel} onChange={(event) => setAgentToolDisplayLabel(event.currentTarget.value)} placeholder="Leave blank to use the object name or ID" /></label>
+              {activeAgentDesignTool.geometry_type !== "table_only" ? (
+                <>
+                  <div className="dashboard-gis-actions">
+                    <button type="button" onClick={() => onBeginDrawing(activeAgentDesignTool.geometry_type)} disabled={Boolean(busy)}>Draw {activeAgentDesignTool.geometry_type}</button>
+                    {pendingGeometryMatchesAgentTool ? <button type="button" onClick={usePendingGeometryForAgentTool}>Use staged map geometry</button> : null}
+                  </div>
+                  <label><span>Geometry GeoJSON</span><textarea value={agentToolGeometryText} onChange={(event) => setAgentToolGeometryText(event.currentTarget.value)} /></label>
+                </>
+              ) : (
+                <p className="dashboard-gis-message">This tool creates a table-only database record. It will not draw a map feature unless you later assign it to a point, line, or polygon object type.</p>
+              )}
+              <label><span>Properties JSON</span><textarea value={agentToolPropertiesText} onChange={(event) => setAgentToolPropertiesText(event.currentTarget.value)} /></label>
+              <label className="dashboard-design-inline-select"><span>Backend write</span><select value={agentToolMaterialize && agentToolSupportsMaterialize ? "materialize" : "design-only"} onChange={(event) => setAgentToolMaterialize(event.currentTarget.value === "materialize")} disabled={!agentToolSupportsMaterialize}>
+                {agentToolSupportsMaterialize ? <option value="materialize">Create Design record and module row</option> : null}
+                <option value="design-only">Design Mode record only</option>
+              </select></label>
+              <div className="dashboard-gis-actions">
+                <button className="telecom-map-button" type="button" onClick={() => void runAgentToolFromDashboard()} disabled={Boolean(busy)}>Create with selected Design tool</button>
+              </div>
+            </div>
+          ) : (
+            <p className="dashboard-gis-message">Install or refresh the Design Mode agent tools to quick-add objects from the dashboard.</p>
+          )}
+          <div className="dashboard-design-row-title">
+            <strong>AI agent Design Mode tools</strong>
+            <span>Agents can call these POST endpoints to create Design Mode objects, then set <code>materialize</code> to true to write supported records into backend module tables.</span>
+          </div>
+          <div className="dashboard-design-blueprint-list">
+            {orderedAgentTools.map((tool) => (
+              <article className="dashboard-design-blueprint-card" key={tool.tool_key}>
+                <div>
+                  <strong>{tool.label}</strong>
+                  <span>{tool.description}</span>
+                </div>
+                <div className="dashboard-design-blueprint-meta">
+                  <span>{tool.method} {tool.endpoint}</span>
+                  <span>{tool.asset_type_slug}</span>
+                  <span>{tool.backend_entity || "Design Mode only"}</span>
+                </div>
+                <div className="dashboard-design-blueprint-slugs">
+                  {tool.required_properties.map((field) => <span key={field}>required: {field}</span>)}
+                </div>
+                <pre className="dashboard-gis-command">{JSON.stringify({ materialize: tool.supports_materialize, geometry: tool.example_geometry, properties: tool.example_properties }, null, 2)}</pre>
+              </article>
+            ))}
+            {!orderedAgentTools.length ? <p className="dashboard-gis-message">No agent tool manifest is available from the API yet.</p> : null}
+          </div>
+          <div className="dashboard-gis-actions">
+            <button type="button" onClick={() => void exportDesignBlueprint()} disabled={Boolean(busy)}>Export current blueprint</button>
+            <button type="button" onClick={() => void exportRebuildPackage()} disabled={Boolean(busy)}>Export rebuild package</button>
+            <label className="dashboard-design-inline-select"><span>Import mode</span><select value={blueprintImportMode} onChange={(event) => setBlueprintImportMode(event.currentTarget.value as "upsert" | "skip_existing")}>
+              <option value="upsert">Upsert existing</option>
+              <option value="skip_existing">Skip existing</option>
+            </select></label>
+            <button type="button" onClick={() => void importDesignBlueprint()} disabled={Boolean(busy) || !blueprintText.trim()}>Import pasted blueprint/package</button>
+            <button type="button" onClick={() => void importRebuildPackageAndReplay()} disabled={Boolean(busy) || !blueprintText.trim()}>Import package + replay snapshots</button>
+          </div>
+          <label><span>Blueprint or rebuild package JSON</span><textarea value={blueprintText} onChange={(event) => setBlueprintText(event.currentTarget.value)} placeholder="Paste an exported Design Mode blueprint or rebuild package JSON here, or click Export rebuild package." /></label>
+        </div>
+      ) : mode === "type" ? (
+        <div className="dashboard-design-form">
+          <div className="dashboard-design-template-grid" aria-label="Object type templates">
+            <button type="button" onClick={() => applyAssetTemplate("database-object")}>
+              <strong>Blank database object</strong>
+              <span>Any table-only data: inspections, permits, vendors, notes, or custom records.</span>
+            </button>
+            <button type="button" onClick={() => applyAssetTemplate("map-point")}>
+              <strong>Map point object</strong>
+              <span>Clickable map objects such as equipment, incidents, sites, or planning markers.</span>
+            </button>
+            <button type="button" onClick={() => applyAssetTemplate("fiber-span")}>
+              <strong>Line or route object</strong>
+              <span>Fiber spans, cable sections, make-ready routes, corridors, or service paths.</span>
+            </button>
+          </div>
+          <label><span>Object type slug</span><input value={assetSlug} onChange={(event) => setAssetSlug(event.currentTarget.value)} placeholder="custom-planning-object" /></label>
+          <label><span>Display name</span><input value={assetDisplayName} onChange={(event) => updateAssetDisplayName(event.currentTarget.value)} placeholder="Custom planning object" /></label>
           <label><span>Description</span><textarea value={assetDescription} onChange={(event) => setAssetDescription(event.currentTarget.value)} /></label>
-          <label><span>Geometry type</span><select value={assetGeometryType} onChange={(event) => setAssetGeometryType(event.currentTarget.value as DesignAssetGeometryType)}>
-            {["point", "line", "polygon", "table_only"].map((item) => <option key={item} value={item}>{item}</option>)}
+          <label><span>Storage / geometry</span><select value={assetGeometryType} onChange={(event) => setAssetGeometryType(event.currentTarget.value as DesignAssetGeometryType)}>
+            {designGeometryTypeOptions.map((item) => <option key={item} value={item}>{item === "table_only" ? "Database only, no map geometry" : item}</option>)}
           </select></label>
-          <label><span>Fields JSON</span><textarea value={assetFieldsText} onChange={(event) => setAssetFieldsText(event.currentTarget.value)} /></label>
+          <div className="dashboard-design-field-builder">
+            <div className="dashboard-design-row-title">
+              <strong>Object fields</strong>
+              <span>Build the form users will fill out when adding objects to the database.</span>
+            </div>
+            {assetFieldDrafts.map((field, index) => (
+              <div className="dashboard-design-field-row" key={`${field.name}-${index}`}>
+                <div className="dashboard-design-field-row-header">
+                  <strong>{field.label || `Field ${index + 1}`}</strong>
+                  <button type="button" onClick={() => removeAssetField(index)} disabled={assetFieldDrafts.length <= 1}>Remove</button>
+                </div>
+                <div className="dashboard-design-field-grid">
+                  <label><span>Label</span><input value={field.label || ""} onChange={(event) => {
+                    const label = event.currentTarget.value;
+                    updateAssetField(index, { label, name: field.name || fieldNameFromLabel(label) });
+                  }} /></label>
+                  <label><span>Field name</span><input value={field.name || ""} onChange={(event) => updateAssetField(index, { name: fieldNameFromLabel(event.currentTarget.value) })} /></label>
+                  <label><span>Type</span><select value={field.type} onChange={(event) => updateAssetFieldType(index, event.currentTarget.value as DesignAssetFieldType)}>
+                    {designFieldTypeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select></label>
+                  <label><span>Required</span><select value={field.required ? "true" : "false"} onChange={(event) => updateAssetField(index, { required: event.currentTarget.value === "true" })}>
+                    <option value="false">Optional</option>
+                    <option value="true">Required</option>
+                  </select></label>
+                  <label><span>Default</span><input value={designFieldDefaultText(field)} onChange={(event) => updateAssetField(index, { default: designFieldDefaultFromText(field.type, event.currentTarget.value) })} /></label>
+                  <label><span>Help text</span><input value={field.help_text || ""} onChange={(event) => updateAssetField(index, { help_text: event.currentTarget.value })} /></label>
+                  {field.type === "enum" ? <label className="dashboard-design-field-wide"><span>Enum options</span><input value={(field.enum_options || []).join(", ")} onChange={(event) => updateAssetField(index, { enum_options: event.currentTarget.value.split(",").map((item) => item.trim()).filter(Boolean) })} /></label> : null}
+                </div>
+              </div>
+            ))}
+            <button className="dashboard-design-add-field" type="button" onClick={addAssetField}>Add field</button>
+          </div>
+          <label><span>Advanced fields JSON</span><textarea value={assetFieldsText} onChange={(event) => setAssetFieldsText(event.currentTarget.value)} /></label>
+          <div className="dashboard-gis-actions">
+            <button type="button" onClick={syncFieldBuilderFromJson}>Load JSON into builder</button>
+          </div>
           <label><span>Map style JSON</span><textarea value={assetStyleText} onChange={(event) => setAssetStyleText(event.currentTarget.value)} /></label>
-          <button className="telecom-map-button full-width" type="button" onClick={() => void createAssetType()} disabled={Boolean(busy)}>Create asset type</button>
+          <button className="telecom-map-button full-width" type="button" onClick={() => void createAssetType()} disabled={Boolean(busy)}>Create object type</button>
         </div>
       ) : (
         <div className="dashboard-design-form">
-          <label><span>Asset type</span><select value={activeType?.slug || ""} onChange={(event) => onSelectedTypeSlugChange(event.currentTarget.value)}>
+          <label><span>Object type</span><select value={activeType?.slug || ""} onChange={(event) => onSelectedTypeSlugChange(event.currentTarget.value)}>
             {assetTypes.map((assetType) => <option key={assetType.slug} value={assetType.slug}>{assetType.display_name}</option>)}
           </select></label>
+          {activeType?.geometry_type === "table_only" ? <p className="dashboard-gis-message">This object type is stored in the database without map geometry. Use it for any synthetic/demo data that should live in the tool but not draw on the map.</p> : null}
           <div className="dashboard-gis-actions">
-            <button type="button" onClick={onNewRecord}>New record</button>
-            {activeType?.geometry_type !== "table_only" ? <button type="button" onClick={() => activeType ? onBeginDrawing(activeType.geometry_type) : setLocalMessage("Select an asset type first.")}>{selectedRecord ? "Redraw geometry" : `Draw ${activeType?.geometry_type || "geometry"}`}</button> : null}
+            <button type="button" onClick={onNewRecord}>New object</button>
+            {activeType?.geometry_type !== "table_only" ? <button type="button" onClick={() => activeType ? onBeginDrawing(activeType.geometry_type) : setLocalMessage("Select an object type first.")}>{selectedRecord ? "Redraw geometry" : `Draw ${activeType?.geometry_type || "geometry"}`}</button> : null}
             {drawingForActiveType ? <button type="button" onClick={onFinishDrawing}>Finish drawing</button> : null}
             {pendingGeometry || drawingForActiveType ? <button type="button" onClick={onCancelDraft}>Cancel unsaved geometry</button> : null}
             <button type="button" onClick={() => void onRefresh()} disabled={Boolean(busy)}>Refresh</button>
@@ -3839,7 +4657,9 @@ function DesignEditDrawer({
           {activeType?.geometry_type !== "table_only" ? <label><span>Geometry GeoJSON</span><textarea value={geometryText} onChange={(event) => setGeometryText(event.currentTarget.value)} /></label> : null}
           <label><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.currentTarget.value)} /></label>
           <div className="dashboard-gis-actions">
-            <button className="telecom-map-button" type="button" onClick={() => void saveRecord()} disabled={Boolean(busy) || !activeType}>Save record</button>
+            <button className="telecom-map-button" type="button" onClick={() => void saveRecord()} disabled={Boolean(busy) || !activeType}>Save object</button>
+            {selectedRecord ? <button type="button" onClick={() => void materializeSelectedRecord("upsert")} disabled={Boolean(busy)}>Materialize selected to backend</button> : null}
+            {activeType ? <button type="button" onClick={() => void materializeActiveType("upsert")} disabled={Boolean(busy)}>Materialize object type</button> : null}
             {selectedRecord ? <button type="button" onClick={() => void archiveRecord()} disabled={Boolean(busy)}>Archive</button> : null}
           </div>
         </div>
@@ -3874,12 +4694,73 @@ function DesignFieldInput({ field, value, onChange }: { field: DesignAssetField;
   return <label><span>{label}</span><input type={field.type === "number" || field.type === "integer" ? "number" : field.type === "date" ? "date" : "text"} value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder={field.help_text || ""} /></label>;
 }
 
-function defaultDesignAssetFieldsText() {
-  return JSON.stringify([
-    { name: "status", label: "Planning status", type: "enum", required: true, default: "proposed", enum_options: ["proposed", "planned", "in_review", "active"] },
-    { name: "owner", label: "Synthetic owner bucket", type: "string", required: false },
+function defaultObjectTypeFields(): DesignAssetField[] {
+  return [
+    { name: "name", label: "Object name", type: "string", required: true, help_text: "Human-readable object name." },
+    { name: "category", label: "Category", type: "string", required: false, help_text: "Optional grouping, owner, system, or object class." },
+    { name: "status", label: "Status", type: "enum", required: true, default: "proposed", enum_options: ["proposed", "planned", "active", "as_built", "archived"] },
+    { name: "metadata", label: "Metadata JSON", type: "json", required: false, help_text: "Optional JSON object or array for custom attributes." },
+  ];
+}
+
+function defaultMapPointFields(): DesignAssetField[] {
+  return [
+    { name: "name", label: "Object name", type: "string", required: true },
+    { name: "object_type", label: "Object category", type: "string", required: false },
+    { name: "status", label: "Status", type: "enum", required: true, default: "proposed", enum_options: ["proposed", "planned", "active", "as_built"] },
     { name: "notes", label: "Planning notes", type: "textarea", required: false },
-  ], null, 2);
+  ];
+}
+
+function defaultFiberSpanFields(): DesignAssetField[] {
+  return [
+    { name: "cable_id", label: "Cable ID", type: "string", required: true },
+    { name: "fiber_count", label: "Fiber count", type: "integer", required: false, default: 48, validation_rules: { min: 1, max: 864 } },
+    { name: "status", label: "Status", type: "enum", required: true, default: "planned", enum_options: ["proposed", "planned", "in_review", "active", "as_built"] },
+    { name: "services_carried", label: "Services carried", type: "textarea", required: false },
+    { name: "notes", label: "Planning notes", type: "textarea", required: false },
+  ];
+}
+
+function blankDesignField(index: number): DesignAssetField {
+  return { name: `field_${index}`, label: `Field ${index}`, type: "string", required: false };
+}
+
+function defaultDesignAssetFieldsText() {
+  return JSON.stringify(defaultObjectTypeFields(), null, 2);
+}
+
+function slugFromLabel(value: string) {
+  const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug && /^[a-z]/.test(slug) ? slug.slice(0, 80) : slug ? `x-${slug}`.slice(0, 80) : "";
+}
+
+function fieldNameFromLabel(value: string) {
+  const name = value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!name) return "";
+  return /^[a-z_]/.test(name) ? name.slice(0, 80) : `field_${name}`.slice(0, 80);
+}
+
+function designFieldDefaultText(field: DesignAssetField) {
+  if (field.default === undefined || field.default === null) return "";
+  if (field.type === "json") return typeof field.default === "string" ? field.default : JSON.stringify(field.default, null, 2);
+  if (field.type === "boolean") return field.default === true ? "true" : field.default === false ? "false" : "";
+  return String(field.default);
+}
+
+function designFieldDefaultFromText(type: DesignAssetFieldType, value: string) {
+  if (value === "") return undefined;
+  if (type === "integer") return Number.parseInt(value, 10);
+  if (type === "number") return Number(value);
+  if (type === "boolean") return value === "true";
+  if (type === "json") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
 }
 
 function defaultPropertiesForFields(fields: DesignAssetField[]) {
@@ -3932,6 +4813,10 @@ function defaultGeometryTextForType(geometryType: DesignAssetGeometryType, pendi
   if (geometryType === "polygon") return JSON.stringify({ type: "Polygon", coordinates: [[[-72.1, 42.1], [-71.95, 42.1], [-71.95, 42.22], [-72.1, 42.22], [-72.1, 42.1]]] }, null, 2);
   if (geometryType === "point") return JSON.stringify({ type: "Point", coordinates: [-71.82, 42.28] }, null, 2);
   return "";
+}
+
+function isDesignRebuildPackage(value: DesignAssetBlueprint | DesignRebuildPackage): value is DesignRebuildPackage {
+  return Boolean((value as DesignRebuildPackage).package_version && (value as DesignRebuildPackage).blueprint);
 }
 
 function designToolForGeometryType(geometryType: Exclude<DesignAssetGeometryType, "table_only">): MapDrawingTool {
@@ -4282,7 +5167,7 @@ function buildDashboardLayerSummaries({
     layer("transmissionLines", "Editable transmission lines", "Planning assets", transmissionLineCount, transmissionLineCount, "/transmission-lines", "Local planning line records", "Demo planning records only."),
     layer("workOrderLocations", "Work order locations", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/work-orders", "Synthetic work-order markers", "Demo work orders only."),
     layer("proposedChanges", "Proposed changes", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/deviceops/change-requests", "Synthetic proposed planning changes", "Proposed/demo records only."),
-    layer("designAssets", "Editable planning assets", "Planning assets", designAssetRecordCount, designAssetRecordCount, "/dashboard?drawer=design", "Schema-backed custom asset records", "Synthetic/demo records only; do not enter sensitive utility data."),
+    layer("designAssets", "Command-created planning assets", "Planning assets", designAssetRecordCount, designAssetRecordCount, "/dashboard?drawer=layers", "Schema-backed command terminal records", "Synthetic/demo records only; do not enter sensitive utility data."),
   ];
 }
 

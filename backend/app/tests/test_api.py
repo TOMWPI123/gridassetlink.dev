@@ -203,6 +203,28 @@ def test_design_asset_record_validation_geometry_crud_and_events() -> None:
     )
     assert polygon_type.status_code == 201
 
+    object_type = client.post(
+        "/api/design-assets/asset-types",
+        json={
+            "slug": "unit-test-custom-object",
+            "display_name": "Unit Test Custom Object",
+            "geometry_type": "table_only",
+            "fields": [
+                {"name": "object_name", "type": "string", "required": True},
+                {"name": "quantity", "type": "integer"},
+                {"name": "rating", "type": "number"},
+                {"name": "in_service", "type": "boolean"},
+                {"name": "inspection_date", "type": "date"},
+                {"name": "category", "type": "enum", "enum_options": ["permit", "vendor", "inspection"]},
+                {"name": "metadata", "type": "json"},
+            ],
+            "searchable_fields": ["object_name", "category"],
+        },
+        headers=headers,
+    )
+    assert object_type.status_code == 201
+    assert object_type.json()["geometry_type"] == "table_only"
+
     missing_required = client.post(
         "/api/design-assets/records",
         json={
@@ -259,6 +281,34 @@ def test_design_asset_record_validation_geometry_crud_and_events() -> None:
     assert polygon_created.status_code == 201
     assert polygon_created.json()["geometry"]["type"] == "Polygon"
 
+    object_created = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "unit-test-custom-object",
+            "record_key": "UNIT-TEST-OBJECT-001",
+            "display_label": "Unit Test Any Data Object",
+            "properties": {
+                "object_name": "Synthetic cabinet inspection record",
+                "quantity": 3,
+                "rating": 4.5,
+                "in_service": True,
+                "inspection_date": "2026-06-10",
+                "category": "inspection",
+                "metadata": {"crew": "demo", "tags": ["custom", "database"]},
+            },
+            "status": "planned",
+        },
+        headers=headers,
+    )
+    assert object_created.status_code == 201
+    object_record = object_created.json()
+    assert object_record["geometry"] is None
+    assert object_record["geometry_type"] == "table_only"
+    assert object_record["properties"]["quantity"] == 3
+    assert object_record["properties"]["rating"] == 4.5
+    assert object_record["properties"]["in_service"] is True
+    assert object_record["properties"]["metadata"]["crew"] == "demo"
+
     viewer_update = client.put(
         f"/api/design-assets/records/{record['id']}",
         json={"properties": {"fiber_count": 72, "status": "planned"}},
@@ -278,6 +328,8 @@ def test_design_asset_record_validation_geometry_crud_and_events() -> None:
     map_payload = client.get("/api/design-assets/map-records")
     assert map_payload.status_code == 200
     assert any(feature["properties"]["recordKey"] == "UNIT-TEST-SPAN-001" for feature in map_payload.json()["feature_collection"]["features"])
+    assert any(row["record_key"] == "UNIT-TEST-OBJECT-001" for row in map_payload.json()["records"])
+    assert not any(feature["properties"].get("recordKey") == "UNIT-TEST-OBJECT-001" for feature in map_payload.json()["feature_collection"]["features"])
 
     events = client.get(f"/api/design-assets/records/{record['id']}/events")
     assert events.status_code == 200
@@ -286,6 +338,484 @@ def test_design_asset_record_validation_geometry_crud_and_events() -> None:
     archived = client.delete(f"/api/design-assets/records/{record['id']}", headers=headers)
     assert archived.status_code == 200
     assert archived.json()["status"] == "archived"
+
+
+def test_design_blueprint_export_import_and_core_module_bundle() -> None:
+    headers = auth_headers("engineer@example.com", "engineer123")
+    blueprints = client.get("/api/design-assets/module-blueprints", headers=headers)
+    assert blueprints.status_code == 200
+    catalog = blueprints.json()
+    core = next(row for row in catalog if row["key"] == "core-telecom-rebuild")
+    assert core["asset_type_count"] >= 15
+    assert {"design-circuit", "design-device", "design-device-port", "design-distribution-pole", "design-opgw-cable", "design-fiber-strand", "design-fiber-splice", "design-patch-panel-port", "design-fiber-assignment", "design-database-object", "design-module-snapshot-record"} <= {row["slug"] for row in core["asset_types"]}
+
+    installed = client.post("/api/design-assets/module-blueprints/core-telecom-rebuild/install", json={}, headers=headers)
+    assert installed.status_code == 201
+    install_payload = installed.json()
+    assert install_payload["created_asset_types"] >= 15
+    assert "design-circuit" in install_payload["installed_asset_type_slugs"]
+
+    circuit = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "design-circuit",
+            "record_key": "DESIGN-CIRCUIT-REBUILD-001",
+            "display_label": "Design Mode Rebuild Circuit",
+            "geometry": {"type": "LineString", "coordinates": [[-71.9, 42.0], [-71.8, 42.1]]},
+            "properties": {
+                "circuit_id": "DESIGN-CIRCUIT-REBUILD-001",
+                "circuit_name": "Design Mode Rebuild Circuit",
+                "service_type": "Ethernet",
+                "criticality": "normal",
+                "a_end": "DEMO-A",
+                "z_end": "DEMO-Z",
+                "fiber_assignment_ids": ["DESIGN-ASSIGN-001"],
+                "service_parameters": {"bandwidth": "1G", "synthetic": True},
+                "status": "planned",
+            },
+            "status": "planned",
+        },
+        headers=headers,
+    )
+    assert circuit.status_code == 201
+    assert circuit.json()["asset_type_slug"] == "design-circuit"
+
+    exported = client.get("/api/design-assets/blueprint?include_records=true&asset_type_slug=design-circuit", headers=headers)
+    assert exported.status_code == 200
+    blueprint = exported.json()
+    assert blueprint["blueprint_version"] == "gridassetlink-design-blueprint-v1"
+    assert [row["slug"] for row in blueprint["asset_types"]] == ["design-circuit"]
+    assert any(row["record_key"] == "DESIGN-CIRCUIT-REBUILD-001" for row in blueprint["records"])
+
+    reimported = client.post("/api/design-assets/blueprint/import", json={**blueprint, "mode": "skip_existing"}, headers=headers)
+    assert reimported.status_code == 201
+    assert reimported.json()["skipped_asset_types"] == 1
+    assert reimported.json()["skipped_records"] >= 1
+
+    materialized = client.post(f"/api/design-assets/records/{circuit.json()['id']}/materialize", json={"mode": "upsert"}, headers=headers)
+    assert materialized.status_code == 200
+    materialized_payload = materialized.json()
+    assert materialized_payload["action"] == "created"
+    assert materialized_payload["entity"] == "circuits"
+    assert materialized_payload["payload"]["circuit_id"] == "DESIGN-CIRCUIT-REBUILD-001"
+
+    backend_circuits = client.get("/api/circuits?search=DESIGN-CIRCUIT-REBUILD-001", headers=headers)
+    assert backend_circuits.status_code == 200
+    backend_row = next(row for row in backend_circuits.json() if row["circuit_id"] == "DESIGN-CIRCUIT-REBUILD-001")
+    assert backend_row["circuit_name"] == "Design Mode Rebuild Circuit"
+    assert backend_row["ownership_type"] == "synthetic_demo"
+    assert backend_row["status"] == "planned"
+
+    materialized_again = client.post(f"/api/design-assets/records/{circuit.json()['id']}/materialize", json={"mode": "upsert"}, headers=headers)
+    assert materialized_again.status_code == 200
+    assert materialized_again.json()["action"] == "updated"
+
+    pole = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "design-distribution-pole",
+            "record_key": "DESIGN-POLE-REBUILD-001",
+            "display_label": "Design Mode Pole 001",
+            "geometry": {"type": "Point", "coordinates": [-71.81, 42.08]},
+            "properties": {
+                "pole_id": "DESIGN-POLE-REBUILD-001",
+                "route_id": "DESIGN-ROUTE-001",
+                "structure_type": "tangent",
+                "has_splice": False,
+                "slack_loop_feet": 25,
+                "fiber_assignment_ids": ["DESIGN-ASSIGN-001"],
+                "status": "planned",
+            },
+            "status": "planned",
+        },
+        headers=headers,
+    )
+    assert pole.status_code == 201
+    pole_materialized = client.post(f"/api/design-assets/records/{pole.json()['id']}/materialize", json={"mode": "upsert"}, headers=headers)
+    assert pole_materialized.status_code == 200
+    assert pole_materialized.json()["entity"] == "regional-structures"
+    backend_poles = client.get("/api/regional-structures?search=DESIGN-POLE-REBUILD-001", headers=headers)
+    assert any(row["structure_number"] == "DESIGN-POLE-REBUILD-001" for row in backend_poles.json())
+
+    opgw = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "design-opgw-cable",
+            "record_key": "DESIGN-OPGW-REBUILD-001",
+            "display_label": "Design Mode OPGW Section 001",
+            "geometry": {"type": "LineString", "coordinates": [[-71.81, 42.08], [-71.79, 42.1]]},
+            "properties": {
+                "cable_id": "DESIGN-OPGW-REBUILD-001",
+                "parent_route_id": "DESIGN-ROUTE-001",
+                "from_splice_point_id": "DESIGN-SPLICE-A",
+                "to_splice_point_id": "DESIGN-SPLICE-B",
+                "fiber_count": 48,
+                "available_strands": 40,
+                "assigned_strands": 8,
+                "status": "planned",
+            },
+            "status": "planned",
+        },
+        headers=headers,
+    )
+    assert opgw.status_code == 201
+    opgw_materialized = client.post(f"/api/design-assets/records/{opgw.json()['id']}/materialize", json={"mode": "upsert"}, headers=headers)
+    assert opgw_materialized.status_code == 200
+    assert opgw_materialized.json()["entity"] == "fiber-cables"
+    backend_fiber = client.get("/api/fiber-cables?search=DESIGN-OPGW-REBUILD-001", headers=headers)
+    fiber_row = next(row for row in backend_fiber.json() if row["cable_id"] == "DESIGN-OPGW-REBUILD-001")
+    assert fiber_row["cable_type"] == "OPGW"
+    assert fiber_row["fiber_count"] == 48
+
+    splice = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "design-splice-point",
+            "record_key": "DESIGN-SPLICE-REBUILD-001",
+            "display_label": "Design Mode Splice Point 001",
+            "geometry": {"type": "Point", "coordinates": [-71.8, 42.09]},
+            "properties": {
+                "splice_point_id": "DESIGN-SPLICE-REBUILD-001",
+                "closure_type": "aerial_opgw_splice",
+                "connected_cable_ids": ["DESIGN-OPGW-REBUILD-001"],
+                "splice_count": 48,
+                "matrix_json": {"rows": []},
+                "status": "planned",
+            },
+            "status": "planned",
+        },
+        headers=headers,
+    )
+    assert splice.status_code == 201
+    splice_materialized = client.post(f"/api/design-assets/records/{splice.json()['id']}/materialize", json={"mode": "upsert"}, headers=headers)
+    assert splice_materialized.status_code == 200
+    assert splice_materialized.json()["entity"] == "splice-closures"
+    backend_splices = client.get("/api/splice-closures?search=DESIGN-SPLICE-REBUILD-001", headers=headers)
+    assert any(row["closure_id"] == "DESIGN-SPLICE-REBUILD-001" for row in backend_splices.json())
+
+
+def test_design_agent_tools_create_and_materialize_objects() -> None:
+    headers = auth_headers("engineer@example.com", "engineer123")
+    tools_response = client.get("/api/design-assets/agent-tools", headers=headers)
+    assert tools_response.status_code == 200
+    tools = tools_response.json()
+    tool_keys = {tool["tool_key"] for tool in tools}
+    assert {"create-circuit", "create-device", "create-device-port", "create-pole", "create-fiber-span", "create-fiber-strand", "create-splice", "create-fiber-splice", "create-patch-panel", "create-patch-panel-port", "create-fiber-assignment", "create-database-object"} <= tool_keys
+    assert all(tool["endpoint"].startswith("/api/design-assets/agent-tools/") for tool in tools)
+    database_tool = next(tool for tool in tools if tool["tool_key"] == "create-database-object")
+    assert database_tool["supports_materialize"] is False
+    assert database_tool["backend_entity"] is None
+
+    circuit = client.post(
+        "/api/design-assets/agent-tools/create-circuit/run",
+        json={
+            "materialize": True,
+            "geometry": {"type": "LineString", "coordinates": [[-72.05, 42.15], [-72.0, 42.2]]},
+            "properties": {
+                "circuit_id": "AGENT-DESIGN-CIRCUIT-001",
+                "circuit_name": "Agent Design Circuit 001",
+                "service_type": "Ethernet",
+                "criticality": "high",
+                "status": "planned",
+            },
+        },
+        headers=headers,
+    )
+    assert circuit.status_code == 201
+    circuit_payload = circuit.json()
+    assert circuit_payload["record"]["asset_type_slug"] == "design-circuit"
+    assert circuit_payload["materialization"]["entity"] == "circuits"
+    assert circuit_payload["materialization"]["action"] == "created"
+    assert any(row["circuit_id"] == "AGENT-DESIGN-CIRCUIT-001" for row in client.get("/api/circuits?search=AGENT-DESIGN-CIRCUIT-001", headers=headers).json())
+
+    pole = client.post(
+        "/api/design-assets/agent-tools/create-pole/run",
+        json={
+            "materialize": True,
+            "geometry": {"type": "Point", "coordinates": [-72.01, 42.16]},
+            "properties": {"pole_id": "AGENT-DESIGN-POLE-001", "route_id": "AGENT-ROUTE-001", "structure_type": "angle", "status": "planned"},
+        },
+        headers=headers,
+    )
+    assert pole.status_code == 201
+    assert pole.json()["materialization"]["entity"] == "regional-structures"
+
+    span = client.post(
+        "/api/design-assets/agent-tools/create-fiber-span/run",
+        json={
+            "materialize": True,
+            "geometry": {"type": "LineString", "coordinates": [[-72.01, 42.16], [-71.99, 42.18]]},
+            "properties": {"cable_id": "AGENT-DESIGN-FIBER-001", "fiber_count": 72, "from_splice_point_id": "AGENT-SPL-A", "to_splice_point_id": "AGENT-SPL-B", "status": "planned"},
+        },
+        headers=headers,
+    )
+    assert span.status_code == 201
+    assert span.json()["materialization"]["entity"] == "fiber-cables"
+
+    splice = client.post(
+        "/api/design-assets/agent-tools/create-splice/run",
+        json={
+            "materialize": True,
+            "geometry": {"type": "Point", "coordinates": [-72.0, 42.17]},
+            "properties": {"splice_point_id": "AGENT-DESIGN-SPLICE-001", "closure_type": "aerial_opgw_splice", "connected_cable_ids": ["AGENT-DESIGN-FIBER-001"], "status": "planned"},
+        },
+        headers=headers,
+    )
+    assert splice.status_code == 201
+    assert splice.json()["materialization"]["entity"] == "splice-closures"
+
+    assignment = client.post(
+        "/api/design-assets/agent-tools/create-fiber-assignment/run",
+        json={
+            "materialize": True,
+            "properties": {"assignment_id": "AGENT-DESIGN-ASSIGN-001", "assignment_name": "Agent Design Assignment 001", "service_type": "Ethernet", "status": "planned"},
+        },
+        headers=headers,
+    )
+    assert assignment.status_code == 201
+    assert assignment.json()["record"]["geometry"] is None
+    assert assignment.json()["materialization"]["entity"] == "fiber-assignments"
+
+    device = client.post(
+        "/api/design-assets/agent-tools/create-device/run",
+        json={
+            "materialize": True,
+            "properties": {"device_name": "AGENT-DESIGN-DEVICE-001", "device_type": "switch", "manufacturer": "Synthetic", "model": "DemoSwitch", "status": "planned"},
+        },
+        headers=headers,
+    )
+    assert device.status_code == 201
+    assert device.json()["materialization"]["entity"] == "devices"
+    assert any(row["device_name"] == "AGENT-DESIGN-DEVICE-001" for row in client.get("/api/devices?search=AGENT-DESIGN-DEVICE-001", headers=headers).json())
+
+    device_port = client.post(
+        "/api/design-assets/agent-tools/create-device-port/run",
+        json={
+            "materialize": True,
+            "properties": {"port_name": "AGENT-DESIGN-DEVICE-001-ETH-1", "port_type": "Ethernet", "physical_label": "AGENT-DESIGN-DEVICE-001-ETH-1", "status": "available"},
+        },
+        headers=headers,
+    )
+    assert device_port.status_code == 201
+    assert device_port.json()["materialization"]["entity"] == "device-ports"
+
+    strand = client.post(
+        "/api/design-assets/agent-tools/create-fiber-strand/run",
+        json={
+            "materialize": True,
+            "properties": {"strand_key": "AGENT-DESIGN-FIBER-001-F001", "strand_number": 1, "strand_color": "blue", "status": "available"},
+        },
+        headers=headers,
+    )
+    assert strand.status_code == 201
+    assert strand.json()["materialization"]["entity"] == "fiber-strands"
+
+    fiber_splice = client.post(
+        "/api/design-assets/agent-tools/create-fiber-splice/run",
+        json={
+            "materialize": True,
+            "properties": {"splice_key": "AGENT-DESIGN-SPLICE-ROW-001", "splice_type": "straight_through", "incoming_strand_number": 1, "outgoing_strand_number": 1, "loss_db": 0.05, "status": "planned"},
+        },
+        headers=headers,
+    )
+    assert fiber_splice.status_code == 201
+    assert fiber_splice.json()["materialization"]["entity"] == "fiber-splices"
+
+    database_object = client.post(
+        "/api/design-assets/agent-tools/create-database-object/run",
+        json={
+            "materialize": True,
+            "properties": {
+                "object_id": "AGENT-DESIGN-OBJECT-001",
+                "object_name": "Agent Design Object 001",
+                "category": "custom_inventory",
+                "status": "planned",
+                "metadata": {"synthetic": True, "module": "demo"},
+            },
+        },
+        headers=headers,
+    )
+    assert database_object.status_code == 201
+    database_payload = database_object.json()
+    assert database_payload["record"]["asset_type_slug"] == "design-database-object"
+    assert database_payload["record"]["geometry"] is None
+    assert database_payload["materialization"] is None
+    assert database_payload["record"]["properties"]["metadata"]["synthetic"] is True
+
+
+def test_design_terminal_command_creates_answers_renames_and_prompts() -> None:
+    headers = auth_headers("engineer@example.com", "engineer123")
+    command = client.post(
+        "/api/design-assets/terminal-command",
+        json={
+            "command": "Build new pole between Meadow-Road-Str-0060 and Meadow-Road-Str-0049 and add a splice to the pole",
+            "materialize": True,
+            "context": {
+                "reference_assets": [
+                    {"id": "meadow-0060", "label": "Meadow-Road-Str-0060", "kind": "transmission_structure", "coordinates": [-72.01, 42.16]},
+                    {"id": "meadow-0049", "label": "Meadow-Road-Str-0049", "kind": "transmission_structure", "coordinates": [-71.99, 42.18]},
+                ]
+            },
+        },
+        headers=headers,
+    )
+    assert command.status_code == 200
+    payload = command.json()
+    action_names = {row["action"] for row in payload["actions"]}
+    assert {"create_pole", "create_splice_can"} <= action_names
+    assert payload["needs_input"] is False
+    created_pole_key = next(row["record_key"] for row in payload["actions"] if row["action"] == "create_pole")
+
+    seeded_fiber = client.post(
+        "/api/design-assets/agent-tools/create-fiber-span/run",
+        json={
+            "materialize": True,
+            "geometry": {"type": "LineString", "coordinates": [[-72.03, 42.14], [-72.0, 42.17]]},
+            "properties": {"cable_id": "TERMINAL-DESIGN-FIBER-001", "fiber_count": 96, "from_splice_point_id": "TERM-SPL-A", "to_splice_point_id": "TERM-SPL-B", "status": "planned"},
+        },
+        headers=headers,
+    )
+    assert seeded_fiber.status_code == 201
+
+    fiber_question = client.post(
+        "/api/design-assets/terminal-command",
+        json={"command": "How many strands of fiber are on TERMINAL-DESIGN-FIBER-001 and where does it go to?"},
+        headers=headers,
+    )
+    assert fiber_question.status_code == 200
+    question_payload = fiber_question.json()
+    assert question_payload["answers"]
+    assert any("96" in row["summary"] or row.get("fields", {}).get("fiber_count") == 96 for row in question_payload["answers"])
+
+    rename = client.post(
+        "/api/design-assets/terminal-command",
+        json={"command": f"rename pole {created_pole_key} to MEADOW-ROAD-CMD-POLE-0055"},
+        headers=headers,
+    )
+    assert rename.status_code == 200
+    assert rename.json()["actions"][0]["status"] == "updated"
+    assert rename.json()["actions"][0]["record_key"] == "MEADOW-ROAD-CMD-POLE-0055"
+
+    incomplete = client.post(
+        "/api/design-assets/terminal-command",
+        json={"command": "add splice can to my pole and attach a span"},
+        headers=headers,
+    )
+    assert incomplete.status_code == 200
+    assert incomplete.json()["needs_input"] is True
+    prompt_fields = {row["field"] for row in incomplete.json()["parameter_prompts"]}
+    assert {"splice_target", "span_endpoints"} <= prompt_fields
+
+
+def test_design_module_snapshot_capture_and_replay() -> None:
+    headers = auth_headers("engineer@example.com", "engineer123")
+    installed = client.post("/api/design-assets/module-blueprints/core-telecom-rebuild/install", json={}, headers=headers)
+    assert installed.status_code == 201
+
+    entities = client.get("/api/design-assets/module-entities", headers=headers)
+    assert entities.status_code == 200
+    entity_names = {row["entity"] for row in entities.json()}
+    assert {"circuits", "fiber-cables", "fiber-strands", "splice-closures", "devices"} <= entity_names
+    assert "users" not in entity_names
+    assert "audit-logs" not in entity_names
+
+    captured = client.post(
+        "/api/design-assets/module-snapshot",
+        json={"entities": ["circuits", "fiber-cables"], "limit_per_entity": 3, "mode": "upsert"},
+        headers=headers,
+    )
+    assert captured.status_code == 201
+    captured_payload = captured.json()
+    assert captured_payload["entities"] == ["circuits", "fiber-cables"]
+    assert captured_payload["result_count"] >= 1
+    assert captured_payload["created_records"] + captured_payload["updated_records"] >= 1
+
+    package_snapshot = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "design-module-snapshot-record",
+            "record_key": "module-snapshot:providers:SNAPSHOT-PACKAGE-PROVIDER-001",
+            "display_label": "providers: Snapshot Package Provider 001",
+            "properties": {
+                "source_entity": "providers",
+                "source_record_id": "",
+                "source_label": "Snapshot Package Provider 001",
+                "snapshot_status": "captured",
+                "dependency_notes": "API test package replay row with full backend attributes.",
+                "record_json": {
+                    "provider_name": "SNAPSHOT-PACKAGE-PROVIDER-001",
+                    "provider_type": "synthetic_demo",
+                    "account_number": "PKG-DEMO-ONLY",
+                    "noc_phone": "555-0001",
+                    "support_email": "package-demo@example.invalid",
+                    "escalation_contact": "Synthetic Package Demo",
+                    "notes": "Created from Design Mode rebuild package import and replay.",
+                },
+            },
+            "status": "planned",
+        },
+        headers=headers,
+    )
+    assert package_snapshot.status_code == 201
+    exported_package = client.get("/api/design-assets/rebuild-package?include_records=true", headers=headers)
+    assert exported_package.status_code == 200
+    package_payload = exported_package.json()
+    assert package_payload["package_version"] == "gridassetlink-design-rebuild-package-v1"
+    assert package_payload["blueprint"]["blueprint_version"] == "gridassetlink-design-blueprint-v1"
+    assert package_payload["snapshot_summary"]["snapshot_record_count"] >= 1
+    assert any(tool["tool_key"] == "create-fiber-span" for tool in package_payload["agent_tools"])
+
+    imported_package = client.post(
+        "/api/design-assets/rebuild-package/import",
+        json={**package_payload, "mode": "upsert", "replay_snapshots": True, "replay_options": {"entities": ["providers"], "limit": 50}},
+        headers=headers,
+    )
+    assert imported_package.status_code == 201
+    imported_package_payload = imported_package.json()
+    assert imported_package_payload["replay_requested"] is True
+    assert imported_package_payload["replay_result"]["materialized_count"] >= 1
+    package_providers = client.get("/api/providers?search=SNAPSHOT-PACKAGE-PROVIDER-001", headers=headers)
+    assert any(row["provider_name"] == "SNAPSHOT-PACKAGE-PROVIDER-001" and row["account_number"] == "PKG-DEMO-ONLY" for row in package_providers.json())
+
+    snapshot_record = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "design-module-snapshot-record",
+            "record_key": "module-snapshot:providers:SNAPSHOT-PROVIDER-001",
+            "display_label": "providers: Snapshot Provider 001",
+            "properties": {
+                "source_entity": "providers",
+                "source_record_id": "",
+                "source_label": "Snapshot Provider 001",
+                "snapshot_status": "captured",
+                "dependency_notes": "API test replay row with full backend attributes.",
+                "record_json": {
+                    "provider_name": "SNAPSHOT-PROVIDER-001",
+                    "provider_type": "synthetic_demo",
+                    "account_number": "DEMO-ONLY",
+                    "noc_phone": "555-0000",
+                    "support_email": "demo@example.invalid",
+                    "escalation_contact": "Synthetic Demo",
+                    "notes": "Created from Design Mode module snapshot replay.",
+                },
+            },
+            "status": "planned",
+        },
+        headers=headers,
+    )
+    assert snapshot_record.status_code == 201
+    replayed = client.post(
+        "/api/design-assets/module-snapshot/materialize",
+        json={"record_ids": [snapshot_record.json()["id"]], "mode": "upsert", "preserve_ids": True, "normalize_user_refs": True},
+        headers=headers,
+    )
+    assert replayed.status_code == 200
+    replayed_payload = replayed.json()
+    assert replayed_payload["materialized_count"] == 1
+    assert replayed_payload["results"][0]["entity"] == "providers"
+    providers = client.get("/api/providers?search=SNAPSHOT-PROVIDER-001", headers=headers)
+    assert providers.status_code == 200
+    assert any(row["provider_name"] == "SNAPSHOT-PROVIDER-001" and row["account_number"] == "DEMO-ONLY" for row in providers.json())
 
 
 def test_deviceops_proposed_change_to_work_order_and_checklist() -> None:

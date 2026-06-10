@@ -1277,6 +1277,215 @@ export type DesignAssetMapPayload = {
   };
 };
 
+export type DesignAssetBlueprint = {
+  blueprint_version: string;
+  exported_at?: string;
+  synthetic_data_notice: string;
+  asset_types: DesignAssetType[];
+  records: DesignAssetRecord[];
+  mode?: "upsert" | "skip_existing";
+};
+
+export type DesignModuleBlueprint = {
+  key: string;
+  display_name: string;
+  description: string;
+  synthetic_data_notice: string;
+  asset_type_count: number;
+  record_count: number;
+  asset_types: Array<{
+    slug: string;
+    display_name: string;
+    description?: string | null;
+    geometry_type: DesignAssetGeometryType;
+    fields: DesignAssetField[];
+    searchable_fields?: string[];
+    map_style?: Record<string, unknown>;
+  }>;
+};
+
+export type DesignBlueprintInstallResult = {
+  blueprint_version: string;
+  source_label: string;
+  mode: "upsert" | "skip_existing";
+  installed_asset_type_slugs: string[];
+  created_asset_types: number;
+  updated_asset_types: number;
+  skipped_asset_types: number;
+  created_records: number;
+  updated_records: number;
+  skipped_records: number;
+  synthetic_data_notice: string;
+};
+
+export type DesignMaterializationResult = {
+  record_id?: number;
+  record_key?: string;
+  asset_type_slug?: string;
+  entity?: string;
+  entity_id?: number | null;
+  action: "created" | "updated" | "skipped";
+  reason?: string;
+  payload?: Record<string, unknown>;
+  synthetic_data_notice?: string;
+};
+
+export type DesignMaterializationBatchResult = {
+  mode: "upsert" | "skip_existing";
+  processed_count: number;
+  materialized_count: number;
+  skipped_count: number;
+  error_count: number;
+  results: DesignMaterializationResult[];
+  errors: Array<{ record_id?: number; record_key?: string; error: unknown }>;
+  synthetic_data_notice: string;
+};
+
+export type DesignAgentTool = {
+  tool_key: string;
+  label: string;
+  description: string;
+  asset_type_slug: string;
+  backend_entity?: string | null;
+  geometry_type: DesignAssetGeometryType;
+  required_properties: string[];
+  example_properties: Record<string, unknown>;
+  example_geometry?: DesignAssetGeoJsonGeometry | null;
+  endpoint: string;
+  method: "POST";
+  supports_materialize: boolean;
+  synthetic_data_notice: string;
+};
+
+export type DesignAgentToolRunResult = {
+  tool: DesignAgentTool;
+  record_action: "created" | "updated";
+  record: DesignAssetRecord;
+  materialization?: DesignMaterializationResult | null;
+  synthetic_data_notice: string;
+};
+
+export type DesignTerminalCommandResult = {
+  input: string;
+  intent: string;
+  summary: string;
+  actions: Array<{
+    action: string;
+    status: string;
+    record_id?: number | null;
+    record_key?: string | null;
+    label?: string | null;
+    asset_type_slug?: string | null;
+    materialization?: DesignMaterializationResult | null;
+    summary?: string;
+  }>;
+  answers: Array<{
+    entity: string;
+    id: string;
+    summary: string;
+    fields?: Record<string, unknown>;
+  }>;
+  parameter_prompts: Array<{ field: string; question: string }>;
+  needs_input: boolean;
+  synthetic_data_notice: string;
+};
+
+export type DesignModuleEntity = {
+  entity: string;
+  model_name: string;
+  record_count: number;
+  fields: string[];
+  primary_key?: string | null;
+  snapshot_record_key_prefix: string;
+  excluded?: boolean;
+};
+
+export type DesignModuleSnapshotResult = {
+  mode: "upsert" | "skip_existing";
+  entities: string[];
+  limit_per_entity: number;
+  captured_count: number;
+  created_records: number;
+  updated_records: number;
+  skipped_records: number;
+  entity_counts: Record<string, number>;
+  results: Array<{ action: string; record_id?: number; record_key?: string; entity?: string }>;
+  result_count: number;
+  synthetic_data_notice: string;
+};
+
+export type DesignModuleSnapshotMaterializeResult = {
+  mode: "upsert" | "skip_existing";
+  preserve_ids: boolean;
+  normalize_user_refs: boolean;
+  processed_count: number;
+  materialized_count: number;
+  skipped_count: number;
+  error_count: number;
+  results: Array<{ action: string; record_id?: number; record_key?: string; entity?: string; entity_id?: number | null; reason?: string }>;
+  errors: Array<{ record_id?: number; record_key?: string; error: unknown }>;
+  synthetic_data_notice: string;
+};
+
+export type DesignRebuildPackage = {
+  package_version: string;
+  exported_at: string;
+  synthetic_data_notice: string;
+  blueprint: DesignAssetBlueprint;
+  module_entities: DesignModuleEntity[];
+  module_blueprints: DesignModuleBlueprint[];
+  agent_tools: DesignAgentTool[];
+  snapshot_summary: {
+    snapshot_record_count: number;
+    snapshot_entities: string[];
+  };
+  rebuild_steps: string[];
+  mode?: "upsert" | "skip_existing";
+};
+
+export type DesignRebuildPackageImportResult = {
+  package_version: string;
+  blueprint_import: DesignBlueprintInstallResult;
+  replay_result?: DesignModuleSnapshotMaterializeResult | null;
+  replay_requested: boolean;
+  synthetic_data_notice: string;
+};
+
+export type DesignRebuildAuditRow = {
+  entity: string;
+  model_name: string;
+  backend_record_count: number;
+  snapshot_record_count: number;
+  replay_ready_count: number;
+  invalid_snapshot_count: number;
+  coverage_ratio: number;
+  coverage_status: "empty" | "package_only" | "missing_snapshots" | "partial" | "needs_review" | "replay_ready";
+  missing_model_fields: string[];
+  missing_model_field_count: number;
+  sample_record_keys: string[];
+};
+
+export type DesignRebuildAudit = {
+  audit_time: string;
+  entities: string[];
+  totals: {
+    entity_count: number;
+    backend_record_count: number;
+    snapshot_record_count: number;
+    replay_ready_entity_count: number;
+    missing_snapshot_entity_count: number;
+    partial_entity_count: number;
+    needs_review_entity_count: number;
+    package_only_entity_count: number;
+    empty_entity_count: number;
+    invalid_snapshot_count: number;
+    orphan_snapshot_count: number;
+  };
+  rows: DesignRebuildAuditRow[];
+  rebuild_ready: boolean;
+  synthetic_data_notice: string;
+};
+
 export type StreetMapLayerKey =
   | "publicTransmissionLines"
   | "publicSubstations"

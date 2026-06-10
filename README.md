@@ -360,17 +360,27 @@ Schema-driven map editing is available behind a feature flag:
 NEXT_PUBLIC_ENABLE_MAP_EDITING=true
 ```
 
-When enabled, the dashboard shows a **Design** drawer and an **Editable planning assets** layer. Admin/editor demo users can:
+The dashboard now uses a bottom **Command Terminal** for schema-backed planning edits instead of a visible Design Mode drawer. Demo users can:
 
-- click the dashboard **Design Mode** button beside **In Service** and **Planned** to enable the editable planning asset layer and open Design/Edit tools;
-- define asset types with slug, display name, geometry type, field JSON, validation/search fields, map style JSON, active/archived state, and version metadata;
-- create, update, and archive database-backed records with Point, LineString, Polygon, or table-only geometry;
+- click **Command Terminal** at the bottom of the dashboard and type natural commands such as `Build new pole between Meadow-Road-Str-0060 and Meadow-Road-Str-0049 and add a splice to the pole`;
+- create synthetic poles/support structures, splice cans, OPGW/fiber spans, fiber assignments, services, or generic database objects from text commands;
+- rename schema-backed planning objects and ask cable/service questions such as strand count, route endpoints, or service status;
+- receive follow-up parameter prompts when a command is missing endpoint, target, fiber-count, splice, or database-object details;
+- define arbitrary object/data types with slug, display name, storage/geometry mode, guided field controls, advanced field JSON, validation/search fields, map style JSON, active/archived state, and version metadata;
+- create, update, and archive database-backed records with Point, LineString, Polygon, or table-only storage for objects that should live in the database without drawing on the map;
+- use table-only object types for synthetic inspections, vendors, permits, notes, inventory, planning assumptions, field observations, or any other demo data that needs a schema-driven form;
+- open the **Blueprints** tab in Design Mode to install the **Core TelecomNE Rebuild Schemas** bundle for recreating module/layer data such as substations, circuits, distribution poles, OPGW cables, splice points, patch panels, fiber assignments, and work orders;
+- use the **Quick add objects from Design Mode** panel to create poles/support structures, splice points, fiber/OPGW spans, circuits, fiber assignments, or generic table-only database objects directly from the dashboard UI. Map objects can use pasted GeoJSON or staged drawing geometry; supported objects can also be materialized into the matching backend module table;
+- use **Capture module data into Design Mode** to snapshot existing backend module/layer rows, including their full row attributes, into `design-module-snapshot-record` records. Those snapshot records can be exported in a blueprint and replayed into a blank instance while preserving row IDs for related fibers, splices, ports, circuits, and work orders;
+- export the current Design Mode schema/record database as a portable blueprint JSON, or export a full rebuild package that includes the blueprint, module entity catalog, agent tool manifest, and snapshot summary. A rebuild package can be imported into a blank instance and replayed into backend module tables;
+- materialize a selected Design Mode object, or every record in the selected object type, into backend module tables when that schema declares a backend mapping. This lets an AI agent create poles, circuits, spans, splices, OPGW/fiber, patch panels, work orders, and other rebuild objects in Design Mode, then push the supported records into canonical backend data;
+- use the Design Mode AI-agent tool manifest to call stable create endpoints for `create-circuit`, `create-device`, `create-device-port`, `create-pole`, `create-fiber-span`, `create-fiber-strand`, `create-splice`, `create-fiber-splice`, `create-patch-panel`, `create-patch-panel-port`, `create-fiber-assignment`, and `create-database-object`. Each tool creates a Design Mode record; tools with a backend entity can also materialize into the matching backend module when `materialize` is true;
 - click the map with Design/Edit tools to place points, add line vertices, or add polygon vertices, then finish/cancel unsaved geometry before saving;
 - select existing editable records, redraw geometry, edit attributes in a schema-generated form, save changes, or archive records with confirmation;
 - search, select, and zoom to schema-backed records on the MapLibre map;
 - review event history through `/api/design-assets/records/{id}/events`.
 
-Backend routes live under `/api/design-assets`. The seeded demo types are `planning-marker`, `fiber-design-span`, and `planning-work-zone`, and all seeded records are synthetic/demo planning data only. Do not enter real CEII, SCADA, relay/protection, operational telecom, credentials, private fiber-route data, or engineering-critical settings into Design/Edit mode.
+Backend routes live under `/api/design-assets`. The command terminal posts to `POST /api/design-assets/terminal-command`. Blueprint routes are `GET /api/design-assets/blueprint`, `POST /api/design-assets/blueprint/import`, `GET /api/design-assets/rebuild-package`, `POST /api/design-assets/rebuild-package/import`, `GET /api/design-assets/module-blueprints`, and `POST /api/design-assets/module-blueprints/{key}/install`. Materialization routes are `POST /api/design-assets/records/{id}/materialize` and `POST /api/design-assets/materialize`. Module snapshot routes are `GET /api/design-assets/module-entities`, `POST /api/design-assets/module-snapshot`, and `POST /api/design-assets/module-snapshot/materialize`. Agent tool routes are `GET /api/design-assets/agent-tools` and `POST /api/design-assets/agent-tools/{tool_key}/run`. The seeded demo types are `planning-marker`, `fiber-design-span`, and `planning-work-zone`; the rebuild bundle adds `design-substation`, `design-circuit`, `design-device`, `design-device-port`, `design-distribution-pole`, `design-opgw-cable`, `design-fiber-strand`, `design-splice-point`, `design-fiber-splice`, `design-patch-panel`, `design-patch-panel-port`, `design-fiber-assignment`, `design-database-object`, `design-module-snapshot-record`, and `design-work-order`. All seeded, blueprint, terminal-created, and user-created records are synthetic/demo planning data only. Do not enter real CEII, SCADA, relay/protection, operational telecom, credentials, private fiber-route data, or engineering-critical settings.
 
 ## MVP Status
 

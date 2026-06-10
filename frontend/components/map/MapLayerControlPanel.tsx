@@ -80,7 +80,7 @@ const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; ba
   { key: "fccMicrowaveLinks", label: "FCC microwave path links", note: "Public FCC ULS point-to-point microwave paths grouped by owner and path frequency", badges: ["Public", "FCC ULS", "Frequency"] },
   { key: "transmissionStructures", label: "Transmission structures", note: "Synthetic demo structure points sampled from public line geometry", badges: ["Synthetic", "Demo"] },
   { key: "spliceClosures", label: "Splice closures", note: "Synthetic demo splice closures mounted on synthetic structures", badges: ["Synthetic", "Demo"] },
-  { key: "designAssets", label: "Editable planning assets", note: "Schema-backed point, line, polygon, and table records from Design/Edit mode", badges: ["Editable", "Feature flag"] },
+  { key: "designAssets", label: "Command-created planning assets", note: "Schema-backed point, line, polygon, and table records created from the dashboard command terminal", badges: ["Editable", "Terminal"] },
 ];
 
 const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges: string[] }> = [
