@@ -4494,12 +4494,16 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   display: inline-flex;
   gap: 4px;
   min-height: 46px;
-  max-width: 292px;
+  max-width: 380px;
   padding: 5px;
   border-radius: 8px;
 }
 
 .dashboard-mode-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   min-width: 0;
   padding: 0 8px;
   border: 1px solid transparent;
@@ -4509,12 +4513,23 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   font-size: 10px;
   font-weight: 840;
   line-height: 1.1;
+  white-space: nowrap;
+}
+
+.dashboard-mode-toggle button.design-mode {
+  color: #f7dc8a;
 }
 
 .dashboard-mode-toggle button.active {
   border-color: rgba(105,215,228,.32);
   background: rgba(105,215,228,.12);
   color: #d9fffb;
+}
+
+.dashboard-mode-toggle button.design-mode.active {
+  border-color: rgba(245,196,81,.42);
+  background: rgba(245,196,81,.14);
+  color: #fff3bc;
 }
 
 .dashboard-map-global-search-wrap {
@@ -4639,11 +4654,115 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   gap: 12px;
 }
 
+.dashboard-gis-local-import-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid rgba(105,215,228,.28);
+  border-radius: 8px;
+  background: rgba(105,215,228,.12);
+}
+
+.dashboard-gis-local-import-banner div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dashboard-gis-local-import-banner strong {
+  color: var(--dash-text);
+  font-size: 13px;
+}
+
+.dashboard-gis-local-import-banner span,
+.dashboard-gis-step-list {
+  color: var(--dash-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.dashboard-gis-local-import-banner button {
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid rgba(238,252,251,.18);
+  border-radius: 7px;
+  background: rgba(5,13,15,.72);
+  color: #d9fffb;
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.dashboard-gis-local-import-banner button:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
 .dashboard-gis-status-grid,
 .dashboard-gis-two-col {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.dashboard-gis-import-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dashboard-gis-import-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(238,252,251,.1);
+  border-radius: 8px;
+  background: rgba(238,252,251,.055);
+  color: var(--dash-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-gis-import-choice.active {
+  border-color: rgba(105,215,228,.46);
+  background: rgba(105,215,228,.13);
+}
+
+.dashboard-gis-import-choice:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+.dashboard-gis-import-choice svg {
+  flex: 0 0 auto;
+  color: #85eef6;
+}
+
+.dashboard-gis-import-choice span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dashboard-gis-import-choice strong {
+  color: var(--dash-text);
+  font-size: 12px;
+}
+
+.dashboard-gis-import-choice small {
+  color: var(--dash-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.dashboard-gis-step-list {
+  margin: 0;
+  padding-left: 18px;
 }
 
 .dashboard-gis-status-grid div,
@@ -4784,6 +4903,140 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 
 .dashboard-gis-message {
   margin: 0;
+}
+
+.dashboard-design-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-design-tabs,
+.dashboard-design-record-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-design-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-design-tabs button,
+.dashboard-design-record-list button {
+  min-width: 0;
+  border: 1px solid rgba(238,252,251,.12);
+  border-radius: 8px;
+  background: rgba(238,252,251,.06);
+  color: var(--dash-text);
+  cursor: pointer;
+}
+
+.dashboard-design-tabs button {
+  min-height: 34px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.dashboard-design-tabs button.active,
+.dashboard-design-record-list button.active {
+  border-color: rgba(105,215,228,.42);
+  background: rgba(105,215,228,.15);
+}
+
+.dashboard-design-form,
+.dashboard-design-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-design-drawing-status {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  border: 1px solid rgba(245,196,81,.26);
+  border-radius: 8px;
+  background: rgba(245,196,81,.09);
+}
+
+.dashboard-design-drawing-status strong {
+  color: var(--dash-text);
+  font-size: 12px;
+}
+
+.dashboard-design-drawing-status span {
+  color: var(--dash-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.dashboard-design-form label,
+.dashboard-design-fields label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dashboard-design-form label span,
+.dashboard-design-fields label span {
+  color: var(--dash-muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.dashboard-design-form input,
+.dashboard-design-form select,
+.dashboard-design-form textarea,
+.dashboard-design-fields input,
+.dashboard-design-fields select,
+.dashboard-design-fields textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(238,252,251,.12);
+  border-radius: 7px;
+  background: rgba(238,252,251,.06);
+  color: var(--dash-text);
+  font-size: 12px;
+  outline: 0;
+}
+
+.dashboard-design-form input,
+.dashboard-design-form select,
+.dashboard-design-fields input,
+.dashboard-design-fields select {
+  min-height: 34px;
+  padding: 0 9px;
+}
+
+.dashboard-design-form textarea,
+.dashboard-design-fields textarea {
+  min-height: 92px;
+  padding: 9px;
+  resize: vertical;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
+  line-height: 1.45;
+}
+
+.dashboard-design-record-list button {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  text-align: left;
+}
+
+.dashboard-design-record-list strong,
+.dashboard-design-record-list span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-design-record-list strong {
+  font-size: 12px;
+}
+
+.dashboard-design-record-list span {
+  color: var(--dash-muted);
+  font-size: 11px;
 }
 
 .dashboard-top-right-toolbar {
@@ -5841,6 +6094,17 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 }
 
 @media (max-width: 720px) {
+  .dashboard-gis-local-import-banner {
+    display: grid;
+  }
+  .dashboard-gis-local-import-banner button {
+    width: 100%;
+  }
+  .dashboard-gis-import-choice-grid,
+  .dashboard-gis-two-col,
+  .dashboard-gis-status-grid {
+    grid-template-columns: 1fr;
+  }
   .dashboard-right-floating-drawer {
     top: auto;
     left: 8px;

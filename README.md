@@ -197,11 +197,12 @@ The map dashboard also includes a `Scale` drawer tab. That tab can import or man
 Website import from your computer:
 
 - Open `https://gridassetlink.dev/dashboard?drawer=scale`.
-- Use `Use website backend` as the GIS API source.
+- In `Import target for local files`, choose `Import into website` to send selected files to the hosted API, or choose `Import into local PostGIS` to use the hosted app shell with a local API/database on this computer.
 - Choose a service territory GeoJSON or public road centerline GeoJSON file from your computer.
 - Use `Upload boundary file` or `Upload road file`. The browser sends the file to the configured website API, which imports it into managed PostGIS when `DATABASE_URL` is configured.
 - Use the upload workflow for boundary and public road-reference inputs, then queue synthetic generation. Do not upload raw 10M pole inventories, tile caches, relay/protection settings, private fiber routes, or CEII-restricted records through the browser.
 - The API also exposes multipart endpoints at `POST /api/service-territories/import-geojson-file` and `POST /api/road-centerlines/import-geojson-file`.
+- The drawer deliberately keeps only health, territory, job, and summary state in React. Generated poles, spans, splices, handholes, mux sites, fibers, and carried services must be browsed through server-side vector tiles and click-detail APIs.
 
 Generation preflight estimates clipped eligible road mileage, synthetic pole/span totals, road placement classes, target-fill percentage, worker batch count, and warnings before the job is queued. Queueing a generation job now refuses territories with no eligible clipped public road centerlines.
 
@@ -218,9 +219,9 @@ Live website local GIS bridge:
 
 - Open `https://gridassetlink.dev/dashboard?drawer=scale`.
 - Start the local FastAPI backend against the local 10M PostGIS database, for example with `DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:55432/telecomne_grid_10m`.
-- In the dashboard `Scale` drawer, use `Connect local 10M API` or enter `http://127.0.0.1:8000` as the GIS API URL.
+- In the dashboard `Scale` drawer, choose `Import into local PostGIS`, click `Use local bridge`, or enter `http://127.0.0.1:8000` as the GIS API URL.
 - To connect immediately from a bookmark, open `https://gridassetlink.dev/dashboard?drawer=scale&gisSource=local`.
-- The browser will request vector tiles, paginated GIS search, and click-detail records directly from the local API while the app shell remains hosted at `gridassetlink.dev`.
+- The browser can upload service-territory and road-reference GeoJSON files to that local API from the `gridassetlink.dev` page, then request vector tiles, paginated GIS search, and click-detail records directly from the local API while the app shell remains hosted at `gridassetlink.dev`.
 - This does not upload the 10M database, generated tiles, or the local PostGIS data directory to Vercel. To host the 10M dataset fully in production, configure a managed PostgreSQL/PostGIS `DATABASE_URL` for the deployed backend and load the generated data there.
 
 Tile invalidation:
@@ -350,6 +351,26 @@ Synthetic fiber generation uses deterministic seeds:
 Public transmission-line data is used for map reference only. Synthetic substations, transmission structures, OPGW, strands, splices, patch panels, assignments, and telecom/fiber/circuit assets are demo planning records and do not represent real utility assets. This dashboard is not for operations, switching, dispatch, protection, restoration, SCADA, telecom routing, or CEII-restricted analysis.
 
 To replace or refresh the public source, provide a different public FeatureServer URL through `TRANSMISSION_LINES_FEATURESERVER_URL`, rerun `npm run data:map`, inspect the metadata file, and verify that only public, non-sensitive display fields are retained.
+
+## Design/Edit Mode
+
+Schema-driven map editing is available behind a feature flag:
+
+```bash
+NEXT_PUBLIC_ENABLE_MAP_EDITING=true
+```
+
+When enabled, the dashboard shows a **Design** drawer and an **Editable planning assets** layer. Admin/editor demo users can:
+
+- click the dashboard **Design Mode** button beside **In Service** and **Planned** to enable the editable planning asset layer and open Design/Edit tools;
+- define asset types with slug, display name, geometry type, field JSON, validation/search fields, map style JSON, active/archived state, and version metadata;
+- create, update, and archive database-backed records with Point, LineString, Polygon, or table-only geometry;
+- click the map with Design/Edit tools to place points, add line vertices, or add polygon vertices, then finish/cancel unsaved geometry before saving;
+- select existing editable records, redraw geometry, edit attributes in a schema-generated form, save changes, or archive records with confirmation;
+- search, select, and zoom to schema-backed records on the MapLibre map;
+- review event history through `/api/design-assets/records/{id}/events`.
+
+Backend routes live under `/api/design-assets`. The seeded demo types are `planning-marker`, `fiber-design-span`, and `planning-work-zone`, and all seeded records are synthetic/demo planning data only. Do not enter real CEII, SCADA, relay/protection, operational telecom, credentials, private fiber-route data, or engineering-critical settings into Design/Edit mode.
 
 ## MVP Status
 

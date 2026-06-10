@@ -317,6 +317,24 @@ function detailRecordForSelection(selection: StreetMapSelection): Record<string,
       scaleModel: "Low zooms render density/cluster records; individual poles appear only at street zoom and fetch details on click.",
     };
   }
+  if (selection.kind === "design_asset_record") {
+    return {
+      id: selection.record.id,
+      recordKey: selection.record.record_key,
+      displayLabel: selection.record.display_label,
+      assetType: selection.record.asset_type_display_name || selection.record.asset_type_slug,
+      geometryType: selection.record.geometry_type,
+      status: selection.record.status,
+      source: selection.record.source,
+      visibility: selection.record.visibility,
+      version: selection.record.version,
+      properties: selection.record.properties || selection.record.properties_json,
+      notes: selection.record.notes,
+      createdAt: selection.record.created_at,
+      updatedAt: selection.record.updated_at,
+      warning: "Schema-backed editable planning record. Synthetic/demo data only.",
+    };
+  }
   return selection.record as Record<string, unknown>;
 }
 
@@ -342,6 +360,7 @@ function detailBadgesForSelection(selection: StreetMapSelection) {
   if (selection.kind === "distribution_fiber_assignment") return ["Distribution assignment", "Synthetic"];
   if (selection.kind === "gis_pole") return ["PostGIS", "Vector tile", "Click-loaded"];
   if (selection.kind === "gis_vector_asset") return ["PostGIS", "Vector tile"];
+  if (selection.kind === "design_asset_record") return ["Editable", "Schema-backed", "Synthetic/demo"];
   if (selection.kind === "patch_panel") return ["Synthetic panel", "Demo"];
   return [];
 }
@@ -368,6 +387,7 @@ function detailNoticeForSelection(selection: StreetMapSelection) {
   if (selection.kind === "distribution_fiber_assignment") return "Synthetic distribution fiber service assignment. It does not represent an actual SCADA, protection, telecom, or private fiber route.";
   if (selection.kind === "gis_pole") return "Synthetic GIS-scale pole/support structure served through PostGIS vector tiles. The browser receives only minimal tile fields until this detail panel is opened.";
   if (selection.kind === "gis_vector_asset") return "Synthetic GIS-scale planning asset served through a vector tile. Use server-side search, trace, and detail endpoints for full records.";
+  if (selection.kind === "design_asset_record") return "Schema-backed editable planning asset. Use only synthetic/demo data and keep CEII, SCADA, relay/protection, operational telecom, and private fiber-route data out of this demo.";
   if (selection.kind === "patch_panel") return "Synthetic patch panel and termination ports for demo planning.";
   return "";
 }

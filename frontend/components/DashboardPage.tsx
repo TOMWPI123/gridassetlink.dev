@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Upload, Workflow } from "lucide-react";
+import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, PencilRuler, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Upload, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { appNavGroups } from "@/components/navigation";
 import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
@@ -21,7 +21,9 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type ContinuityHighlight, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, DesignAssetField, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+
+const MAP_EDITING_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MAP_EDITING === "true";
 
 const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   publicTransmissionLines: true,
@@ -65,6 +67,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   circuitEndpoints: false,
   workOrderLocations: false,
   proposedChanges: false,
+  designAssets: false,
   missingLocationAssets: false,
   planningRegions: false,
   isoNeReferenceOverlays: false,
@@ -96,10 +99,11 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   compareSpliceLayers: false,
   spliceClosures: true,
   availableStrandCapacity: true,
+  designAssets: MAP_EDITING_ENABLED,
 };
 
 type MapStatus = "loading" | "active" | "error";
-type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "scale" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor";
+type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "scale" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor" | "design";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
 type DashboardOperatingMode = "in_service" | "planned";
 type DashboardLayerSummary = {
@@ -172,6 +176,7 @@ type DashboardSearchLayer =
   | "distributionFiberAssignments"
   | "patchPanels"
   | "syntheticSubstations"
+  | "designAssets"
   | "editablePlanning";
 
 const searchLayerOptions: Array<{ value: DashboardSearchLayer; label: string; kinds: StreetMapSelection["kind"][] }> = [
@@ -196,6 +201,7 @@ const searchLayerOptions: Array<{ value: DashboardSearchLayer; label: string; ki
   { value: "distributionFiberAssignments", label: "Distribution fiber assignments", kinds: ["distribution_fiber_assignment"] },
   { value: "patchPanels", label: "Patch panels", kinds: ["patch_panel"] },
   { value: "syntheticSubstations", label: "Synthetic substations", kinds: ["synthetic_substation"] },
+  { value: "designAssets", label: "Editable planning assets", kinds: ["design_asset_record"] },
   { value: "editablePlanning", label: "Editable planning assets", kinds: ["substation", "node", "transmission_line", "work_order"] },
 ];
 
@@ -241,6 +247,7 @@ export function DashboardPage() {
   const [transmissionLines] = useState(seedTransmissionLines);
   const [planningRegions] = useState(seedPlanningRegions);
   const [activeTool, setActiveTool] = useState<MapDrawingTool>("select");
+  const [designModeEnabled, setDesignModeEnabled] = useState(MAP_EDITING_ENABLED);
   const [selectedAsset, setSelectedAsset] = useState<StreetMapSelection | null>(null);
   const [draftSubstation, setDraftSubstation] = useState<Substation | null>(null);
   const [draftNode, setDraftNode] = useState<MapNode | null>(null);
@@ -294,7 +301,14 @@ export function DashboardPage() {
   const [distributionFiberAssignments, setDistributionFiberAssignments] = useState<DistributionFiberAssignmentFeature[]>([]);
   const [mapDataWarnings, setMapDataWarnings] = useState<Record<string, string>>({});
   const [serverGisSearchResults, setServerGisSearchResults] = useState<StreetMapSelection[]>([]);
+  const [designAssetTypes, setDesignAssetTypes] = useState<DesignAssetType[]>([]);
+  const [designAssetRecords, setDesignAssetRecords] = useState<DesignAssetRecord[]>([]);
+  const [selectedDesignAssetTypeSlug, setSelectedDesignAssetTypeSlug] = useState("");
+  const [pendingDesignGeometry, setPendingDesignGeometry] = useState<DesignAssetGeoJsonGeometry | null>(null);
+  const [designDrawingCoordinates, setDesignDrawingCoordinates] = useState<Coordinate[]>([]);
+  const [designAssetMessage, setDesignAssetMessage] = useState("");
   const [gisApiBase, setGisApiBase] = useState(API_BASE);
+  const designFeaturesEnabled = MAP_EDITING_ENABLED || designModeEnabled;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -440,6 +454,23 @@ export function DashboardPage() {
     };
   }, []);
 
+  const loadDesignAssets = useCallback(async () => {
+    if (!designFeaturesEnabled) return;
+    try {
+      const payload = await fetchFromApiBase<DesignAssetMapPayload>(API_BASE, "/api/design-assets/map-records");
+      setDesignAssetTypes(payload.asset_types || []);
+      setDesignAssetRecords(payload.records || []);
+      setSelectedDesignAssetTypeSlug((current) => current || payload.asset_types?.[0]?.slug || "");
+      setDesignAssetMessage(payload.synthetic_data_notice || "Design/Edit mode uses synthetic/demo planning records only.");
+    } catch (error) {
+      setDesignAssetMessage(error instanceof Error ? error.message : String(error));
+    }
+  }, [designFeaturesEnabled]);
+
+  useEffect(() => {
+    void loadDesignAssets();
+  }, [loadDesignAssets]);
+
   useEffect(() => {
     const query = search.trim();
     if (query.length < 2) {
@@ -473,7 +504,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
-    if (drawer && ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments"].includes(drawer)) {
+    if (drawer && ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "design"].includes(drawer)) {
       setRightMode(drawer as RightDrawerMode);
       setRightCollapsed(false);
     }
@@ -569,6 +600,39 @@ export function DashboardPage() {
     () => patchPanels.filter((panel) => panel.synthetic),
     [patchPanels],
   );
+  const visibleDesignAssetRecords = useMemo(
+    () => designFeaturesEnabled ? designAssetRecords.filter((record) => record.status !== "archived") : [],
+    [designAssetRecords, designFeaturesEnabled],
+  );
+  const activeDesignAssetType = useMemo(
+    () => designAssetTypes.find((item) => item.slug === selectedDesignAssetTypeSlug) || designAssetTypes[0],
+    [designAssetTypes, selectedDesignAssetTypeSlug],
+  );
+  const visibleDesignAssetMapRecords = useMemo(() => {
+    if (!designFeaturesEnabled || !pendingDesignGeometry || !activeDesignAssetType || !geometryTypeMatchesDesignGeometry(activeDesignAssetType.geometry_type, pendingDesignGeometry)) {
+      return visibleDesignAssetRecords;
+    }
+    const draftRecord: DesignAssetRecord = {
+      id: -1,
+      asset_type_id: activeDesignAssetType.id,
+      asset_type_slug: activeDesignAssetType.slug,
+      asset_type_display_name: activeDesignAssetType.display_name,
+      record_key: "unsaved-design-draft",
+      display_label: `Unsaved ${activeDesignAssetType.display_name}`,
+      geometry_type: activeDesignAssetType.geometry_type,
+      geometry: pendingDesignGeometry,
+      geometry_json: pendingDesignGeometry,
+      properties: { owner: "Synthetic planning owner", draft: true },
+      properties_json: { owner: "Synthetic planning owner", draft: true },
+      map_style: activeDesignAssetType.map_style || activeDesignAssetType.map_style_json || { color: "#f5c451", lineWidth: 4, radius: 9, fillOpacity: 0.16 },
+      status: "proposed",
+      source: "synthetic_demo_draft",
+      visibility: "synthetic-demo",
+      version: 0,
+      notes: "Unsaved Design/Edit geometry preview.",
+    };
+    return [draftRecord, ...visibleDesignAssetRecords];
+  }, [activeDesignAssetType, designFeaturesEnabled, pendingDesignGeometry, visibleDesignAssetRecords]);
   const visibleFiberAssignments = useMemo(
     () => fiberAssignments.filter((assignment) => assignment.synthetic),
     [fiberAssignments],
@@ -794,8 +858,9 @@ export function DashboardPage() {
       nodeCount: visibleNodes.length,
       transmissionLineCount: visibleTransmissionLines.length,
       workOrderLocationCount: availableWorkOrderIds.length,
+      designAssetRecordCount: visibleDesignAssetRecords.length,
     }),
-    [estimatedDistributionPoleScale, fiberStrands.length, layerFilteredFccMicrowaveLinks.length, layerFilteredFccUtilityTowers.length, layerFilteredPublicSubstations.length, layerFilteredPublicTransmissionLines.length, layerFilteredSpliceClosures.length, layerFilteredTransmissionStructures.length, opgwPlanningMetrics.assumedRouteCount, opgwPlanningMetrics.availableStrands, opgwPlanningMetrics.criticalRidingCircuits, opgwPlanningMetrics.openWorkOrders, opgwPlanningMetrics.outageImpactCount, opgwPlanningMetrics.plannedRouteCount, opgwPlanningMetrics.spanInspectionIssues, opgwPlanningMetrics.verifiedRouteCount, streetLayers, visibleDistributionFiberAssignments.length, visibleDistributionPoleDensity.length, visibleDistributionPoleFiberRoutes.length, visibleDistributionPoles.length, visibleDistributionSlackLoops.length, visibleDistributionSplicePoints.length, visibleFccMicrowaveLinks.length, visibleFccUtilityTowers.length, visibleFiberAssignments.length, visibleNodes.length, visibleOpgwCableSections.length, visibleOpgwCables.length, visibleOpgwRoutes.length, visibleOpgwSpanSegments.length, visibleOpgwSplicePoints.length, visiblePatchPanels.length, visiblePublicSubstations.length, visiblePublicTransmissionLines.length, visibleSpliceClosures.length, visibleSyntheticSubstations.length, visibleTransmissionLines.length, visibleTransmissionStructures.length],
+    [estimatedDistributionPoleScale, fiberStrands.length, layerFilteredFccMicrowaveLinks.length, layerFilteredFccUtilityTowers.length, layerFilteredPublicSubstations.length, layerFilteredPublicTransmissionLines.length, layerFilteredSpliceClosures.length, layerFilteredTransmissionStructures.length, opgwPlanningMetrics.assumedRouteCount, opgwPlanningMetrics.availableStrands, opgwPlanningMetrics.criticalRidingCircuits, opgwPlanningMetrics.openWorkOrders, opgwPlanningMetrics.outageImpactCount, opgwPlanningMetrics.plannedRouteCount, opgwPlanningMetrics.spanInspectionIssues, opgwPlanningMetrics.verifiedRouteCount, streetLayers, visibleDesignAssetRecords.length, visibleDistributionFiberAssignments.length, visibleDistributionPoleDensity.length, visibleDistributionPoleFiberRoutes.length, visibleDistributionPoles.length, visibleDistributionSlackLoops.length, visibleDistributionSplicePoints.length, visibleFccMicrowaveLinks.length, visibleFccUtilityTowers.length, visibleFiberAssignments.length, visibleNodes.length, visibleOpgwCableSections.length, visibleOpgwCables.length, visibleOpgwRoutes.length, visibleOpgwSpanSegments.length, visibleOpgwSplicePoints.length, visiblePatchPanels.length, visiblePublicSubstations.length, visiblePublicTransmissionLines.length, visibleSpliceClosures.length, visibleSyntheticSubstations.length, visibleTransmissionLines.length, visibleTransmissionStructures.length],
   );
 
   const summaryCards = useMemo(
@@ -822,8 +887,8 @@ export function DashboardPage() {
     [visibleFccMicrowaveLinks, visibleFccUtilityTowers, visiblePublicSubstations, visiblePublicTransmissionLines],
   );
   const rawSearchResults = useMemo(
-    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, layerFilteredPublicTransmissionLines, layerFilteredPublicSubstations, layerFilteredFccUtilityTowers, layerFilteredFccMicrowaveLinks, visibleSyntheticSubstations, layerFilteredTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, layerFilteredSpliceClosures, visibleFiberAssignments, layerFilteredDistributionPoleDensity, layerFilteredDistributionPoles, layerFilteredDistributionFiberRoutes, layerFilteredDistributionSplicePoints, layerFilteredDistributionSlackLoops, layerFilteredDistributionFiberAssignments, visiblePatchPanels, search),
-    [layerFilteredDistributionFiberAssignments, layerFilteredDistributionFiberRoutes, layerFilteredDistributionPoleDensity, layerFilteredDistributionPoles, layerFilteredDistributionSlackLoops, layerFilteredDistributionSplicePoints, layerFilteredFccMicrowaveLinks, layerFilteredFccUtilityTowers, layerFilteredPublicSubstations, layerFilteredPublicTransmissionLines, layerFilteredSpliceClosures, layerFilteredTransmissionStructures, search, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
+    () => buildSearchResults(visibleSubstations, visibleNodes, visibleTransmissionLines, layerFilteredPublicTransmissionLines, layerFilteredPublicSubstations, layerFilteredFccUtilityTowers, layerFilteredFccMicrowaveLinks, visibleSyntheticSubstations, layerFilteredTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, layerFilteredSpliceClosures, visibleFiberAssignments, layerFilteredDistributionPoleDensity, layerFilteredDistributionPoles, layerFilteredDistributionFiberRoutes, layerFilteredDistributionSplicePoints, layerFilteredDistributionSlackLoops, layerFilteredDistributionFiberAssignments, visiblePatchPanels, visibleDesignAssetRecords, search),
+    [layerFilteredDistributionFiberAssignments, layerFilteredDistributionFiberRoutes, layerFilteredDistributionPoleDensity, layerFilteredDistributionPoles, layerFilteredDistributionSlackLoops, layerFilteredDistributionSplicePoints, layerFilteredFccMicrowaveLinks, layerFilteredFccUtilityTowers, layerFilteredPublicSubstations, layerFilteredPublicTransmissionLines, layerFilteredSpliceClosures, layerFilteredTransmissionStructures, search, visibleDesignAssetRecords, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines],
   );
   const layerScopedSearchResults = useMemo(
     () => rawSearchResults.filter((selection) => matchesSearchLayer(selection, searchLayerFilter)),
@@ -862,6 +927,89 @@ export function DashboardPage() {
     showToast(`Created private transmission map "${map.name}".`);
   }
 
+  function beginDesignDrawing(geometryType: DesignAssetGeometryType) {
+    if (!designFeaturesEnabled) {
+      setDesignModeEnabled(true);
+      setStreetLayers((current) => ({ ...current, designAssets: true }));
+      setRightMode("design");
+      setRightCollapsed(false);
+      showToast("Design Mode enabled. Choose a schema type, then draw on the map.");
+      return;
+    }
+    if (geometryType === "table_only") {
+      showToast("Table-only design assets do not have map geometry.");
+      return;
+    }
+    const currentType = designAssetTypes.find((item) => item.slug === selectedDesignAssetTypeSlug);
+    const compatibleType = currentType?.geometry_type === geometryType
+      ? currentType
+      : designAssetTypes.find((item) => item.geometry_type === geometryType && item.status === "active");
+    if (!compatibleType) {
+      setRightMode("design");
+      setRightCollapsed(false);
+      showToast(`Create or select a ${geometryType} asset type before drawing.`);
+      return;
+    }
+    setSelectedDesignAssetTypeSlug(compatibleType.slug);
+    setPendingDesignGeometry(null);
+    setDesignDrawingCoordinates([]);
+    setStreetLayers((current) => ({ ...current, designAssets: true }));
+    setRightMode("design");
+    setRightCollapsed(false);
+    setActiveTool(designToolForGeometryType(geometryType));
+    showToast(geometryType === "point" ? "Click the map to place or move this editable point." : `Click the map to add ${geometryType} vertices, then finish drawing in the Design drawer.`);
+  }
+
+  function cancelDesignDraft() {
+    setPendingDesignGeometry(null);
+    setDesignDrawingCoordinates([]);
+    if (isDesignDrawingTool(activeTool)) setActiveTool("select");
+    showToast("Canceled unsaved Design/Edit geometry.");
+  }
+
+  function finishDesignDrawing() {
+    if (!pendingDesignGeometry) {
+      showToast("No Design/Edit geometry is staged yet.");
+      return;
+    }
+    setActiveTool("select");
+    setDesignAssetMessage("Geometry staged. Review attributes and save the record.");
+    showToast("Design/Edit geometry staged. Review attributes and save.");
+  }
+
+  function startNewDesignRecord() {
+    setSelectedAsset((current) => current?.kind === "design_asset_record" ? null : current);
+    setPendingDesignGeometry(null);
+    setDesignDrawingCoordinates([]);
+    if (isDesignDrawingTool(activeTool)) setActiveTool("select");
+    setRightMode("design");
+    setRightCollapsed(false);
+    showToast("Started a new editable planning asset.");
+  }
+
+  function stageDesignVertex(coordinate: Coordinate, geometryType: "line" | "polygon") {
+    const activeType = designAssetTypes.find((item) => item.slug === selectedDesignAssetTypeSlug) || designAssetTypes.find((item) => item.geometry_type === geometryType);
+    if (!activeType || activeType.geometry_type !== geometryType) {
+      setRightMode("design");
+      setRightCollapsed(false);
+      showToast(`Choose a ${geometryType} asset type in Design/Edit before drawing.`);
+      return;
+    }
+    const nextCoordinates = [...designDrawingCoordinates, coordinate];
+    setSelectedDesignAssetTypeSlug(activeType.slug);
+    setDesignDrawingCoordinates(nextCoordinates);
+    setStreetLayers((current) => ({ ...current, designAssets: true }));
+    setRightMode("design");
+    setRightCollapsed(false);
+    if (geometryType === "line") {
+      if (nextCoordinates.length >= 2) setPendingDesignGeometry({ type: "LineString", coordinates: nextCoordinates });
+      showToast(nextCoordinates.length >= 2 ? `${nextCoordinates.length} line vertices staged. Finish drawing when ready.` : "First line vertex staged. Click at least one more point.");
+      return;
+    }
+    if (nextCoordinates.length >= 3) setPendingDesignGeometry({ type: "Polygon", coordinates: [closedCoordinateRing(nextCoordinates)] });
+    showToast(nextCoordinates.length >= 3 ? `${nextCoordinates.length} polygon vertices staged. Finish drawing when ready.` : `Polygon vertex ${nextCoordinates.length} staged. Add at least ${3 - nextCoordinates.length} more.`);
+  }
+
   function handleMapClick(coordinate: Coordinate) {
     if (activeTool === "add_substation") {
       setDraftSubstation(createSubstationDraft(coordinate));
@@ -877,6 +1025,31 @@ export function DashboardPage() {
     }
     if (activeTool === "place_missing" && placementTarget) {
       placeMissingAsset(coordinate);
+      return;
+    }
+    if (activeTool === "draw_design_point") {
+      const activeType = designAssetTypes.find((item) => item.slug === selectedDesignAssetTypeSlug) || designAssetTypes.find((item) => item.geometry_type === "point");
+      if (!activeType || activeType.geometry_type !== "point") {
+        setRightMode("design");
+        setRightCollapsed(false);
+        showToast("Choose a point asset type in Design/Edit before placing a point.");
+        return;
+      }
+      setSelectedDesignAssetTypeSlug(activeType.slug);
+      setPendingDesignGeometry({ type: "Point", coordinates: coordinate });
+      setStreetLayers((current) => ({ ...current, designAssets: true }));
+      setRightMode("design");
+      setRightCollapsed(false);
+      setActiveTool("select");
+      showToast("Point geometry staged. Complete the schema-generated form.");
+      return;
+    }
+    if (activeTool === "draw_design_line") {
+      stageDesignVertex(coordinate, "line");
+      return;
+    }
+    if (activeTool === "draw_design_polygon") {
+      stageDesignVertex(coordinate, "polygon");
       return;
     }
     if (activeTool.startsWith("draw_") || activeTool.includes("geometry")) {
@@ -923,9 +1096,14 @@ export function DashboardPage() {
   }
 
   function focusSelection(selection: StreetMapSelection) {
+    if (selection.kind === "design_asset_record") {
+      setPendingDesignGeometry(null);
+      setDesignDrawingCoordinates([]);
+      if (isDesignDrawingTool(activeTool)) setActiveTool("select");
+    }
     setSelectedAsset(selection);
     setFocusRequest({ selection: focusTargetForSelection(selection), sequence: Date.now() });
-    setRightMode("details");
+    setRightMode(selection.kind === "design_asset_record" ? "design" : "details");
     setRightCollapsed(false);
   }
 
@@ -965,6 +1143,11 @@ export function DashboardPage() {
     }
     if (selection.kind === "gis_vector_asset") {
       setStreetLayers((current) => ({ ...current, distributionFiberRoutes: true, distributionFiberAssignments: true, distributionSplicePoints: true }));
+    }
+    if (selection.kind === "design_asset_record") {
+      setStreetLayers((current) => ({ ...current, designAssets: true }));
+      setRightMode("design");
+      setRightCollapsed(false);
     }
     focusSelection(selection);
     setSearch(selection.label);
@@ -1006,6 +1189,17 @@ export function DashboardPage() {
   }
 
   function handleMapSelect(selection: StreetMapSelection) {
+    if (selection.kind === "design_asset_record") {
+      setContinuityHighlight(undefined);
+      setPendingDesignGeometry(null);
+      setDesignDrawingCoordinates([]);
+      if (isDesignDrawingTool(activeTool)) setActiveTool("select");
+      setSelectedAsset(selection);
+      setStreetLayers((current) => ({ ...current, designAssets: true }));
+      setRightMode("design");
+      setRightCollapsed(false);
+      return;
+    }
     const nextHighlight = continuityHighlightForSelection(selection);
     if (nextHighlight) {
       setContinuityHighlight(nextHighlight);
@@ -1473,6 +1667,17 @@ export function DashboardPage() {
     issueMapCommand("resize");
   }
 
+  function handleDesignModeClick() {
+    setDesignModeEnabled(true);
+    setStreetLayers((current) => ({ ...current, designAssets: true }));
+    setRightMode("design");
+    setRightCollapsed(false);
+    setActiveTool("select");
+    void loadDesignAssets();
+    showToast("Design Mode enabled: editable planning assets, schema forms, and map drawing tools are available.");
+    issueMapCommand("resize");
+  }
+
   function handleTransmissionLineOwnerLayerChange(owner: string, enabled: boolean) {
     setVisibleTransmissionLineOwners((current) => ({ ...current, [owner]: enabled }));
     if (enabled) {
@@ -1645,6 +1850,7 @@ export function DashboardPage() {
         distributionSlackLoops={layerFilteredDistributionSlackLoops}
         distributionFiberAssignments={layerFilteredDistributionFiberAssignments}
         patchPanels={visiblePatchPanels}
+        designAssetRecords={streetLayers.designAssets ? visibleDesignAssetMapRecords : []}
         planningRegions={visiblePlanningRegions}
         layers={streetLayers}
         gisApiBase={gisApiBase}
@@ -1677,6 +1883,14 @@ export function DashboardPage() {
               {label}
             </button>
           ))}
+          <button
+            type="button"
+            className={designModeEnabled && rightMode === "design" ? "active design-mode" : "design-mode"}
+            onClick={handleDesignModeClick}
+          >
+            <PencilRuler size={12} />
+            Design Mode
+          </button>
         </div>
         <div className="dashboard-map-global-search-wrap">
           <div className="dashboard-map-global-search-shell">
@@ -1739,6 +1953,7 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "scale" ? "active" : ""} onClick={() => setRightMode("scale")}><Database size={14} />Scale</button>
               <button type="button" className={rightMode === "sources" ? "active" : ""} onClick={() => setRightMode("sources")}><TableProperties size={14} />Sources</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
+              {designFeaturesEnabled ? <button type="button" className={rightMode === "design" ? "active" : ""} onClick={handleDesignModeClick}><PencilRuler size={14} />Design</button> : null}
               <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
             </div>
             <div className="dashboard-drawer-body">
@@ -1796,6 +2011,7 @@ export function DashboardPage() {
                     distributionSplicePointCount={visibleDistributionSplicePoints.length}
                     distributionSlackLoopCount={visibleDistributionSlackLoops.length}
                     distributionFiberAssignmentCount={visibleDistributionFiberAssignments.length}
+                    designAssetCount={visibleDesignAssetRecords.length}
                     estimatedDistributionPoleScale={estimatedDistributionPoleScale}
                     availableStrandCount={opgwPlanningMetrics.availableStrands}
                     criticalRidingCircuitCount={opgwPlanningMetrics.criticalRidingCircuits}
@@ -1858,6 +2074,35 @@ export function DashboardPage() {
               ) : null}
               {rightMode === "sources" ? <DashboardDataSourcesPanel /> : null}
               {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} onClose={handleCloseAssetDetail} /> : null}
+              {rightMode === "design" ? (
+                <DesignEditDrawer
+                  enabled={designFeaturesEnabled}
+                  assetTypes={designAssetTypes}
+                  records={visibleDesignAssetRecords}
+                  selectedRecord={selectedAsset?.kind === "design_asset_record" ? selectedAsset.record : null}
+                  selectedTypeSlug={selectedDesignAssetTypeSlug}
+                  pendingGeometry={pendingDesignGeometry}
+                  activeTool={activeTool}
+                  drawingVertexCount={designDrawingCoordinates.length}
+                  message={designAssetMessage}
+                  onSelectedTypeSlugChange={setSelectedDesignAssetTypeSlug}
+                  onPendingGeometryChange={setPendingDesignGeometry}
+                  onBeginDrawing={beginDesignDrawing}
+                  onFinishDrawing={finishDesignDrawing}
+                  onCancelDraft={cancelDesignDraft}
+                  onNewRecord={startNewDesignRecord}
+                  onRefresh={loadDesignAssets}
+                  onSelectRecord={(record) => {
+                    const selection: StreetMapSelection = { kind: "design_asset_record", id: String(record.id), label: record.display_label || record.record_key, record };
+                    setPendingDesignGeometry(null);
+                    setDesignDrawingCoordinates([]);
+                    if (isDesignDrawingTool(activeTool)) setActiveTool("select");
+                    setSelectedAsset(selection);
+                    setFocusRequest({ selection, sequence: Date.now() });
+                  }}
+                  onNotify={showToast}
+                />
+              ) : null}
               {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} onUpdateStrands={updateFiberStrands} /> : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
               {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
@@ -2233,6 +2478,8 @@ function GisScaleControlPanel({
   const [message, setMessage] = useState("");
   const normalizedGisApiBase = normalizeApiBase(gisApiBase);
   const usingWebsiteBackend = normalizedGisApiBase === normalizeApiBase(API_BASE);
+  const usingLocalBridge = normalizedGisApiBase === normalizeApiBase(LOCAL_GIS_API_BASE);
+  const importTargetLabel = usingWebsiteBackend ? "website PostGIS backend" : usingLocalBridge ? "local computer API bridge" : "custom GIS API";
 
   const selectedTerritory = territories.find((territory) => String(territory.id) === selectedTerritoryId) || health?.territories?.find((territory) => String(territory.id) === selectedTerritoryId);
   const postgisReady = Boolean(health?.postgis_configured);
@@ -2507,12 +2754,48 @@ function GisScaleControlPanel({
         <p>Generated poles, spans, strand, splice, slack, handhole, mux, circuit, and fiber records are synthetic until explicitly imported and marked verified.</p>
       </div>
 
+      <div className="dashboard-gis-local-import-banner">
+        <div>
+          <strong>Import from this computer while using gridassetlink.dev</strong>
+          <span>Select GeoJSON files in this browser. The files go to the active GIS API target below; the map still reads poles, spans, splices, and routes through vector tiles instead of downloading raw inventories.</span>
+        </div>
+        <button type="button" onClick={() => onGisApiBaseChange(LOCAL_GIS_API_BASE)} disabled={Boolean(busy)}>
+          Use local bridge
+        </button>
+      </div>
+
       <div className="dashboard-gis-section">
-        <div className="dashboard-gis-section-title">Website import target</div>
+        <div className="dashboard-gis-section-title">Import target for local files</div>
+        <div className="dashboard-gis-import-choice-grid" role="group" aria-label="Choose where local files are imported">
+          <button
+            type="button"
+            className={`dashboard-gis-import-choice ${usingWebsiteBackend ? "active" : ""}`}
+            onClick={() => onGisApiBaseChange(API_BASE)}
+            disabled={Boolean(busy)}
+          >
+            <Upload size={15} />
+            <span>
+              <strong>Import into website</strong>
+              <small>Upload selected files to the gridassetlink.dev backend. Requires managed PostGIS on the deployed API.</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`dashboard-gis-import-choice ${usingLocalBridge ? "active" : ""}`}
+            onClick={() => onGisApiBaseChange(LOCAL_GIS_API_BASE)}
+            disabled={Boolean(busy)}
+          >
+            <Database size={15} />
+            <span>
+              <strong>Import into local PostGIS</strong>
+              <small>Use gridassetlink.dev as the app shell while files, tiles, search, and details point at this computer.</small>
+            </span>
+          </button>
+        </div>
         <article className="dashboard-gis-card">
-          <strong>{usingWebsiteBackend ? "Website backend" : "Advanced local bridge"}</strong>
+          <strong>Active target: {importTargetLabel}</strong>
           <span>{normalizedGisApiBase}</span>
-          <span>{usingWebsiteBackend ? "Files selected on this computer upload to the gridassetlink.dev backend and import into managed PostGIS when configured." : "Uploads and map tiles are pointed at this API source instead of the website backend."}</span>
+          <span>{usingWebsiteBackend ? "Files selected on this computer upload to the hosted backend and import into managed PostGIS when configured." : "Files selected on this computer upload to this API source. Keep that API running and allow browser CORS/private-network access from gridassetlink.dev."}</span>
         </article>
         <label className="dashboard-gis-field">
           <span>GIS API URL</span>
@@ -2521,10 +2804,16 @@ function GisScaleControlPanel({
         <div className="dashboard-gis-actions">
           <button type="button" onClick={() => onGisApiBaseChange(gisApiBaseDraft)} disabled={Boolean(busy)}>Use this source</button>
           <button type="button" onClick={onResetGisApiBase} disabled={Boolean(busy)}>Use website backend</button>
-          <button type="button" onClick={() => onGisApiBaseChange(LOCAL_GIS_API_BASE)} disabled={Boolean(busy)}>Advanced: local bridge</button>
+          <button type="button" onClick={() => onGisApiBaseChange(LOCAL_GIS_API_BASE)} disabled={Boolean(busy)}>Use local bridge</button>
           <button type="button" onClick={loadHealth} disabled={Boolean(busy)}>Test connection</button>
         </div>
-        <p className="dashboard-gis-message">Use the website backend to import GeoJSON files from this computer into the hosted GIS database. Use the local bridge only for private development or a database that intentionally stays on this machine.</p>
+        <ol className="dashboard-gis-step-list">
+          <li>Choose whether local files import into the website backend or a local API bridge.</li>
+          <li>Import a service territory GeoJSON, then import public road centerline GeoJSON.</li>
+          <li>Run preflight and queue generation; the worker writes synthetic assets into PostGIS in batches.</li>
+          <li>Enable GIS layers to browse the generated network through vector tiles.</li>
+        </ol>
+        <p className="dashboard-gis-message">Do not upload a raw 10M-pole inventory file through the browser. Upload only territory and public road-reference inputs, then generate synthetic poles server-side.</p>
       </div>
 
       <div className="dashboard-gis-status-grid">
@@ -3299,6 +3588,377 @@ function FiberAssignmentPlanner({
   );
 }
 
+function DesignEditDrawer({
+  enabled,
+  assetTypes,
+  records,
+  selectedRecord,
+  selectedTypeSlug,
+  pendingGeometry,
+  activeTool,
+  drawingVertexCount,
+  message,
+  onSelectedTypeSlugChange,
+  onPendingGeometryChange,
+  onBeginDrawing,
+  onFinishDrawing,
+  onCancelDraft,
+  onNewRecord,
+  onRefresh,
+  onSelectRecord,
+  onNotify,
+}: {
+  enabled: boolean;
+  assetTypes: DesignAssetType[];
+  records: DesignAssetRecord[];
+  selectedRecord: DesignAssetRecord | null;
+  selectedTypeSlug: string;
+  pendingGeometry: DesignAssetGeoJsonGeometry | null;
+  activeTool: MapDrawingTool;
+  drawingVertexCount: number;
+  message: string;
+  onSelectedTypeSlugChange: (slug: string) => void;
+  onPendingGeometryChange: (geometry: DesignAssetGeoJsonGeometry | null) => void;
+  onBeginDrawing: (geometryType: DesignAssetGeometryType) => void;
+  onFinishDrawing: () => void;
+  onCancelDraft: () => void;
+  onNewRecord: () => void;
+  onRefresh: () => Promise<void>;
+  onSelectRecord: (record: DesignAssetRecord) => void;
+  onNotify: (message: string) => void;
+}) {
+  const [mode, setMode] = useState<"record" | "type">("record");
+  const [recordKey, setRecordKey] = useState("");
+  const [displayLabel, setDisplayLabel] = useState("");
+  const [recordStatus, setRecordStatus] = useState<DesignAssetRecord["status"]>("proposed");
+  const [notes, setNotes] = useState("");
+  const [propertiesDraft, setPropertiesDraft] = useState<Record<string, string>>({});
+  const [geometryText, setGeometryText] = useState("");
+  const [assetSlug, setAssetSlug] = useState("");
+  const [assetDisplayName, setAssetDisplayName] = useState("");
+  const [assetDescription, setAssetDescription] = useState("");
+  const [assetGeometryType, setAssetGeometryType] = useState<DesignAssetGeometryType>("point");
+  const [assetFieldsText, setAssetFieldsText] = useState(defaultDesignAssetFieldsText());
+  const [assetStyleText, setAssetStyleText] = useState(JSON.stringify({ color: "#55d6ff", radius: 8, lineWidth: 3, fillOpacity: 0.18 }, null, 2));
+  const [busy, setBusy] = useState("");
+  const [localMessage, setLocalMessage] = useState("");
+  const activeType = assetTypes.find((item) => item.slug === selectedTypeSlug) || assetTypes[0];
+  const fields = activeType?.fields_json?.length ? activeType.fields_json : activeType?.fields || [];
+  const drawingForActiveType = Boolean(activeType && activeType.geometry_type !== "table_only" && activeTool === designToolForGeometryType(activeType.geometry_type));
+  const pendingGeometryMatches = Boolean(activeType && pendingGeometry && geometryTypeMatchesDesignGeometry(activeType.geometry_type, pendingGeometry));
+
+  useEffect(() => {
+    if (!activeType && assetTypes[0]) onSelectedTypeSlugChange(assetTypes[0].slug);
+  }, [activeType, assetTypes, onSelectedTypeSlugChange]);
+
+  useEffect(() => {
+    if (selectedRecord) {
+      if (selectedRecord.asset_type_slug) onSelectedTypeSlugChange(selectedRecord.asset_type_slug);
+      setRecordKey(selectedRecord.record_key);
+      setDisplayLabel(selectedRecord.display_label);
+      setRecordStatus(selectedRecord.status);
+      setNotes(selectedRecord.notes || "");
+      setPropertiesDraft(propertiesToFieldDraft(fields, selectedRecord.properties || selectedRecord.properties_json || {}));
+      setGeometryText(selectedRecord.geometry || selectedRecord.geometry_json ? JSON.stringify(selectedRecord.geometry || selectedRecord.geometry_json, null, 2) : "");
+      return;
+    }
+    if (!activeType) return;
+    const defaults = defaultPropertiesForFields(fields);
+    setRecordKey(`${activeType.slug}-${Date.now().toString(36)}`);
+    setDisplayLabel(`${activeType.display_name} planning record`);
+    setRecordStatus("proposed");
+    setNotes("Synthetic/demo planning record only.");
+    setPropertiesDraft(defaults);
+    setGeometryText(defaultGeometryTextForType(activeType.geometry_type, pendingGeometry));
+  }, [activeType, fields, onSelectedTypeSlugChange, selectedRecord]);
+
+  useEffect(() => {
+    if (!activeType || !pendingGeometry || !geometryTypeMatchesDesignGeometry(activeType.geometry_type, pendingGeometry)) return;
+    setGeometryText(JSON.stringify(pendingGeometry, null, 2));
+  }, [activeType, pendingGeometry]);
+
+  if (!enabled) {
+    return (
+      <section className="dashboard-design-panel">
+        <div className="dashboard-panel-heading">
+          <PencilRuler size={16} />
+          <div><strong>Design/Edit mode</strong><span>Feature flag disabled</span></div>
+        </div>
+        <p className="dashboard-gis-message">Set <code>NEXT_PUBLIC_ENABLE_MAP_EDITING=true</code> to enable schema-backed editing.</p>
+      </section>
+    );
+  }
+
+  async function createAssetType() {
+    setBusy("Creating asset type");
+    try {
+      const fieldsPayload = JSON.parse(assetFieldsText) as DesignAssetField[];
+      const stylePayload = JSON.parse(assetStyleText) as Record<string, unknown>;
+      const payload = await fetchFromApiBase<DesignAssetType>(API_BASE, "/api/design-assets/asset-types", {
+        method: "POST",
+        body: JSON.stringify({
+          slug: assetSlug,
+          display_name: assetDisplayName,
+          description: assetDescription,
+          geometry_type: assetGeometryType,
+          fields: fieldsPayload,
+          searchable_fields: fieldsPayload.map((field) => field.name),
+          map_style: stylePayload,
+          status: "active",
+        }),
+      });
+      onSelectedTypeSlugChange(payload.slug);
+      await onRefresh();
+      setLocalMessage(`Created asset type ${payload.display_name}.`);
+      onNotify(`Created schema type ${payload.display_name}.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function saveRecord() {
+    if (!activeType) {
+      setLocalMessage("Create or select an asset type first.");
+      return;
+    }
+    setBusy(selectedRecord ? "Updating record" : "Creating record");
+    try {
+      const geometry = activeType.geometry_type === "table_only" ? null : JSON.parse(geometryText) as DesignAssetGeoJsonGeometry;
+      const payload = await fetchFromApiBase<DesignAssetRecord>(API_BASE, selectedRecord ? `/api/design-assets/records/${selectedRecord.id}` : "/api/design-assets/records", {
+        method: selectedRecord ? "PUT" : "POST",
+        body: JSON.stringify({
+          asset_type_slug: activeType.slug,
+          record_key: recordKey,
+          display_label: displayLabel,
+          status: recordStatus,
+          properties: fieldDraftToProperties(fields, propertiesDraft),
+          geometry,
+          source: "synthetic_demo",
+          visibility: "synthetic-demo",
+          notes,
+        }),
+      });
+      await onRefresh();
+      onPendingGeometryChange(null);
+      onSelectRecord(payload);
+      setLocalMessage(`Saved ${payload.display_label}.`);
+      onNotify(`Saved editable planning asset ${payload.display_label}.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function archiveRecord() {
+    if (!selectedRecord) return;
+    if (!window.confirm(`Archive ${selectedRecord.display_label}?`)) return;
+    setBusy("Archiving record");
+    try {
+      await fetchFromApiBase<DesignAssetRecord>(API_BASE, `/api/design-assets/records/${selectedRecord.id}`, { method: "DELETE" });
+      await onRefresh();
+      setLocalMessage(`Archived ${selectedRecord.display_label}.`);
+      onNotify(`Archived editable planning asset ${selectedRecord.display_label}.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function updateProperty(fieldName: string, value: string) {
+    setPropertiesDraft((current) => ({ ...current, [fieldName]: value }));
+  }
+
+  return (
+    <section className="dashboard-design-panel" aria-label="Schema-backed Design/Edit mode">
+      <div className="dashboard-panel-heading">
+        <PencilRuler size={16} />
+        <div>
+          <strong>Design/Edit mode</strong>
+          <span>Schema-backed synthetic planning records</span>
+        </div>
+      </div>
+      <div className="dashboard-source-boundary">
+        <p>This editor is for synthetic/demo planning records only. Do not enter CEII, SCADA, relay, protection, telecom, operational access, or private fiber-route data.</p>
+      </div>
+      <div className="dashboard-design-tabs">
+        <button type="button" className={mode === "record" ? "active" : ""} onClick={() => setMode("record")}>Records</button>
+        <button type="button" className={mode === "type" ? "active" : ""} onClick={() => setMode("type")}>Type Designer</button>
+      </div>
+
+      {mode === "type" ? (
+        <div className="dashboard-design-form">
+          <label><span>Slug</span><input value={assetSlug} onChange={(event) => setAssetSlug(event.currentTarget.value)} placeholder="custom-planning-asset" /></label>
+          <label><span>Display name</span><input value={assetDisplayName} onChange={(event) => setAssetDisplayName(event.currentTarget.value)} placeholder="Custom planning asset" /></label>
+          <label><span>Description</span><textarea value={assetDescription} onChange={(event) => setAssetDescription(event.currentTarget.value)} /></label>
+          <label><span>Geometry type</span><select value={assetGeometryType} onChange={(event) => setAssetGeometryType(event.currentTarget.value as DesignAssetGeometryType)}>
+            {["point", "line", "polygon", "table_only"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select></label>
+          <label><span>Fields JSON</span><textarea value={assetFieldsText} onChange={(event) => setAssetFieldsText(event.currentTarget.value)} /></label>
+          <label><span>Map style JSON</span><textarea value={assetStyleText} onChange={(event) => setAssetStyleText(event.currentTarget.value)} /></label>
+          <button className="telecom-map-button full-width" type="button" onClick={() => void createAssetType()} disabled={Boolean(busy)}>Create asset type</button>
+        </div>
+      ) : (
+        <div className="dashboard-design-form">
+          <label><span>Asset type</span><select value={activeType?.slug || ""} onChange={(event) => onSelectedTypeSlugChange(event.currentTarget.value)}>
+            {assetTypes.map((assetType) => <option key={assetType.slug} value={assetType.slug}>{assetType.display_name}</option>)}
+          </select></label>
+          <div className="dashboard-gis-actions">
+            <button type="button" onClick={onNewRecord}>New record</button>
+            {activeType?.geometry_type !== "table_only" ? <button type="button" onClick={() => activeType ? onBeginDrawing(activeType.geometry_type) : setLocalMessage("Select an asset type first.")}>{selectedRecord ? "Redraw geometry" : `Draw ${activeType?.geometry_type || "geometry"}`}</button> : null}
+            {drawingForActiveType ? <button type="button" onClick={onFinishDrawing}>Finish drawing</button> : null}
+            {pendingGeometry || drawingForActiveType ? <button type="button" onClick={onCancelDraft}>Cancel unsaved geometry</button> : null}
+            <button type="button" onClick={() => void onRefresh()} disabled={Boolean(busy)}>Refresh</button>
+          </div>
+          {drawingForActiveType ? (
+            <div className="dashboard-design-drawing-status">
+              <strong>{activeType?.geometry_type === "polygon" ? "Polygon drawing" : activeType?.geometry_type === "line" ? "Line drawing" : "Point placement"}</strong>
+              <span>{activeType?.geometry_type === "point" ? "Click the map to place or move the point." : `${drawingVertexCount} vertex${drawingVertexCount === 1 ? "" : "es"} staged. ${activeType?.geometry_type === "polygon" ? "Three vertices are required before save." : "Two vertices are required before save."}`}</span>
+            </div>
+          ) : null}
+          {pendingGeometryMatches ? <p className="dashboard-gis-message">Unsaved geometry is staged on the map. Save the record to persist it, or cancel to discard it.</p> : null}
+          <div className="dashboard-design-record-list">
+            {records.slice(0, 8).map((record) => (
+              <button type="button" key={record.id} className={selectedRecord?.id === record.id ? "active" : ""} onClick={() => onSelectRecord(record)}>
+                <strong>{record.display_label}</strong>
+                <span>{record.asset_type_display_name || record.asset_type_slug} / {record.status}</span>
+              </button>
+            ))}
+          </div>
+          <label><span>Record key</span><input value={recordKey} onChange={(event) => setRecordKey(event.currentTarget.value)} /></label>
+          <label><span>Display label</span><input value={displayLabel} onChange={(event) => setDisplayLabel(event.currentTarget.value)} /></label>
+          <label><span>Status</span><select value={recordStatus} onChange={(event) => setRecordStatus(event.currentTarget.value as DesignAssetRecord["status"])}>
+            {["proposed", "planned", "in_review", "active", "as_built", "archived"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select></label>
+          <div className="dashboard-design-fields">
+            {fields.map((field) => <DesignFieldInput key={field.name} field={field} value={propertiesDraft[field.name] || ""} onChange={(value) => updateProperty(field.name, value)} />)}
+          </div>
+          {activeType?.geometry_type !== "table_only" ? <label><span>Geometry GeoJSON</span><textarea value={geometryText} onChange={(event) => setGeometryText(event.currentTarget.value)} /></label> : null}
+          <label><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.currentTarget.value)} /></label>
+          <div className="dashboard-gis-actions">
+            <button className="telecom-map-button" type="button" onClick={() => void saveRecord()} disabled={Boolean(busy) || !activeType}>Save record</button>
+            {selectedRecord ? <button type="button" onClick={() => void archiveRecord()} disabled={Boolean(busy)}>Archive</button> : null}
+          </div>
+        </div>
+      )}
+      {message || localMessage ? <p className="dashboard-gis-message">{busy ? `${busy}... ` : ""}{localMessage || message}</p> : null}
+    </section>
+  );
+}
+
+function DesignFieldInput({ field, value, onChange }: { field: DesignAssetField; value: string; onChange: (value: string) => void }) {
+  const label = `${field.label}${field.required ? " *" : ""}`;
+  if (field.type === "textarea" || field.type === "json") {
+    return <label><span>{label}</span><textarea value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder={field.help_text || ""} /></label>;
+  }
+  if (field.type === "enum") {
+    return (
+      <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.currentTarget.value)}>
+        <option value="">Select...</option>
+        {(field.enum_options || []).map((option) => <option key={option} value={option}>{option}</option>)}
+      </select></label>
+    );
+  }
+  if (field.type === "boolean") {
+    return (
+      <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.currentTarget.value)}>
+        <option value="">Select...</option>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select></label>
+    );
+  }
+  return <label><span>{label}</span><input type={field.type === "number" || field.type === "integer" ? "number" : field.type === "date" ? "date" : "text"} value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder={field.help_text || ""} /></label>;
+}
+
+function defaultDesignAssetFieldsText() {
+  return JSON.stringify([
+    { name: "status", label: "Planning status", type: "enum", required: true, default: "proposed", enum_options: ["proposed", "planned", "in_review", "active"] },
+    { name: "owner", label: "Synthetic owner bucket", type: "string", required: false },
+    { name: "notes", label: "Planning notes", type: "textarea", required: false },
+  ], null, 2);
+}
+
+function defaultPropertiesForFields(fields: DesignAssetField[]) {
+  return Object.fromEntries(fields.map((field) => [field.name, field.default === undefined || field.default === null ? "" : stringifyFieldDraftValue(field.default, field)]));
+}
+
+function propertiesToFieldDraft(fields: DesignAssetField[], properties: Record<string, unknown>) {
+  return Object.fromEntries(fields.map((field) => [field.name, stringifyFieldDraftValue(properties[field.name] ?? field.default ?? "", field)]));
+}
+
+function stringifyFieldDraftValue(value: unknown, field: DesignAssetField) {
+  if (value === undefined || value === null) return "";
+  if (field.type === "json") return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  if (field.type === "boolean") return value === true ? "true" : value === false ? "false" : "";
+  return String(value);
+}
+
+function fieldDraftToProperties(fields: DesignAssetField[], draft: Record<string, string>) {
+  const properties: Record<string, unknown> = {};
+  fields.forEach((field) => {
+    const value = draft[field.name];
+    if (value === undefined || value === "") {
+      if (field.required) properties[field.name] = value || "";
+      return;
+    }
+    if (field.type === "integer") {
+      properties[field.name] = Number.parseInt(value, 10);
+      return;
+    }
+    if (field.type === "number") {
+      properties[field.name] = Number(value);
+      return;
+    }
+    if (field.type === "boolean") {
+      properties[field.name] = value === "true";
+      return;
+    }
+    if (field.type === "json") {
+      properties[field.name] = JSON.parse(value);
+      return;
+    }
+    properties[field.name] = value;
+  });
+  return properties;
+}
+
+function defaultGeometryTextForType(geometryType: DesignAssetGeometryType, pendingGeometry: DesignAssetGeoJsonGeometry | null) {
+  if (pendingGeometry && geometryTypeMatchesDesignGeometry(geometryType, pendingGeometry)) return JSON.stringify(pendingGeometry, null, 2);
+  if (geometryType === "line") return JSON.stringify({ type: "LineString", coordinates: [[-72.05, 42.15], [-71.82, 42.28]] }, null, 2);
+  if (geometryType === "polygon") return JSON.stringify({ type: "Polygon", coordinates: [[[-72.1, 42.1], [-71.95, 42.1], [-71.95, 42.22], [-72.1, 42.22], [-72.1, 42.1]]] }, null, 2);
+  if (geometryType === "point") return JSON.stringify({ type: "Point", coordinates: [-71.82, 42.28] }, null, 2);
+  return "";
+}
+
+function designToolForGeometryType(geometryType: Exclude<DesignAssetGeometryType, "table_only">): MapDrawingTool {
+  if (geometryType === "line") return "draw_design_line";
+  if (geometryType === "polygon") return "draw_design_polygon";
+  return "draw_design_point";
+}
+
+function isDesignDrawingTool(tool: MapDrawingTool) {
+  return tool === "draw_design_point" || tool === "draw_design_line" || tool === "draw_design_polygon";
+}
+
+function closedCoordinateRing(coordinates: Coordinate[]) {
+  if (!coordinates.length) return coordinates;
+  const first = coordinates[0];
+  const last = coordinates[coordinates.length - 1];
+  if (first[0] === last[0] && first[1] === last[1]) return coordinates;
+  return [...coordinates, first];
+}
+
+function geometryTypeMatchesDesignGeometry(geometryType: DesignAssetGeometryType, geometry: DesignAssetGeoJsonGeometry) {
+  if (geometryType === "point") return geometry.type === "Point";
+  if (geometryType === "line") return geometry.type === "LineString" || geometry.type === "MultiLineString";
+  if (geometryType === "polygon") return geometry.type === "Polygon" || geometry.type === "MultiPolygon";
+  return geometryType === "table_only";
+}
+
 async function fetchGeoJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
@@ -3518,6 +4178,7 @@ function buildDashboardLayerSummaries({
   nodeCount,
   transmissionLineCount,
   workOrderLocationCount,
+  designAssetRecordCount,
 }: {
   layers: Record<StreetMapLayerKey, boolean>;
   publicLineCount: number;
@@ -3559,6 +4220,7 @@ function buildDashboardLayerSummaries({
   nodeCount: number;
   transmissionLineCount: number;
   workOrderLocationCount: number;
+  designAssetRecordCount: number;
 }): DashboardLayerSummary[] {
   const layer = (
     key: StreetMapLayerKey,
@@ -3620,6 +4282,7 @@ function buildDashboardLayerSummaries({
     layer("transmissionLines", "Editable transmission lines", "Planning assets", transmissionLineCount, transmissionLineCount, "/transmission-lines", "Local planning line records", "Demo planning records only."),
     layer("workOrderLocations", "Work order locations", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/work-orders", "Synthetic work-order markers", "Demo work orders only."),
     layer("proposedChanges", "Proposed changes", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/deviceops/change-requests", "Synthetic proposed planning changes", "Proposed/demo records only."),
+    layer("designAssets", "Editable planning assets", "Planning assets", designAssetRecordCount, designAssetRecordCount, "/dashboard?drawer=design", "Schema-backed custom asset records", "Synthetic/demo records only; do not enter sensitive utility data."),
   ];
 }
 
@@ -3701,6 +4364,7 @@ function buildSearchResults(
   distributionSlackLoops: DistributionSlackLoopFeature[],
   distributionFiberAssignments: DistributionFiberAssignmentFeature[],
   panels: PatchPanel[],
+  designRecords: DesignAssetRecord[],
   query: string,
 ): StreetMapSelection[] {
   const all: StreetMapSelection[] = [
@@ -3724,6 +4388,7 @@ function buildSearchResults(
     ...distributionSlackLoops.map((record) => ({ kind: "distribution_slack_loop" as const, id: record.properties.id, label: record.properties.slackName, record })),
     ...distributionFiberAssignments.map((record) => ({ kind: "distribution_fiber_assignment" as const, id: record.properties.id, label: record.properties.assignmentName, record })),
     ...panels.map((record) => ({ kind: "patch_panel" as const, id: record.id, label: record.name, record })),
+    ...designRecords.map((record) => ({ kind: "design_asset_record" as const, id: String(record.id), label: record.display_label || record.record_key, record })),
     ...substations.map((record) => ({ kind: "substation" as const, id: record.id, label: record.name, record })),
     ...nodes.map((record) => ({ kind: "node" as const, id: record.id, label: record.name, record })),
     ...lines.map((record) => ({ kind: "transmission_line" as const, id: record.id, label: record.name, record })),
@@ -3770,7 +4435,8 @@ function isDashboardMapSearchResult(selection: StreetMapSelection) {
     || selection.kind === "distribution_fiber_assignment"
     || selection.kind === "gis_pole"
     || selection.kind === "gis_vector_asset"
-    || selection.kind === "patch_panel";
+    || selection.kind === "patch_panel"
+    || selection.kind === "design_asset_record";
 }
 
 function matchesDashboardFilters(selection: StreetMapSelection, assetType: string, status: string, region: string, visibility: string, owner: string) {
@@ -3821,6 +4487,7 @@ function searchLayerLabel(layer: string) {
 function selectionLayerLabel(selection: StreetMapSelection) {
   if (selection.kind === "gis_pole") return "GIS-scale distribution poles";
   if (selection.kind === "gis_vector_asset") return `GIS-scale ${String(selection.record.assetType || "asset")} layer`;
+  if (selection.kind === "design_asset_record") return "Editable planning assets";
   return searchLayerOptions.find((option) => option.kinds.includes(selection.kind))?.label || "Other map layer";
 }
 
@@ -3845,6 +4512,7 @@ function selectionStatus(selection: StreetMapSelection) {
   if (selection.kind === "distribution_slack_loop") return selection.record.properties.status;
   if (selection.kind === "distribution_fiber_assignment") return selection.record.properties.status;
   if (selection.kind === "gis_pole" || selection.kind === "gis_vector_asset") return String(selection.record.status || selection.record.asset_status || "synthetic");
+  if (selection.kind === "design_asset_record") return selection.record.status;
   if (selection.kind === "patch_panel") return selection.record.ports.some((port) => port.status === "assigned") ? "assigned" : "planned";
   const record = selection.record as { status?: string };
   return record.status || "open";
@@ -3858,6 +4526,7 @@ function selectionRegion(selection: StreetMapSelection) {
   if (selection.kind === "synthetic_substation") return selection.record.properties.state;
   if (selection.kind === "distribution_pole_density" || selection.kind === "distribution_pole" || selection.kind === "distribution_pole_fiber" || selection.kind === "distribution_splice_point" || selection.kind === "distribution_slack_loop" || selection.kind === "distribution_fiber_assignment") return selection.record.properties.state;
   if (selection.kind === "gis_pole" || selection.kind === "gis_vector_asset") return String(selection.record.state || "MA");
+  if (selection.kind === "design_asset_record") return "MA";
   if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "opgw_route" || selection.kind === "opgw_cable_section" || selection.kind === "opgw_span_segment" || selection.kind === "opgw_splice_point" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "MA";
   const record = selection.record as { state?: string };
   return record.state || "MA";
@@ -3870,6 +4539,7 @@ function selectionVisibility(selection: StreetMapSelection) {
   if (selection.kind === "synthetic_substation") return selection.record.properties.visibility;
   if (selection.kind === "distribution_pole_density" || selection.kind === "distribution_pole" || selection.kind === "distribution_pole_fiber" || selection.kind === "distribution_splice_point" || selection.kind === "distribution_slack_loop" || selection.kind === "distribution_fiber_assignment") return "synthetic-demo";
   if (selection.kind === "gis_pole" || selection.kind === "gis_vector_asset") return "synthetic-demo";
+  if (selection.kind === "design_asset_record") return selection.record.visibility || "synthetic-demo";
   if (selection.kind === "transmission_structure" || selection.kind === "opgw_cable" || selection.kind === "opgw_route" || selection.kind === "opgw_cable_section" || selection.kind === "opgw_span_segment" || selection.kind === "opgw_splice_point" || selection.kind === "splice_closure" || selection.kind === "fiber_assignment" || selection.kind === "patch_panel") return "synthetic-demo";
   const record = selection.record as { visibility?: string };
   return record.visibility || "private";
@@ -3881,6 +4551,7 @@ function selectionUtilityOwner(selection: StreetMapSelection) {
   if (selection.kind === "fcc_utility_tower" || selection.kind === "fcc_microwave_link") return selection.record.properties.utilityOwner;
   if (selection.kind === "distribution_pole_density" || selection.kind === "distribution_pole" || selection.kind === "distribution_pole_fiber" || selection.kind === "distribution_splice_point" || selection.kind === "distribution_slack_loop" || selection.kind === "distribution_fiber_assignment") return selection.record.properties.utilityOwner;
   if (selection.kind === "gis_pole" || selection.kind === "gis_vector_asset") return String(selection.record.utilityOwner || selection.record.owner || "Synthetic planning owner");
+  if (selection.kind === "design_asset_record") return String(selection.record.properties?.owner || selection.record.properties_json?.owner || "Synthetic planning owner");
   return "Unknown public owner";
 }
 
@@ -4053,6 +4724,10 @@ function selectionSearchText(selection: StreetMapSelection) {
   if (selection.kind === "distribution_fiber_assignment") {
     const properties = selection.record.properties;
     return [layerLabel, selection.label, properties.id, properties.assignmentName, properties.routeId, properties.feederId, properties.utilityOwner, properties.state, properties.serviceType, properties.status, properties.criticality, properties.strandNumbers.join(" "), properties.aEndPoleId, properties.zEndPoleId, properties.splicePointIds.join(" "), properties.slackLoopIds.join(" ")].join(" ");
+  }
+  if (selection.kind === "design_asset_record") {
+    const record = selection.record;
+    return [layerLabel, selection.label, record.id, record.record_key, record.asset_type_slug, record.asset_type_display_name, record.status, record.source, record.visibility, JSON.stringify(record.properties || record.properties_json || {})].join(" ");
   }
   return [layerLabel, JSON.stringify(selection.record)].join(" ");
 }

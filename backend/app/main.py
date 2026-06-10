@@ -5,7 +5,7 @@ from starlette.responses import Response
 
 from app.config import settings
 from app.database import create_db_and_tables
-from app.routers import auth, dashboard, deviceops, gis, regional_grid, sql, workflows
+from app.routers import auth, dashboard, design_assets, deviceops, gis, regional_grid, sql, workflows
 from app.routers.crud import all_crud_routers
 
 app = FastAPI(title=settings.app_name, description="Fictional utility telecom planning and asset management API.", version="0.1.0")
@@ -23,6 +23,7 @@ async def allow_local_gis_bridge_private_network(request: Request, call_next) ->
 
 app.include_router(auth.router)
 app.include_router(dashboard.router)
+app.include_router(design_assets.router)
 app.include_router(workflows.router)
 app.include_router(deviceops.router)
 app.include_router(regional_grid.router)

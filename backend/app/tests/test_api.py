@@ -129,6 +129,165 @@ def test_deviceops_icon_provisioning_dashboard() -> None:
     assert any(row["carried_device_count"] >= 4 for row in payload["node_service_summary"])
 
 
+def test_design_asset_type_validation_seed_and_permissions() -> None:
+    seeded = client.get("/api/design-assets/map-records")
+    assert seeded.status_code == 200
+    seeded_payload = seeded.json()
+    assert seeded_payload["feature_flag"] == "NEXT_PUBLIC_ENABLE_MAP_EDITING=true"
+    assert any(row["slug"] == "planning-marker" for row in seeded_payload["asset_types"])
+    assert any(feature["properties"]["kind"] == "design_asset_record" for feature in seeded_payload["feature_collection"]["features"])
+
+    viewer_forbidden = client.post(
+        "/api/design-assets/asset-types",
+        json={"slug": "viewer-type", "display_name": "Viewer Type", "geometry_type": "point", "fields": []},
+        headers=auth_headers("viewer@example.com", "viewer123"),
+    )
+    assert viewer_forbidden.status_code == 403
+
+    invalid = client.post(
+        "/api/design-assets/asset-types",
+        json={"slug": "Bad Slug", "display_name": "Bad Slug", "geometry_type": "point", "fields": []},
+        headers=auth_headers(),
+    )
+    assert invalid.status_code == 422
+
+    created = client.post(
+        "/api/design-assets/asset-types",
+        json={
+            "slug": "unit-test-marker",
+            "display_name": "Unit Test Marker",
+            "geometry_type": "point",
+            "fields": [
+                {"name": "status", "type": "enum", "required": True, "enum_options": ["planned", "proposed"]},
+                {"name": "notes", "type": "textarea"},
+            ],
+            "searchable_fields": ["status", "notes"],
+            "map_style": {"color": "#55d6ff"},
+        },
+        headers=auth_headers(),
+    )
+    assert created.status_code == 201
+    assert created.json()["slug"] == "unit-test-marker"
+    assert created.json()["fields"][0]["required"] is True
+
+
+def test_design_asset_record_validation_geometry_crud_and_events() -> None:
+    headers = auth_headers("engineer@example.com", "engineer123")
+    admin_headers = auth_headers()
+    type_response = client.post(
+        "/api/design-assets/asset-types",
+        json={
+            "slug": "unit-test-span",
+            "display_name": "Unit Test Span",
+            "geometry_type": "line",
+            "fields": [
+                {"name": "fiber_count", "type": "integer", "required": True, "validation_rules": {"min": 1, "max": 288}},
+                {"name": "status", "type": "enum", "required": True, "enum_options": ["planned", "proposed"]},
+            ],
+            "map_style": {"color": "#6ee7b7", "lineWidth": 4},
+        },
+        headers=admin_headers,
+    )
+    assert type_response.status_code == 201
+
+    polygon_type = client.post(
+        "/api/design-assets/asset-types",
+        json={
+            "slug": "unit-test-work-zone",
+            "display_name": "Unit Test Work Zone",
+            "geometry_type": "polygon",
+            "fields": [{"name": "risk_level", "type": "enum", "required": True, "enum_options": ["low", "high"]}],
+            "map_style": {"color": "#f5c451", "fillOpacity": 0.2},
+        },
+        headers=admin_headers,
+    )
+    assert polygon_type.status_code == 201
+
+    missing_required = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "unit-test-span",
+            "display_label": "Missing required field",
+            "geometry": {"type": "LineString", "coordinates": [[-72.0, 42.0], [-71.9, 42.1]]},
+            "properties": {"status": "planned"},
+        },
+        headers=headers,
+    )
+    assert missing_required.status_code == 422
+
+    bad_geometry = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "unit-test-span",
+            "display_label": "Bad geometry",
+            "geometry": {"type": "Point", "coordinates": [-72.0, 42.0]},
+            "properties": {"fiber_count": 48, "status": "planned"},
+        },
+        headers=headers,
+    )
+    assert bad_geometry.status_code == 422
+
+    created = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "unit-test-span",
+            "record_key": "UNIT-TEST-SPAN-001",
+            "display_label": "Unit Test Editable Span",
+            "geometry": {"type": "LineString", "coordinates": [[-72.0, 42.0], [-71.9, 42.1]]},
+            "properties": {"fiber_count": 48, "status": "planned"},
+            "status": "planned",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+    record = created.json()
+    assert record["properties"]["fiber_count"] == 48
+    assert record["geometry"]["type"] == "LineString"
+
+    polygon_created = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "unit-test-work-zone",
+            "record_key": "UNIT-TEST-WORK-ZONE-001",
+            "display_label": "Unit Test Editable Work Zone",
+            "geometry": {"type": "Polygon", "coordinates": [[[-72.0, 42.0], [-71.9, 42.0], [-71.9, 42.1], [-72.0, 42.1], [-72.0, 42.0]]]},
+            "properties": {"risk_level": "low"},
+            "status": "proposed",
+        },
+        headers=headers,
+    )
+    assert polygon_created.status_code == 201
+    assert polygon_created.json()["geometry"]["type"] == "Polygon"
+
+    viewer_update = client.put(
+        f"/api/design-assets/records/{record['id']}",
+        json={"properties": {"fiber_count": 72, "status": "planned"}},
+        headers=auth_headers("viewer@example.com", "viewer123"),
+    )
+    assert viewer_update.status_code == 403
+
+    updated = client.put(
+        f"/api/design-assets/records/{record['id']}",
+        json={"properties": {"fiber_count": 72, "status": "planned"}, "display_label": "Updated Editable Span"},
+        headers=headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["version"] == 2
+    assert updated.json()["display_label"] == "Updated Editable Span"
+
+    map_payload = client.get("/api/design-assets/map-records")
+    assert map_payload.status_code == 200
+    assert any(feature["properties"]["recordKey"] == "UNIT-TEST-SPAN-001" for feature in map_payload.json()["feature_collection"]["features"])
+
+    events = client.get(f"/api/design-assets/records/{record['id']}/events")
+    assert events.status_code == 200
+    assert {event["event_type"] for event in events.json()} >= {"record_created", "record_updated"}
+
+    archived = client.delete(f"/api/design-assets/records/{record['id']}", headers=headers)
+    assert archived.status_code == 200
+    assert archived.json()["status"] == "archived"
+
+
 def test_deviceops_proposed_change_to_work_order_and_checklist() -> None:
     headers = auth_headers("engineer@example.com", "engineer123")
     nodes = client.get("/api/icon-nodes", headers=headers).json()
@@ -261,6 +420,8 @@ def test_gis_scale_capabilities_empty_tile_and_search() -> None:
     assert payload["synthetic_boundary"]
     assert payload["website_import"]["service_territory_upload_endpoint"] == "/api/service-territories/import-geojson-file"
     assert payload["website_import"]["road_centerline_upload_endpoint"] == "/api/road-centerlines/import-geojson-file"
+    assert "local_computer_api_bridge" in payload["website_import"]["import_targets"]
+    assert any("gridassetlink.dev/dashboard?drawer=scale" in row for row in payload["website_import"]["browser_steps"])
     assert any("Geometry-aware" in row for row in payload["cache_strategy"])
 
     health = client.get("/api/gis/scale-health")

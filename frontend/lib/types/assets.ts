@@ -1199,6 +1199,84 @@ export type MapAnnotation = {
   status: EditableMapStatus | "needs_review";
 };
 
+export type DesignAssetGeometryType = "point" | "line" | "polygon" | "table_only";
+export type DesignAssetFieldType = "string" | "textarea" | "number" | "integer" | "boolean" | "date" | "enum" | "json";
+
+export type DesignAssetField = {
+  name: string;
+  label: string;
+  type: DesignAssetFieldType;
+  required?: boolean;
+  default?: unknown;
+  enum_options?: string[];
+  validation_rules?: Record<string, unknown>;
+  help_text?: string;
+};
+
+export type DesignAssetType = {
+  id: number;
+  slug: string;
+  display_name: string;
+  description?: string | null;
+  geometry_type: DesignAssetGeometryType;
+  fields_json: DesignAssetField[];
+  fields: DesignAssetField[];
+  searchable_fields_json?: string[];
+  searchable_fields?: string[];
+  validation_rules_json?: Record<string, unknown>;
+  validation_rules?: Record<string, unknown>;
+  map_style_json?: Record<string, unknown>;
+  map_style?: Record<string, unknown>;
+  status: "active" | "archived";
+  version: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type DesignAssetGeoJsonGeometry =
+  | { type: "Point"; coordinates: Coordinate }
+  | { type: "LineString"; coordinates: Coordinate[] }
+  | { type: "MultiLineString"; coordinates: Coordinate[][] }
+  | { type: "Polygon"; coordinates: Coordinate[][] }
+  | { type: "MultiPolygon"; coordinates: Coordinate[][][] };
+
+export type DesignAssetRecord = {
+  id: number;
+  asset_type_id: number;
+  asset_type_slug?: string | null;
+  asset_type_display_name?: string | null;
+  record_key: string;
+  display_label: string;
+  geometry_type: DesignAssetGeometryType;
+  geometry_json?: DesignAssetGeoJsonGeometry | null;
+  geometry?: DesignAssetGeoJsonGeometry | null;
+  properties_json: Record<string, unknown>;
+  properties: Record<string, unknown>;
+  map_style?: Record<string, unknown>;
+  status: "active" | "planned" | "proposed" | "in_review" | "as_built" | "archived";
+  source: string;
+  visibility: string;
+  version: number;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type DesignAssetMapPayload = {
+  feature_flag: string;
+  synthetic_data_notice: string;
+  asset_types: DesignAssetType[];
+  records: DesignAssetRecord[];
+  feature_collection: {
+    type: "FeatureCollection";
+    features: Array<{
+      type: "Feature";
+      properties: Record<string, string | number | boolean | null>;
+      geometry: DesignAssetGeoJsonGeometry;
+    }>;
+  };
+};
+
 export type StreetMapLayerKey =
   | "publicTransmissionLines"
   | "publicSubstations"
@@ -1241,6 +1319,7 @@ export type StreetMapLayerKey =
   | "circuitEndpoints"
   | "workOrderLocations"
   | "proposedChanges"
+  | "designAssets"
   | "missingLocationAssets"
   | "planningRegions"
   | "isoNeReferenceOverlays";
@@ -1253,6 +1332,9 @@ export type MapDrawingTool =
   | "draw_transmission_line"
   | "draw_fiber_path"
   | "draw_planning_polygon"
+  | "draw_design_point"
+  | "draw_design_line"
+  | "draw_design_polygon"
   | "edit_geometry"
   | "delete_geometry"
   | "place_missing";

@@ -12,6 +12,8 @@ from app.models import (
     CommissioningChecklistItem,
     Device,
     DevicePort,
+    DesignAssetRecord,
+    DesignAssetType,
     DistributionFeeder,
     FiberAssignment,
     FiberCable,
@@ -61,6 +63,9 @@ def seed_database() -> None:
     create_db_and_tables()
     with Session(engine) as session:
         if session.exec(select(User)).first():
+            engineer = session.exec(select(User).where(User.role == "engineer")).first() or session.exec(select(User).where(User.role == "admin")).first()
+            if engineer:
+                _seed_design_assets(session, engineer)
             _seed_deviceops_addons(session)
             from app.seed.regional_seed import seed_regional_grid_addons
 
@@ -72,6 +77,7 @@ def seed_database() -> None:
         for user in users:
             session.refresh(user)
         _, engineer, field_tech, _, _ = users
+        _seed_design_assets(session, engineer)
 
         providers = [
             Provider(provider_name="Internal Utility Fiber", provider_type="utility_owned", noc_phone="555-0100"),
@@ -514,6 +520,112 @@ def seed_database() -> None:
         from app.seed.regional_seed import seed_regional_grid_addons
 
         seed_regional_grid_addons(session)
+
+
+def _seed_design_assets(session: Session, engineer: User) -> None:
+    type_specs = [
+        {
+            "slug": "planning-marker",
+            "display_name": "Editable Planning Marker",
+            "description": "Synthetic point marker for demo design/edit workflows.",
+            "geometry_type": "point",
+            "fields_json": [
+                {"name": "status", "label": "Status", "type": "enum", "required": True, "default": "proposed", "enum_options": ["active", "planned", "proposed", "in_review"]},
+                {"name": "priority", "label": "Priority", "type": "enum", "required": True, "default": "normal", "enum_options": ["low", "normal", "high"]},
+                {"name": "owner", "label": "Owner", "type": "string", "required": False, "default": "Synthetic Planning"},
+                {"name": "notes", "label": "Notes", "type": "textarea", "required": False},
+            ],
+            "searchable_fields_json": ["status", "priority", "owner", "notes"],
+            "map_style_json": {"color": "#55d6ff", "radius": 7, "strokeColor": "#ffffff"},
+        },
+        {
+            "slug": "fiber-design-span",
+            "display_name": "Editable Fiber Design Span",
+            "description": "Synthetic line asset for planned fiber/design-span examples.",
+            "geometry_type": "line",
+            "fields_json": [
+                {"name": "fiber_count", "label": "Fiber Count", "type": "integer", "required": True, "default": 48, "validation_rules": {"min": 1, "max": 288}},
+                {"name": "status", "label": "Status", "type": "enum", "required": True, "default": "planned", "enum_options": ["planned", "proposed", "in_review"]},
+                {"name": "confidence", "label": "Confidence", "type": "enum", "required": True, "default": "medium", "enum_options": ["low", "medium", "high"]},
+                {"name": "notes", "label": "Notes", "type": "textarea", "required": False},
+            ],
+            "searchable_fields_json": ["status", "confidence", "notes"],
+            "map_style_json": {"color": "#6ee7b7", "lineWidth": 4, "dashArray": [1.4, 0.8]},
+        },
+        {
+            "slug": "planning-work-zone",
+            "display_name": "Editable Planning Work Zone",
+            "description": "Synthetic polygon asset for planning-area examples.",
+            "geometry_type": "polygon",
+            "fields_json": [
+                {"name": "work_window", "label": "Work Window", "type": "string", "required": True, "default": "planning placeholder"},
+                {"name": "risk_level", "label": "Risk Level", "type": "enum", "required": True, "default": "low", "enum_options": ["low", "normal", "high"]},
+                {"name": "notes", "label": "Notes", "type": "textarea", "required": False},
+            ],
+            "searchable_fields_json": ["work_window", "risk_level", "notes"],
+            "map_style_json": {"color": "#f5c451", "fillOpacity": 0.18, "lineWidth": 2},
+        },
+    ]
+    type_by_slug: dict[str, DesignAssetType] = {}
+    for spec in type_specs:
+        asset_type = session.exec(select(DesignAssetType).where(DesignAssetType.slug == spec["slug"])).first()
+        if not asset_type:
+            asset_type = DesignAssetType(
+                **spec,
+                status="active",
+                validation_rules_json={"synthetic_data_only": True, "requires_non_sensitive_content": True},
+                notes="Seeded schema-driven Design/Edit type. Synthetic/demo planning data only.",
+                created_by=engineer.id,
+                updated_by=engineer.id,
+            )
+            session.add(asset_type)
+            session.commit()
+            session.refresh(asset_type)
+        type_by_slug[asset_type.slug] = asset_type
+
+    record_specs = [
+        {
+            "asset_type": "planning-marker",
+            "record_key": "DEMO-MARKER-WBS-001",
+            "display_label": "Synthetic Webster planning marker",
+            "geometry_json": {"type": "Point", "coordinates": [-71.8809, 42.0501]},
+            "properties_json": {"status": "proposed", "priority": "normal", "owner": "Synthetic Planning", "notes": "Demo marker for map-edit workflow."},
+            "status": "proposed",
+        },
+        {
+            "asset_type": "fiber-design-span",
+            "record_key": "DEMO-FIBER-SPAN-WBS-AUB-001",
+            "display_label": "Synthetic Webster-Auburn editable span",
+            "geometry_json": {"type": "LineString", "coordinates": [[-71.8809, 42.0501], [-71.8588, 42.1073], [-71.8356, 42.1945]]},
+            "properties_json": {"fiber_count": 48, "status": "planned", "confidence": "medium", "notes": "Fictional editable line demo. Not an actual fiber path."},
+            "status": "planned",
+        },
+        {
+            "asset_type": "planning-work-zone",
+            "record_key": "DEMO-WORK-ZONE-CMA-001",
+            "display_label": "Synthetic Central MA planning work zone",
+            "geometry_json": {"type": "Polygon", "coordinates": [[[-71.91, 42.03], [-71.78, 42.03], [-71.78, 42.14], [-71.91, 42.14], [-71.91, 42.03]]]},
+            "properties_json": {"work_window": "demo planning window", "risk_level": "low", "notes": "Synthetic polygon used to test editable design layers."},
+            "status": "planned",
+        },
+    ]
+    for spec in record_specs:
+        if session.exec(select(DesignAssetRecord).where(DesignAssetRecord.record_key == spec["record_key"])).first():
+            continue
+        asset_type = type_by_slug[spec.pop("asset_type")]
+        session.add(
+            DesignAssetRecord(
+                asset_type_id=asset_type.id,
+                geometry_type=asset_type.geometry_type,
+                source="synthetic_demo",
+                visibility="team",
+                notes="Seeded editable design asset. Synthetic/demo planning data only.",
+                created_by=engineer.id,
+                updated_by=engineer.id,
+                **spec,
+            )
+        )
+    session.commit()
 
 
 def _seed_deviceops_addons(session: Session) -> None:

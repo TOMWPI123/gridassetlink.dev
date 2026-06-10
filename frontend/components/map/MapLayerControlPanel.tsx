@@ -33,6 +33,7 @@ type MapLayerControlPanelProps = {
   distributionSplicePointCount?: number;
   distributionSlackLoopCount?: number;
   distributionFiberAssignmentCount?: number;
+  designAssetCount?: number;
   estimatedDistributionPoleScale?: number;
   availableStrandCount?: number;
   criticalRidingCircuitCount?: number;
@@ -79,6 +80,7 @@ const layerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; ba
   { key: "fccMicrowaveLinks", label: "FCC microwave path links", note: "Public FCC ULS point-to-point microwave paths grouped by owner and path frequency", badges: ["Public", "FCC ULS", "Frequency"] },
   { key: "transmissionStructures", label: "Transmission structures", note: "Synthetic demo structure points sampled from public line geometry", badges: ["Synthetic", "Demo"] },
   { key: "spliceClosures", label: "Splice closures", note: "Synthetic demo splice closures mounted on synthetic structures", badges: ["Synthetic", "Demo"] },
+  { key: "designAssets", label: "Editable planning assets", note: "Schema-backed point, line, polygon, and table records from Design/Edit mode", badges: ["Editable", "Feature flag"] },
 ];
 
 const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string; badges: string[] }> = [
@@ -139,6 +141,7 @@ export function MapLayerControlPanel({
   distributionSplicePointCount = 0,
   distributionSlackLoopCount = 0,
   distributionFiberAssignmentCount = 0,
+  designAssetCount = 0,
   estimatedDistributionPoleScale = 0,
   availableStrandCount = 0,
   criticalRidingCircuitCount = 0,
@@ -188,6 +191,7 @@ export function MapLayerControlPanel({
     distributionSplicePoints: distributionSplicePointCount,
     distributionSlackLoops: distributionSlackLoopCount,
     distributionFiberAssignments: distributionFiberAssignmentCount,
+    designAssets: designAssetCount,
   };
   const visibleLineOwnerCount = transmissionLineOwnerCounts.filter(({ owner }) => visibleTransmissionLineOwners[owner] !== false).length;
   const visibleSubstationOwnerCount = substationOwnerCounts.filter(({ owner }) => visibleSubstationOwners[owner] !== false).length;

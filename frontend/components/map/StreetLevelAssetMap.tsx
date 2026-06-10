@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Crosshair, MapPinned } from "lucide-react";
-import type { Coordinate, DistributionFiberAssignmentFeature, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointFeature, DistributionSlackLoopFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DesignAssetRecord, DistributionFiberAssignmentFeature, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointFeature, DistributionSlackLoopFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 
 export type GisVectorAssetRecord = Record<string, unknown>;
 
@@ -31,6 +31,7 @@ export type StreetMapSelection =
   | { kind: "distribution_fiber_assignment"; id: string; label: string; record: DistributionFiberAssignmentFeature }
   | { kind: "gis_pole"; id: string; label: string; record: GisVectorAssetRecord }
   | { kind: "gis_vector_asset"; id: string; label: string; record: GisVectorAssetRecord }
+  | { kind: "design_asset_record"; id: string; label: string; record: DesignAssetRecord }
   | { kind: "patch_panel"; id: string; label: string; record: PatchPanel }
   | { kind: "planning_region"; id: string; label: string; record: PlanningRegion }
   | { kind: "work_order"; id: string; label: string; record: MapNode };
@@ -79,6 +80,7 @@ type StreetLevelAssetMapProps = {
   distributionSlackLoops: DistributionSlackLoopFeature[];
   distributionFiberAssignments: DistributionFiberAssignmentFeature[];
   patchPanels: PatchPanel[];
+  designAssetRecords: DesignAssetRecord[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
   gisApiBase: string;
@@ -125,6 +127,7 @@ export function StreetLevelAssetMap({
   distributionSlackLoops,
   distributionFiberAssignments,
   patchPanels,
+  designAssetRecords,
   planningRegions,
   layers,
   gisApiBase,
@@ -169,6 +172,7 @@ export function StreetLevelAssetMap({
           distributionSlackLoops={distributionSlackLoops}
           distributionFiberAssignments={distributionFiberAssignments}
           patchPanels={patchPanels}
+          designAssetRecords={designAssetRecords}
           planningRegions={planningRegions}
           layers={layers}
           gisApiBase={gisApiBase}
@@ -195,6 +199,9 @@ function toolHint(activeTool: MapDrawingTool) {
   if (activeTool === "add_device_node") return "Click the map to add the selected asset type.";
   if (activeTool === "add_fiber_node") return "Click the map to add a fiber node point.";
   if (activeTool === "place_missing") return "Click the map to place the selected missing-location asset.";
-  if (activeTool.startsWith("draw_") || activeTool.includes("geometry")) return "Line and polygon drawing are staged for the next implementation pass.";
+  if (activeTool === "draw_design_point") return "Click the map to place a schema-backed editable point record.";
+  if (activeTool === "draw_design_line") return "Click the map to add line vertices, then finish and save in Design/Edit.";
+  if (activeTool === "draw_design_polygon") return "Click the map to add polygon vertices, then finish and save in Design/Edit.";
+  if (activeTool.startsWith("draw_") || activeTool.includes("geometry")) return "Click the map to stage geometry, then save it from the editor.";
   return "Pan, zoom, search, or click assets to inspect linked records.";
 }

@@ -973,6 +973,53 @@ class RegionalSyntheticCircuit(TimestampMixin, table=True):
     notes: Optional[str] = None
 
 
+class DesignAssetType(TimestampMixin, table=True):
+    __tablename__ = "design_asset_types"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True, max_length=100)
+    display_name: str = Field(index=True, max_length=180)
+    description: Optional[str] = None
+    geometry_type: str = Field(index=True, max_length=40)
+    fields_json: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    searchable_fields_json: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    validation_rules_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    map_style_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    status: str = Field(default="active", index=True, max_length=40)
+    version: int = Field(default=1, index=True)
+    archived_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class DesignAssetRecord(TimestampMixin, table=True):
+    __tablename__ = "design_asset_records"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    asset_type_id: int = Field(foreign_key="design_asset_types.id", index=True)
+    record_key: str = Field(index=True, unique=True, max_length=160)
+    display_label: str = Field(index=True, max_length=180)
+    geometry_type: str = Field(index=True, max_length=40)
+    geometry_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    properties_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    status: str = Field(default="proposed", index=True, max_length=40)
+    source: str = Field(default="synthetic_demo", index=True, max_length=80)
+    visibility: str = Field(default="team", index=True, max_length=40)
+    version: int = Field(default=1, index=True)
+    archived_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class DesignAssetEvent(SQLModel, table=True):
+    __tablename__ = "design_asset_events"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    asset_type_id: Optional[int] = Field(default=None, foreign_key="design_asset_types.id", index=True)
+    asset_record_id: Optional[int] = Field(default=None, foreign_key="design_asset_records.id", index=True)
+    event_type: str = Field(index=True, max_length=80)
+    actor_user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    event_time: datetime = Field(default_factory=utc_now, index=True)
+    before_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    after_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    notes: Optional[str] = None
+
+
 class AuditLog(SQLModel, table=True):
     __tablename__ = "audit_logs"
     id: Optional[int] = Field(default=None, primary_key=True)

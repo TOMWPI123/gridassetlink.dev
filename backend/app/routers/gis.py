@@ -121,6 +121,15 @@ def gis_capabilities() -> dict[str, Any]:
             "max_geojson_upload_mb": MAX_GEOJSON_UPLOAD_BYTES // (1024 * 1024),
             "usage": "Choose GeoJSON files from your computer while on gridassetlink.dev. Files are uploaded to the configured website API and imported into managed PostGIS when available.",
             "scale_boundary": "Upload service territory and public road reference files here, then queue the background synthetic generation job. Do not upload raw 10M pole inventories to the browser.",
+            "import_targets": ["website_postgis_backend", "local_computer_api_bridge", "custom_gis_api"],
+            "browser_steps": [
+                "Open https://gridassetlink.dev/dashboard?drawer=scale.",
+                "Choose whether files import to the website backend or a local API bridge.",
+                "Select a service territory GeoJSON from this computer.",
+                "Select public road centerline GeoJSON from this computer.",
+                "Run generation preflight and queue the synthetic worker job.",
+                "Browse generated assets through vector tiles instead of raw browser downloads.",
+            ],
         },
         "level_of_detail": {
             "zoom_0_7": "territory boundary, summaries, major corridors; no individual poles",

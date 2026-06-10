@@ -2,7 +2,7 @@
 
 import maplibregl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapLibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, DistributionFiberAssignmentFeature, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointFeature, DistributionSlackLoopFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DesignAssetRecord, DistributionFiberAssignmentFeature, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointFeature, DistributionSlackLoopFeature, FccMicrowaveLinkFeature, FccUtilityTowerFeature, FiberAssignment, FiberSplice, FiberStrand, MapDrawingTool, MapNode, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PlanningRegion, PublicSubstationFeature, PublicTransmissionLineFeature, SpliceClosureFeature, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureFeature } from "@/lib/types/assets";
 import type { ContinuityHighlight, FocusRequest, MapCommand, StreetMapSelection } from "./StreetLevelAssetMap";
 import { normalizeApiBase } from "@/lib/api";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
@@ -36,6 +36,7 @@ type MapLibreStreetMapProps = {
   distributionSlackLoops: DistributionSlackLoopFeature[];
   distributionFiberAssignments: DistributionFiberAssignmentFeature[];
   patchPanels: PatchPanel[];
+  designAssetRecords: DesignAssetRecord[];
   planningRegions: PlanningRegion[];
   layers: Record<StreetMapLayerKey, boolean>;
   gisApiBase: string;
@@ -55,7 +56,8 @@ type MapFeature = {
     | { type: "Point"; coordinates: Coordinate }
     | { type: "LineString"; coordinates: Coordinate[] }
     | { type: "MultiLineString"; coordinates: Coordinate[][] }
-    | { type: "Polygon"; coordinates: Coordinate[][] };
+    | { type: "Polygon"; coordinates: Coordinate[][] }
+    | { type: "MultiPolygon"; coordinates: Coordinate[][][] };
 };
 
 type MapFeatureCollection = {
@@ -86,6 +88,7 @@ const sourceIds = {
   distributionSlackLoops: "synthetic-distribution-slack-loops",
   distributionFiberAssignments: "synthetic-distribution-fiber-assignments",
   patchPanels: "synthetic-patch-panels",
+  designAssets: "editable-design-assets",
   substations: "regional-substations",
   syntheticSubstations: "synthetic-substations",
   nodes: "regional-map-nodes",
@@ -157,6 +160,9 @@ const clickableLayerIds = [
   "synthetic-substations-points",
   "regional-map-nodes",
   "regional-work-orders",
+  "editable-design-assets-fill",
+  "editable-design-assets-line",
+  "editable-design-assets-point",
 ];
 
 const isoNeBounds: LngLatBoundsLike = [[-74.2, 40.8], [-66.7, 47.7]];
@@ -210,6 +216,7 @@ export function MapLibreStreetMap({
   distributionSlackLoops,
   distributionFiberAssignments,
   patchPanels,
+  designAssetRecords,
   planningRegions,
   layers,
   gisApiBase,
@@ -235,12 +242,12 @@ export function MapLibreStreetMap({
   const [errorMessage, setErrorMessage] = useState("");
 
   const datasets = useMemo(
-    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, planningRegions, layers, continuityHighlight),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, planningRegions, layers, continuityHighlight],
+    () => buildDatasets(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, designAssetRecords, planningRegions, layers, continuityHighlight),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberStrands, fiberAssignments, syntheticServices, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, designAssetRecords, planningRegions, layers, continuityHighlight],
   );
   const lookup = useMemo(
-    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, planningRegions),
-    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, planningRegions],
+    () => buildSelectionLookup(substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, designAssetRecords, planningRegions),
+    [substations, nodes, transmissionLines, publicTransmissionLines, publicSubstations, fccUtilityTowers, fccMicrowaveLinks, syntheticSubstations, transmissionStructures, opgwCables, opgwRoutes, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberAssignments, distributionPoleDensity, distributionPoles, distributionPoleFiberRoutes, distributionSplicePoints, distributionSlackLoops, distributionFiberAssignments, patchPanels, designAssetRecords, planningRegions],
   );
 
   useEffect(() => {
@@ -359,6 +366,7 @@ export function MapLibreStreetMap({
     updateSource(mapRef.current, sourceIds.distributionSlackLoops, datasets.distributionSlackLoops);
     updateSource(mapRef.current, sourceIds.distributionPoles, datasets.distributionPoles);
     updateSource(mapRef.current, sourceIds.patchPanels, datasets.patchPanels);
+    updateSource(mapRef.current, sourceIds.designAssets, datasets.designAssets);
     updateSource(mapRef.current, sourceIds.substations, datasets.substations);
     updateSource(mapRef.current, sourceIds.syntheticSubstations, datasets.syntheticSubstations);
     updateSource(mapRef.current, sourceIds.nodes, datasets.nodes);
@@ -485,6 +493,7 @@ export function MapLibreStreetMap({
           {layers.distributionSlackLoops ? <span><i className="legend-node" />Distribution slack loops</span> : null}
           {layers.distributionFiberAssignments ? <span><i className="legend-line" />Distribution assignments</span> : null}
           {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
+          {layers.designAssets ? <span><i className="legend-node" />Editable planning assets</span> : null}
           {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
           {layers.substations ? <span><i className="legend-substation" />Substations</span> : null}
           {layers.selIconNodes || layers.telecomNodes || layers.circuitEndpoints ? <span><i className="legend-node" />SEL ICON / telecom</span> : null}
@@ -514,6 +523,7 @@ function addPlanningSourcesAndLayers(map: MapLibreMap, gisApiBase: string) {
   map.addSource(sourceIds.fiberAssignments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.distributionPoleFiberRoutes, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   map.addSource(sourceIds.distributionFiberAssignments, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
+  map.addSource(sourceIds.designAssets, { type: "geojson", data: emptyCollection as Parameters<GeoJSONSource["setData"]>[0] });
   [sourceIds.publicSubstations, sourceIds.fccUtilityTowers, sourceIds.substations, sourceIds.syntheticSubstations, sourceIds.structures, sourceIds.opgwSplicePoints, sourceIds.spliceClosures, sourceIds.distributionPoleDensity, sourceIds.distributionPoles, sourceIds.distributionSplicePoints, sourceIds.distributionSlackLoops, sourceIds.patchPanels, sourceIds.nodes, sourceIds.workOrders].forEach((sourceId) => {
     map.addSource(sourceId, {
       type: "geojson",
@@ -906,6 +916,50 @@ function addPlanningSourcesAndLayers(map: MapLibreMap, gisApiBase: string) {
   addClusterLayers(map, sourceIds.patchPanels, "synthetic-patch-panels", "#d5f3ff", "panel");
   addClusterLayers(map, sourceIds.nodes, "regional-map-nodes", "#28c7a9", "node");
   addClusterLayers(map, sourceIds.workOrders, "regional-work-orders", "#efc95f", "work_order");
+
+  map.addLayer({
+    id: "editable-design-assets-fill",
+    type: "fill",
+    source: sourceIds.designAssets,
+    filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+    paint: {
+      "fill-color": ["coalesce", ["get", "mapColor"], "#f5c451"],
+      "fill-opacity": ["case", ["==", ["get", "status"], "archived"], 0.08, ["to-number", ["coalesce", ["get", "fillOpacity"], 0.18]]],
+    },
+  });
+  map.addLayer({
+    id: "editable-design-assets-line",
+    type: "line",
+    source: sourceIds.designAssets,
+    filter: ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString", "Polygon", "MultiPolygon"]]],
+    paint: {
+      "line-color": ["coalesce", ["get", "mapColor"], "#55d6ff"],
+      "line-width": ["to-number", ["coalesce", ["get", "lineWidth"], 3]],
+      "line-opacity": ["case", ["==", ["get", "status"], "archived"], 0.28, 0.9],
+      "line-dasharray": ["case", ["==", ["get", "status"], "proposed"], ["literal", [1.3, 0.8]], ["literal", [1, 0]]],
+    },
+  });
+  map.addLayer({
+    id: "editable-design-assets-point",
+    type: "circle",
+    source: sourceIds.designAssets,
+    filter: ["==", ["geometry-type"], "Point"],
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 4.5, 11, ["to-number", ["coalesce", ["get", "radius"], 8]]],
+      "circle-color": ["coalesce", ["get", "mapColor"], "#55d6ff"],
+      "circle-opacity": ["case", ["==", ["get", "status"], "archived"], 0.36, 0.94],
+      "circle-stroke-color": ["coalesce", ["get", "strokeColor"], "#ffffff"],
+      "circle-stroke-width": 1.5,
+    },
+  });
+  map.addLayer({
+    id: "editable-design-assets-labels",
+    type: "symbol",
+    source: sourceIds.designAssets,
+    minzoom: 10.5,
+    layout: { "text-field": ["get", "label"], "text-size": 10, "text-offset": [0, 1.15], "text-anchor": "top" },
+    paint: { "text-color": "#efffff", "text-halo-color": "#061012", "text-halo-width": 1.35 },
+  });
 
   map.addLayer({
     id: "regional-substations",
@@ -1617,6 +1671,7 @@ function buildDatasets(
   distributionSlackLoops: DistributionSlackLoopFeature[],
   distributionFiberAssignments: DistributionFiberAssignmentFeature[],
   patchPanels: PatchPanel[],
+  designAssetRecords: DesignAssetRecord[],
   planningRegions: PlanningRegion[],
   layers: Record<StreetMapLayerKey, boolean>,
   continuityHighlight?: ContinuityHighlight,
@@ -2206,6 +2261,34 @@ function buildDatasets(
         geometry: { type: "Point" as const, coordinates: structure.geometry.coordinates },
       }];
     })) : emptyCollection,
+    designAssets: layers.designAssets ? collection(designAssetRecords.flatMap((record) => {
+      const geometry = record.geometry || record.geometry_json;
+      if (!geometry) return [];
+      const style = record.map_style || {};
+      return [{
+        type: "Feature" as const,
+        properties: {
+          kind: "design_asset_record",
+          id: String(record.id),
+          label: record.display_label || record.record_key,
+          status: record.status,
+          recordKey: record.record_key,
+          assetTypeSlug: record.asset_type_slug || "",
+          assetType: record.asset_type_display_name || "Editable planning asset",
+          source: record.source,
+          visibility: record.visibility,
+          version: record.version,
+          mapColor: stringStyleValue(style.color, "#55d6ff"),
+          strokeColor: stringStyleValue(style.strokeColor, "#ffffff"),
+          lineWidth: numberStyleValue(style.lineWidth, 3),
+          fillOpacity: numberStyleValue(style.fillOpacity, 0.18),
+          radius: numberStyleValue(style.radius, 8),
+          synthetic: record.source.includes("synthetic") || record.visibility === "synthetic-demo",
+          warning: "Schema-backed editable planning asset. Use synthetic/demo data only; do not enter CEII, SCADA, relay, protection, telecom, or private fiber-route data.",
+        },
+        geometry,
+      }];
+    })) : emptyCollection,
     substations: collection(substations.filter((substation) => layers.substations && hasCoordinates(substation)).map((substation) => ({
       type: "Feature",
       properties: { kind: "substation", id: substation.id, label: substation.abbreviation || substation.name, status: substation.status, visibility: substation.visibility, voltageKv: substation.voltageKv?.[0] || 0 },
@@ -2290,6 +2373,7 @@ function buildSelectionLookup(
   distributionSlackLoops: DistributionSlackLoopFeature[],
   distributionFiberAssignments: DistributionFiberAssignmentFeature[],
   patchPanels: PatchPanel[],
+  designAssetRecords: DesignAssetRecord[],
   planningRegions: PlanningRegion[],
 ) {
   const lookup: Record<string, StreetMapSelection> = {};
@@ -2465,6 +2549,15 @@ function buildSelectionLookup(
       record,
     };
   });
+  designAssetRecords.forEach((record) => {
+    if (record.id < 0) return;
+    lookup[`design_asset_record:${record.id}`] = {
+      kind: "design_asset_record",
+      id: String(record.id),
+      label: record.display_label || record.record_key,
+      record,
+    };
+  });
   planningRegions.forEach((record) => {
     lookup[`planning_region:${record.id}`] = { kind: "planning_region", id: record.id, label: record.name, record };
   });
@@ -2601,6 +2694,7 @@ function selectionCoordinates(selection: StreetMapSelection): Coordinate[] {
   if (selection.kind === "distribution_splice_point") return [selection.record.geometry.coordinates];
   if (selection.kind === "distribution_slack_loop") return [selection.record.geometry.coordinates];
   if (selection.kind === "distribution_fiber_assignment") return selection.record.geometry.coordinates;
+  if (selection.kind === "design_asset_record") return coordinatesFromDesignGeometry(selection.record.geometry || selection.record.geometry_json);
   if (selection.kind === "gis_pole" || selection.kind === "gis_vector_asset") {
     const longitude = Number(selection.record.longitude);
     const latitude = Number(selection.record.latitude);
@@ -2623,6 +2717,24 @@ function boundsFromCoordinates(coordinates: Coordinate[]): LngLatBoundsLike {
 
 function hasCoordinates(asset: { latitude?: number; longitude?: number }) {
   return typeof asset.latitude === "number" && typeof asset.longitude === "number";
+}
+
+function stringStyleValue(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function numberStyleValue(value: unknown, fallback: number) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function coordinatesFromDesignGeometry(geometry: DesignAssetRecord["geometry"] | DesignAssetRecord["geometry_json"]): Coordinate[] {
+  if (!geometry) return [];
+  if (geometry.type === "Point") return [geometry.coordinates];
+  if (geometry.type === "LineString") return geometry.coordinates;
+  if (geometry.type === "MultiLineString") return geometry.coordinates.flat();
+  if (geometry.type === "Polygon") return geometry.coordinates.flat();
+  return geometry.coordinates.flat(2);
 }
 
 function setCursor(map: MapLibreMap, cursor: string) {
