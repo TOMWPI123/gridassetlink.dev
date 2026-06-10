@@ -55,7 +55,10 @@ export function buildOpgwOutageImpactView(
   const services = resolveServicesForOutageTarget(targetType, normalizedId, data);
   if (!services.length) return null;
 
-  const selectedSplicePointId = targetType === "splice_point" ? normalizedId : undefined;
+  const selectedSplicePointId =
+    targetType === "splice_point" || targetType === "splice_closure"
+      ? buildSpliceManagerView(normalizedId, data)?.header.splicePointId
+      : undefined;
   const paths = services.map((service) => traceSyntheticService(service, data, selectedSplicePointId));
   const impactedTransmissionLines = unique(paths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId).filter(Boolean) as string[]));
   const impactedCableSections = unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId)));

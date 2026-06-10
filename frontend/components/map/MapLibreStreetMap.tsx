@@ -1967,21 +1967,30 @@ function renderPopupHtml(label: unknown, kind: string, status: unknown, warning?
 }
 
 function renderSplicePopupHtml(properties: Record<string, unknown>) {
-  const splicePointId = String(properties.splicePointId || properties.id || "");
-  const closureId = String(properties.closureId || "");
-  const managerHref = `/opgw/splices/${encodeURIComponent(splicePointId)}`;
+  const kind = String(properties.kind || "");
+  const recordId = String(properties.id || "");
+  const splicePointId = String(properties.splicePointId || (kind === "opgw_splice_point" ? recordId : ""));
+  const closureId = String(properties.closureId || (kind === "splice_closure" ? recordId : ""));
+  const targetId = splicePointId || closureId || recordId;
+  const continuityHref = splicePointId
+    ? `/fiber-trace?splicePoint=${encodeURIComponent(splicePointId)}`
+    : `/fiber-trace?spliceClosure=${encodeURIComponent(closureId)}`;
+  const outageHref = splicePointId
+    ? `/outage-impact?splicePoint=${encodeURIComponent(splicePointId)}`
+    : `/outage-impact?spliceClosure=${encodeURIComponent(closureId)}`;
+  const workOrderHref = splicePointId
+    ? `/work-orders/new?splicePoint=${encodeURIComponent(splicePointId)}`
+    : `/work-orders/new?spliceClosure=${encodeURIComponent(closureId)}`;
+  const managerHref = `/opgw/splices/${encodeURIComponent(targetId)}`;
   const diagramHref = `${managerHref}/diagram`;
-  const continuityHref = `/fiber-trace?splicePoint=${encodeURIComponent(splicePointId)}`;
   const existingHref = `${managerHref}?layer=existing`;
   const proposedHref = `${managerHref}?layer=proposed`;
-  const outageHref = `/outage-impact?splicePoint=${encodeURIComponent(splicePointId)}`;
-  const workOrderHref = `/work-orders/new?splicePoint=${encodeURIComponent(splicePointId)}`;
   return `
     <div class="maplibre-popup-card splice-popup-card">
-      <strong>${escapeHtml(String(properties.label || splicePointId))}</strong>
+      <strong>${escapeHtml(String(properties.label || targetId))}</strong>
       <span>${escapeHtml(String(properties.kind || "splice node").replaceAll("_", " "))} / ${escapeHtml(String(properties.status || "synthetic_existing"))}</span>
       <dl>
-        <div><dt>Splice point</dt><dd>${escapeHtml(splicePointId)}</dd></div>
+        <div><dt>Splice point</dt><dd>${escapeHtml(splicePointId || "resolved by closure")}</dd></div>
         <div><dt>Closure</dt><dd>${escapeHtml(closureId || "-")}</dd></div>
         <div><dt>Structure</dt><dd>${escapeHtml(String(properties.structureId || properties.structureNumber || "-"))}</dd></div>
         <div><dt>Line</dt><dd>${escapeHtml(String(properties.transmissionLineId || "-"))}</dd></div>

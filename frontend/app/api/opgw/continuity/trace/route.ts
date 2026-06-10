@@ -8,10 +8,12 @@ export async function POST(request: Request) {
   const data = await loadSyntheticFiberContinuityData();
   const normalizedServiceId = body.serviceId ? decodeURIComponent(body.serviceId) : undefined;
 
-  if (normalizedServiceId && !body.assignmentId && !body.strandId && !body.cableSectionId && !body.layerType) {
+  const selectedSplicePointId = resolveSelectedSplicePointId(body, data);
+
+  if (normalizedServiceId && !body.assignmentId && !body.strandId && !body.cableSectionId && !body.spliceClosureId && !body.layerType) {
     const service = data.syntheticServices.find((item) => item.serviceId === normalizedServiceId);
     if (!service) return NextResponse.json({ error: "Synthetic service not found" }, { status: 404 });
-    return NextResponse.json(traceSyntheticService(service, data, body.splicePointId));
+    return NextResponse.json(traceSyntheticService(service, data, selectedSplicePointId));
   }
 
   const services = resolveTraceServices(body, data.syntheticServices, data);
@@ -19,12 +21,11 @@ export async function POST(request: Request) {
   if (!filteredServices.length) {
     return NextResponse.json({
       error: "No synthetic services matched the requested continuity trace input",
-      acceptedInputs: ["serviceId", "assignmentId", "strandId", "cableSectionId", "splicePointId", "layerType"],
+      acceptedInputs: ["serviceId", "assignmentId", "strandId", "cableSectionId", "splicePointId", "spliceClosureId", "layerType"],
       syntheticFlag: true,
     }, { status: 404 });
   }
 
-  const selectedSplicePointId = body.splicePointId ? decodeURIComponent(body.splicePointId) : undefined;
   const paths = filteredServices.map((service) => traceSyntheticService(service, data, selectedSplicePointId));
   return NextResponse.json({
     input: body,
@@ -60,6 +61,7 @@ type TraceRequestPayload = {
   strandId?: string;
   cableSectionId?: string;
   splicePointId?: string;
+  spliceClosureId?: string;
   layerType?: "existing" | "proposed" | "compare";
 };
 
@@ -97,8 +99,18 @@ function resolveTraceServices(payload: TraceRequestPayload, services: SyntheticS
     const view = buildSpliceManagerView(payload.splicePointId, data);
     view?.services.forEach(add);
   }
+  if (payload.spliceClosureId) {
+    const view = buildSpliceManagerView(payload.spliceClosureId, data);
+    view?.services.forEach(add);
+  }
 
   return Array.from(matched.values());
+}
+
+function resolveSelectedSplicePointId(payload: TraceRequestPayload, data: ContinuityData) {
+  if (payload.splicePointId) return buildSpliceManagerView(payload.splicePointId, data)?.header.splicePointId || decodeURIComponent(payload.splicePointId);
+  if (payload.spliceClosureId) return buildSpliceManagerView(payload.spliceClosureId, data)?.header.splicePointId;
+  return undefined;
 }
 
 function addServicesForCableSection(routeId: string, services: SyntheticService[], data: ContinuityData, matched: Map<string, SyntheticService>) {

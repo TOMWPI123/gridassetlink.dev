@@ -14,15 +14,17 @@ type PageProps = {
 export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams;
   const splicePointId = firstQueryValue(params?.splicePoint);
+  const spliceClosureId = firstQueryValue(params?.spliceClosure);
   const serviceId = firstQueryValue(params?.service);
   const cableId = firstQueryValue(params?.cable);
+  const spliceTargetId = splicePointId || spliceClosureId;
 
-  if (!splicePointId && !serviceId && !cableId) return <LegacyCircuitFiberTracePage />;
+  if (!spliceTargetId && !serviceId && !cableId) return <LegacyCircuitFiberTracePage />;
 
   const data = await loadSyntheticFiberContinuityData();
 
-  if (splicePointId) {
-    const view = buildSpliceManagerView(splicePointId, data);
+  if (spliceTargetId) {
+    const view = buildSpliceManagerView(spliceTargetId, data);
     if (!view) notFound();
     return (
       <OpgwFiberTraceView

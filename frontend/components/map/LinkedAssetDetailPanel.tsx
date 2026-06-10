@@ -77,17 +77,22 @@ export function LinkedAssetDetailPanel({ selection, onClose }: LinkedAssetDetail
       ) : null}
       {selection.kind === "opgw_splice_point" ? (
         <div className="linked-asset-actions">
+          <a href={`/opgw/splices/${encodeURIComponent(selection.id)}/diagram`}>Interactive Splicing Diagram</a>
           <a href={`/opgw/splices/${encodeURIComponent(selection.id)}`}>Open Splice Manager</a>
           <a href={`/fiber-trace?splicePoint=${encodeURIComponent(selection.id)}`}>Open Fiber Trace</a>
           <a href={`/opgw/splices/${encodeURIComponent(selection.id)}?layer=existing`}>View existing splices</a>
           <a href={`/opgw/splices/${encodeURIComponent(selection.id)}?layer=proposed`}>View proposed splices</a>
+          <a href={`/outage-impact?splicePoint=${encodeURIComponent(selection.id)}`}>Analyze outage impact</a>
           <a href={`/work-orders/new?splicePoint=${encodeURIComponent(selection.id)}`}>Create work order</a>
         </div>
       ) : null}
       {selection.kind === "splice_closure" ? (
         <div className="linked-asset-actions">
+          <a href={`/opgw/splices/${encodeURIComponent(selection.id)}/diagram`}>Interactive Splicing Diagram</a>
           <a href={`/opgw/splices/${encodeURIComponent(selection.id)}`}>Open Splice Manager</a>
           <a href={`/fiber-trace?spliceClosure=${encodeURIComponent(selection.id)}`}>Open Fiber Trace</a>
+          <a href={`/opgw/splices/${encodeURIComponent(selection.id)}?layer=existing`}>View existing splices</a>
+          <a href={`/opgw/splices/${encodeURIComponent(selection.id)}?layer=proposed`}>View proposed splices</a>
           <a href={`/outage-impact?spliceClosure=${encodeURIComponent(selection.id)}`}>Analyze outage impact</a>
           <a href={`/work-orders/new?spliceClosure=${encodeURIComponent(selection.id)}`}>Create work order</a>
         </div>

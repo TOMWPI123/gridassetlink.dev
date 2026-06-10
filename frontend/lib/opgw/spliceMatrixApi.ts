@@ -1,5 +1,6 @@
 import type { FiberSplice, SyntheticService } from "@/lib/types/assets";
 import {
+  buildClosureToSplicePointId,
   buildSpliceManagerView,
   traceSyntheticService,
   type FiberContinuityData,
@@ -28,6 +29,7 @@ export type SpliceMatrixRecord = {
 };
 
 const DEMO_NOW = "2026-06-07T00:00:00Z";
+const FIBER_COLORS = ["Blue", "Orange", "Green", "Brown", "Slate", "White", "Red", "Black", "Yellow", "Violet", "Rose", "Aqua"];
 
 export function matricesForSplicePoint(splicePointId: string, data: FiberContinuityData) {
   const view = buildSpliceManagerView(splicePointId, data);
@@ -58,13 +60,35 @@ export function findSpliceMatrix(matrixId: string, data: FiberContinuityData) {
 }
 
 export function allSpliceConnections(data: FiberContinuityData) {
-  return data.fiberSplices.map((connection) => ({
-    ...connection,
-    layerType: connection.status === "existing" ? "existing" : "proposed",
-    syntheticFlag: true,
-    readOnly: connection.status === "existing",
-    notes: connection.notes || "Synthetic demo splice connection.",
-  }));
+  const closureToPoint = buildClosureToSplicePointId(data.opgwSplicePoints);
+  return data.fiberSplices.map((connection) => {
+    const splicePointId = closureToPoint.get(connection.spliceClosureId);
+    const layerType = connection.status === "existing" ? "existing" : "proposed";
+    const service = data.syntheticServices.find((item) => item.primaryPathAssignmentId === connection.assignmentId || item.backupPathAssignmentId === connection.assignmentId);
+    return {
+      ...connection,
+      spliceConnectionId: connection.id,
+      spliceMatrixId: splicePointId ? `MATRIX-${splicePointId}-${layerType.toUpperCase()}` : undefined,
+      splicePointId,
+      spliceClosureId: connection.spliceClosureId,
+      fromCableSectionId: connection.fromCableId,
+      fromStrandId: strandIdFor(connection.fromCableId, connection.fromStrandNumber),
+      fromBufferTube: tubeNumber(connection.fromStrandNumber),
+      fromStrandColor: strandColor(connection.fromStrandNumber),
+      toCableSectionId: connection.toCableId,
+      toStrandId: strandIdFor(connection.toCableId, connection.toStrandNumber),
+      toBufferTube: tubeNumber(connection.toStrandNumber),
+      toStrandColor: strandColor(connection.toStrandNumber),
+      serviceId: service?.serviceId,
+      connectionStatus: connection.status === "faulted" ? "faulted" : connection.spliceType === "open" ? "open" : "connected",
+      layerType,
+      lossEstimateDb: connection.lossDb ?? 0,
+      testResultDb: connection.status === "faulted" ? undefined : Number(((connection.lossDb ?? 0.06) + 0.01).toFixed(3)),
+      syntheticFlag: true,
+      readOnly: connection.status === "existing",
+      notes: connection.notes || "Synthetic demo splice connection.",
+    };
+  });
 }
 
 export function findSyntheticService(serviceId: string, data: FiberContinuityData) {
@@ -193,6 +217,18 @@ function withoutConnections(matrix: SpliceMatrixRecord) {
 
 function connectionKey(row: FiberSplice) {
   return `${row.fromCableId}:${row.fromStrandNumber}->${row.toCableId}:${row.toStrandNumber}:${row.spliceType}`;
+}
+
+function strandIdFor(cableId: string, strandNumber: number) {
+  return `${cableId}-STRAND-${String(strandNumber).padStart(3, "0")}`;
+}
+
+function tubeNumber(strandNumber: number) {
+  return Math.max(1, Math.ceil(strandNumber / 12));
+}
+
+function strandColor(strandNumber: number) {
+  return FIBER_COLORS[(Math.max(1, strandNumber) - 1) % FIBER_COLORS.length];
 }
 
 function endpointKeys(row: FiberSplice) {
