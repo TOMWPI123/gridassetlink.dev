@@ -151,6 +151,15 @@ type DashboardContinuitySummary = {
   warningSummary: string[];
   traceHref: string;
 };
+type DashboardMapDataGroup =
+  | "publicReference"
+  | "fccReference"
+  | "opgwTopology"
+  | "fiberDetails"
+  | "patchPanels"
+  | "spliceContinuity"
+  | "distributionDetails"
+  | "distributionPoleSample";
 
 const availableDeviceIds = ["NODE-WBS-ICON", "NODE-AUB-ICON", "NODE-BOS-OTN", "NODE-RI-RTR", "NODE-NH-MW"];
 const availableCircuitIds = ["87L-MA-WBS-AUB-001", "87L-MA-WBS-AUB-002", "DTT-MA-AUB-MIL-001", "SCADA-MA-BOS-RI-001", "DWDM-ME-BOS-001"];
@@ -329,6 +338,16 @@ export function DashboardPage() {
   const [designAssetMessage, setDesignAssetMessage] = useState("");
   const [gisApiBase, setGisApiBase] = useState(API_BASE);
   const designFeaturesEnabled = MAP_EDITING_ENABLED || designModeEnabled;
+  const mountedRef = useRef(false);
+  const loadedMapDataGroupsRef = useRef<Set<DashboardMapDataGroup>>(new Set());
+  const loadingMapDataGroupsRef = useRef<Set<DashboardMapDataGroup>>(new Set());
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -340,144 +359,247 @@ export function DashboardPage() {
     setGisApiBase(getStoredGisApiBase());
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadStaticMapData() {
+  const loadMapDataGroups = useCallback(async (requestedGroups: DashboardMapDataGroup[]) => {
+    const groups = requestedGroups.filter((group, index) => requestedGroups.indexOf(group) === index);
+    const pendingGroups = groups.filter((group) => !loadedMapDataGroupsRef.current.has(group) && !loadingMapDataGroupsRef.current.has(group));
+    if (!pendingGroups.length) return;
+    pendingGroups.forEach((group) => loadingMapDataGroupsRef.current.add(group));
+
+    await Promise.all(pendingGroups.map(async (group) => {
       const warnings: Record<string, string> = {};
-      const publicLines = await fetchGeoJson<PublicTransmissionLineCollection>("/data/iso-ne-public-transmission-lines.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.publicLines = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as PublicTransmissionLineFeature[];
-        });
-      const publicSubstationRecords = await fetchGeoJson<PublicSubstationCollection>("/data/iso-ne-public-substations.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.publicSubstations = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as PublicSubstationFeature[];
-        });
-      const structures = await fetchGeoJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.structures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as TransmissionStructureFeature[];
-        });
-      const closures = await fetchGeoJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.spliceClosures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as SpliceClosureFeature[];
-        });
-      const cables = await fetchGeoJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.opgwCables = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as OpgwCableFeature[];
-        });
-      const strands = await fetchGeoJson<FiberStrand[]>("/data/iso-ne-synthetic-fiber-strands.json").catch((error) => {
-        warnings.fiberStrands = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as FiberStrand[];
-      });
-      const assignments = await fetchGeoJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json").catch((error) => {
-        warnings.fiberAssignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as FiberAssignment[];
-      });
-      const panels = await fetchGeoJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json").catch((error) => {
-        warnings.patchPanels = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as PatchPanel[];
-      });
-      const fccTowers = await fetchGeoJson<FccUtilityTowerCollection>("/data/fcc-uls-utility-towers.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.fccUtilityTowers = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as FccUtilityTowerFeature[];
-        });
-      const fccLinks = await fetchGeoJson<FccMicrowaveLinkCollection>("/data/fcc-uls-utility-microwave-links.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.fccMicrowaveLinks = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as FccMicrowaveLinkFeature[];
-        });
-      const splices = await fetchGeoJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json").catch((error) => {
-        warnings.splices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as FiberSplice[];
-      });
-      const services = await fetchGeoJson<SyntheticService[]>("/data/iso-ne-synthetic-services.json").catch((error) => {
-        warnings.syntheticServices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as SyntheticService[];
-      });
-      const strandContinuity = await fetchGeoJson<StrandContinuityRecord[]>("/data/iso-ne-synthetic-strand-continuity.json").catch((error) => {
-        warnings.strandContinuity = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-        return [] as StrandContinuityRecord[];
-      });
-      const distributionPoleRecords = LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE
-        ? await fetchGeoJson<DistributionPoleCollection>("/data/iso-ne-synthetic-distribution-poles.geojson")
-          .then((collection) => collection.features || [])
-          .catch((error) => {
-            warnings.distributionPoles = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-            return [] as DistributionPoleFeature[];
-          })
-        : [] as DistributionPoleFeature[];
-      if (!LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE) {
-        warnings.distributionPoles = "Static pole point sample disabled. Production-scale poles are served through PostGIS vector tiles at street zoom.";
+      try {
+        if (group === "publicReference") {
+          const [publicLines, publicSubstationRecords, distributionDensityRecords] = await Promise.all([
+            fetchGeoJson<PublicTransmissionLineCollection>("/data/iso-ne-public-transmission-lines.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.publicLines = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as PublicTransmissionLineFeature[];
+              }),
+            fetchGeoJson<PublicSubstationCollection>("/data/iso-ne-public-substations.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.publicSubstations = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as PublicSubstationFeature[];
+              }),
+            fetchGeoJson<DistributionPoleDensityCollection>("/data/iso-ne-synthetic-distribution-pole-density.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.distributionPoleDensity = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as DistributionPoleDensityFeature[];
+              }),
+          ]);
+          if (!mountedRef.current) return;
+          setPublicTransmissionLines(publicLines);
+          setPublicSubstations(publicSubstationRecords);
+          setDistributionPoleDensity(distributionDensityRecords);
+          if (!LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE) {
+            warnings.distributionPoles = "Static pole point sample disabled. Production-scale poles are served through PostGIS vector tiles at street zoom.";
+          }
+        }
+
+        if (group === "fccReference") {
+          const [fccTowers, fccLinks] = await Promise.all([
+            fetchGeoJson<FccUtilityTowerCollection>("/data/fcc-uls-utility-towers.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.fccUtilityTowers = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as FccUtilityTowerFeature[];
+              }),
+            fetchGeoJson<FccMicrowaveLinkCollection>("/data/fcc-uls-utility-microwave-links.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.fccMicrowaveLinks = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as FccMicrowaveLinkFeature[];
+              }),
+          ]);
+          if (!mountedRef.current) return;
+          setFccUtilityTowers(fccTowers);
+          setFccMicrowaveLinks(fccLinks);
+        }
+
+        if (group === "opgwTopology") {
+          const [structures, closures, cables] = await Promise.all([
+            fetchGeoJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.structures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as TransmissionStructureFeature[];
+              }),
+            fetchGeoJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.spliceClosures = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as SpliceClosureFeature[];
+              }),
+            fetchGeoJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.opgwCables = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as OpgwCableFeature[];
+              }),
+          ]);
+          if (!mountedRef.current) return;
+          setTransmissionStructures(structures);
+          setSpliceClosures(closures);
+          setOpgwCables(cables);
+        }
+
+        if (group === "fiberDetails") {
+          const [strands, assignments] = await Promise.all([
+            fetchGeoJson<FiberStrand[]>("/data/iso-ne-synthetic-fiber-strands.json").catch((error) => {
+              warnings.fiberStrands = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+              return [] as FiberStrand[];
+            }),
+            fetchGeoJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json").catch((error) => {
+              warnings.fiberAssignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+              return [] as FiberAssignment[];
+            }),
+          ]);
+          if (!mountedRef.current) return;
+          setFiberStrands(strands);
+          setFiberAssignments(assignments);
+        }
+
+        if (group === "patchPanels") {
+          const panels = await fetchGeoJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json").catch((error) => {
+            warnings.patchPanels = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+            return [] as PatchPanel[];
+          });
+          if (!mountedRef.current) return;
+          setPatchPanels(panels);
+        }
+
+        if (group === "spliceContinuity") {
+          const [splices, services, strandContinuity] = await Promise.all([
+            fetchGeoJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json").catch((error) => {
+              warnings.splices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+              return [] as FiberSplice[];
+            }),
+            fetchGeoJson<SyntheticService[]>("/data/iso-ne-synthetic-services.json").catch((error) => {
+              warnings.syntheticServices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+              return [] as SyntheticService[];
+            }),
+            fetchGeoJson<StrandContinuityRecord[]>("/data/iso-ne-synthetic-strand-continuity.json").catch((error) => {
+              warnings.strandContinuity = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+              return [] as StrandContinuityRecord[];
+            }),
+          ]);
+          if (!mountedRef.current) return;
+          setFiberSplices(splices);
+          setSyntheticServices(services);
+          setStrandContinuityRecords(strandContinuity);
+        }
+
+        if (group === "distributionDetails") {
+          const [distributionFiberRoutes, distributionSpliceRecords, distributionSlackRecords, distributionFiberAssignmentRecords] = await Promise.all([
+            fetchGeoJson<DistributionPoleFiberRouteCollection>("/data/iso-ne-synthetic-distribution-pole-fiber.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.distributionPoleFiberRoutes = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as DistributionPoleFiberRouteFeature[];
+              }),
+            fetchGeoJson<DistributionPoleSplicePointCollection>("/data/iso-ne-synthetic-distribution-splice-points.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.distributionSplicePoints = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as DistributionPoleSplicePointFeature[];
+              }),
+            fetchGeoJson<DistributionSlackLoopCollection>("/data/iso-ne-synthetic-distribution-slack-loops.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.distributionSlackLoops = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as DistributionSlackLoopFeature[];
+              }),
+            fetchGeoJson<DistributionFiberAssignmentCollection>("/data/iso-ne-synthetic-distribution-fiber-assignments.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.distributionFiberAssignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as DistributionFiberAssignmentFeature[];
+              }),
+          ]);
+          if (!mountedRef.current) return;
+          setDistributionPoleFiberRoutes(distributionFiberRoutes);
+          setDistributionSplicePoints(distributionSpliceRecords);
+          setDistributionSlackLoops(distributionSlackRecords);
+          setDistributionFiberAssignments(distributionFiberAssignmentRecords);
+        }
+
+        if (group === "distributionPoleSample") {
+          const distributionPoleRecords = LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE
+            ? await fetchGeoJson<DistributionPoleCollection>("/data/iso-ne-synthetic-distribution-poles.geojson")
+              .then((collection) => collection.features || [])
+              .catch((error) => {
+                warnings.distributionPoles = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+                return [] as DistributionPoleFeature[];
+              })
+            : [] as DistributionPoleFeature[];
+          if (!LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE) {
+            warnings.distributionPoles = "Static pole point sample disabled. Production-scale poles are served through PostGIS vector tiles at street zoom.";
+          }
+          if (!mountedRef.current) return;
+          setDistributionPoles(distributionPoleRecords);
+        }
+
+        loadedMapDataGroupsRef.current.add(group);
+      } finally {
+        loadingMapDataGroupsRef.current.delete(group);
+        if (mountedRef.current && Object.keys(warnings).length) {
+          setMapDataWarnings((current) => ({ ...current, ...warnings }));
+        }
       }
-      const distributionFiberRoutes = await fetchGeoJson<DistributionPoleFiberRouteCollection>("/data/iso-ne-synthetic-distribution-pole-fiber.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.distributionPoleFiberRoutes = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as DistributionPoleFiberRouteFeature[];
-        });
-      const distributionDensityRecords = await fetchGeoJson<DistributionPoleDensityCollection>("/data/iso-ne-synthetic-distribution-pole-density.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.distributionPoleDensity = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as DistributionPoleDensityFeature[];
-        });
-      const distributionSpliceRecords = await fetchGeoJson<DistributionPoleSplicePointCollection>("/data/iso-ne-synthetic-distribution-splice-points.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.distributionSplicePoints = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as DistributionPoleSplicePointFeature[];
-        });
-      const distributionSlackRecords = await fetchGeoJson<DistributionSlackLoopCollection>("/data/iso-ne-synthetic-distribution-slack-loops.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.distributionSlackLoops = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as DistributionSlackLoopFeature[];
-        });
-      const distributionFiberAssignmentRecords = await fetchGeoJson<DistributionFiberAssignmentCollection>("/data/iso-ne-synthetic-distribution-fiber-assignments.geojson")
-        .then((collection) => collection.features || [])
-        .catch((error) => {
-          warnings.distributionFiberAssignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-          return [] as DistributionFiberAssignmentFeature[];
-        });
-      if (cancelled) return;
-      setPublicTransmissionLines(publicLines);
-      setPublicSubstations(publicSubstationRecords);
-      setTransmissionStructures(structures);
-      setSpliceClosures(closures);
-      setOpgwCables(cables);
-      setFiberStrands(strands);
-      setFiberAssignments(assignments);
-      setPatchPanels(panels);
-      setFccUtilityTowers(fccTowers);
-      setFccMicrowaveLinks(fccLinks);
-      setFiberSplices(splices);
-      setSyntheticServices(services);
-      setStrandContinuityRecords(strandContinuity);
-      setDistributionPoleDensity(distributionDensityRecords);
-      setDistributionPoles(distributionPoleRecords);
-      setDistributionPoleFiberRoutes(distributionFiberRoutes);
-      setDistributionSplicePoints(distributionSpliceRecords);
-      setDistributionSlackLoops(distributionSlackRecords);
-      setDistributionFiberAssignments(distributionFiberAssignmentRecords);
-      setMapDataWarnings(warnings);
-    }
-    void loadStaticMapData();
-    return () => {
-      cancelled = true;
-    };
+    }));
   }, []);
+
+  useEffect(() => {
+    void loadMapDataGroups(["publicReference"]);
+  }, [loadMapDataGroups]);
+
+  useEffect(() => {
+    const groups: DashboardMapDataGroup[] = [];
+    if (streetLayers.fccUtilityTowers || streetLayers.fccMicrowaveLinks || searchLayerFilter === "fccUtilityTowers" || searchLayerFilter === "fccMicrowaveLinks") groups.push("fccReference");
+
+    const needsOpgwTopology = streetLayers.transmissionStructures
+      || streetLayers.syntheticOpgwCables
+      || streetLayers.assumedOpgwRoutes
+      || streetLayers.plannedOpgwFiber
+      || streetLayers.verifiedOpgwFiber
+      || streetLayers.opgwRoutes
+      || streetLayers.opgwCableSections
+      || streetLayers.opgwSpanSegments
+      || streetLayers.opgwSplicePoints
+      || streetLayers.spliceClosures
+      || streetLayers.existingFiberSplices
+      || streetLayers.proposedFiberSplices
+      || streetLayers.compareSpliceLayers
+      || streetLayers.patchPanels
+      || streetLayers.availableStrandCapacity
+      || streetLayers.criticalRidingCircuits
+      || streetLayers.opgwOutageImpact
+      || streetLayers.opgwOpenWorkOrders
+      || streetLayers.opgwSpanInspectionIssues
+      || streetLayers.strandContinuity
+      || rightMode === "splices"
+      || rightMode === "strands"
+      || rightMode === "assignments"
+      || Boolean(continuityHighlight);
+    if (needsOpgwTopology) groups.push("opgwTopology");
+
+    if (streetLayers.availableStrandCapacity || streetLayers.fiberAssignments || streetLayers.criticalRidingCircuits || streetLayers.strandContinuity || rightMode === "strands" || rightMode === "assignments" || Boolean(continuityHighlight)) {
+      groups.push("fiberDetails");
+    }
+    if (streetLayers.patchPanels || streetLayers.strandContinuity || rightMode === "strands" || Boolean(continuityHighlight)) {
+      groups.push("patchPanels");
+    }
+    if (streetLayers.existingFiberSplices || streetLayers.proposedFiberSplices || streetLayers.compareSpliceLayers || streetLayers.strandContinuity || rightMode === "splices" || Boolean(continuityHighlight)) {
+      groups.push("spliceContinuity");
+    }
+    if (streetLayers.distributionFiberRoutes || streetLayers.distributionSplicePoints || streetLayers.distributionSlackLoops || streetLayers.distributionFiberAssignments || searchLayerFilter === "distributionFiberRoutes") {
+      groups.push("distributionDetails");
+    }
+    if (streetLayers.distributionPoles) groups.push("distributionPoleSample");
+    if (groups.length) void loadMapDataGroups(groups);
+  }, [continuityHighlight, loadMapDataGroups, rightMode, searchLayerFilter, streetLayers]);
 
   const loadDesignAssets = useCallback(async () => {
     if (!designFeaturesEnabled) return;
