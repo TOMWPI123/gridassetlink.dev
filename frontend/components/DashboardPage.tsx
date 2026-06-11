@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, PencilRuler, Plus, RadioTower, Route, Search, Send, SlidersHorizontal, TableProperties, Terminal, Upload, Workflow, X } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, PencilRuler, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Upload, Workflow, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { appNavGroups } from "@/components/navigation";
 import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
 import { seedMapNodes } from "@/data/nodeParameters";
@@ -21,7 +21,7 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type ContinuityHighlight, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, DesignAgentTool, DesignAgentToolRunResult, DesignAssetBlueprint, DesignAssetField, DesignAssetFieldType, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignBlueprintInstallResult, DesignMaterializationBatchResult, DesignMaterializationResult, DesignModuleBlueprint, DesignModuleEntity, DesignModuleSnapshotMaterializeResult, DesignModuleSnapshotResult, DesignRebuildAudit, DesignRebuildPackage, DesignRebuildPackageImportResult, DesignTerminalCommandResult, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StrandContinuityRecord, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, DesignAgentTool, DesignAgentToolRunResult, DesignAssetBlueprint, DesignAssetField, DesignAssetFieldType, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignBlueprintInstallResult, DesignMaterializationBatchResult, DesignMaterializationResult, DesignModuleBlueprint, DesignModuleEntity, DesignModuleSnapshotMaterializeResult, DesignModuleSnapshotResult, DesignRebuildAudit, DesignRebuildPackage, DesignRebuildPackageImportResult, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StrandContinuityRecord, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const MAP_EDITING_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MAP_EDITING === "true";
 const designFieldTypeOptions: DesignAssetFieldType[] = ["string", "textarea", "number", "integer", "boolean", "date", "enum", "json"];
@@ -33,7 +33,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   fccUtilityTowers: false,
   fccMicrowaveLinks: false,
   syntheticSubstations: false,
-  transmissionStructures: true,
+  transmissionStructures: false,
   syntheticOpgwCables: false,
   assumedOpgwRoutes: false,
   plannedOpgwFiber: false,
@@ -45,7 +45,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   proposedFiberSplices: false,
   compareSpliceLayers: false,
   fiberStrandsLayer: false,
-  spliceClosures: true,
+  spliceClosures: false,
   fiberAssignments: false,
   strandContinuity: false,
   patchPanels: false,
@@ -83,26 +83,26 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   ...initialStreetLayers,
   publicTransmissionLines: true,
   publicSubstations: true,
-  fccUtilityTowers: true,
-  fccMicrowaveLinks: true,
-  transmissionStructures: true,
-  assumedOpgwRoutes: true,
-  plannedOpgwFiber: true,
-  opgwCableSections: true,
-  opgwSpanSegments: true,
-  opgwSplicePoints: true,
+  fccUtilityTowers: false,
+  fccMicrowaveLinks: false,
+  transmissionStructures: false,
+  assumedOpgwRoutes: false,
+  plannedOpgwFiber: false,
+  opgwCableSections: false,
+  opgwSpanSegments: false,
+  opgwSplicePoints: false,
   distributionPoleDensity: true,
   distributionPoles: false,
-  distributionFiberRoutes: true,
-  distributionSplicePoints: true,
+  distributionFiberRoutes: false,
+  distributionSplicePoints: false,
   distributionSlackLoops: false,
-  distributionFiberAssignments: true,
-  existingFiberSplices: true,
-  proposedFiberSplices: true,
+  distributionFiberAssignments: false,
+  existingFiberSplices: false,
+  proposedFiberSplices: false,
   compareSpliceLayers: false,
-  spliceClosures: true,
+  spliceClosures: false,
   strandContinuity: false,
-  availableStrandCapacity: true,
+  availableStrandCapacity: false,
   designAssets: MAP_EDITING_ENABLED,
 };
 
@@ -129,66 +129,6 @@ type DashboardLayerSummary = {
   enabled: boolean;
   moduleHref: string;
   safety: string;
-};
-type DashboardTerminalMessage = {
-  id: string;
-  role: "user" | "assistant" | "system";
-  text: string;
-  details?: string[];
-};
-type DashboardTerminalContextAsset = {
-  id: string;
-  label: string;
-  kind: StreetMapSelection["kind"] | "typed_reference";
-  coordinates?: Coordinate;
-};
-type TerminalLayerAction = "help" | "list" | "show" | "hide" | "only" | "toggle" | "reset" | "clear";
-type TerminalLayerOption = {
-  key: StreetMapLayerKey;
-  label: string;
-  aliases: string[];
-  summary?: DashboardLayerSummary;
-};
-type ParsedTerminalLayerCommand = {
-  action: TerminalLayerAction;
-  targets: TerminalLayerOption[];
-  missingTargets: string[];
-};
-type DashboardLiveStatusPayload = {
-  intel: {
-    symbol: string;
-    name?: string;
-    exchange?: string;
-    currency?: string;
-    price?: number | null;
-    previous_close?: number | null;
-    change?: number | null;
-    change_percent?: number | null;
-    as_of?: string | null;
-    status?: string;
-    source?: string;
-    source_url?: string;
-    message?: string;
-  };
-  nba: {
-    league?: string;
-    season_type?: string;
-    status?: string;
-    status_detail?: string | null;
-    game_date?: string | null;
-    short_name?: string | null;
-    home_team?: string | null;
-    away_team?: string | null;
-    home_abbreviation?: string | null;
-    away_abbreviation?: string | null;
-    home_score?: string | number | null;
-    away_score?: string | number | null;
-    venue?: string | null;
-    series_summary?: string | null;
-    source?: string;
-    source_url?: string;
-  };
-  updated_at?: string;
 };
 type DashboardContinuitySummary = {
   label: string;
@@ -387,18 +327,7 @@ export function DashboardPage() {
   const [pendingDesignGeometry, setPendingDesignGeometry] = useState<DesignAssetGeoJsonGeometry | null>(null);
   const [designDrawingCoordinates, setDesignDrawingCoordinates] = useState<Coordinate[]>([]);
   const [designAssetMessage, setDesignAssetMessage] = useState("");
-  const [terminalOpen, setTerminalOpen] = useState(false);
-  const [terminalBusy, setTerminalBusy] = useState(false);
-  const [terminalHistory, setTerminalHistory] = useState<DashboardTerminalMessage[]>(() => [
-    {
-      id: "terminal-welcome",
-      role: "system",
-      text: "Command terminal ready. Use synthetic/demo data only. Try @layer list, @layer only Distribution Network, or @layer show OPGW cable sections.",
-    },
-  ]);
   const [gisApiBase, setGisApiBase] = useState(API_BASE);
-  const [liveStatus, setLiveStatus] = useState<DashboardLiveStatusPayload | null>(null);
-  const [liveStatusError, setLiveStatusError] = useState("");
   const designFeaturesEnabled = MAP_EDITING_ENABLED || designModeEnabled;
 
   useEffect(() => {
@@ -409,31 +338,6 @@ export function DashboardPage() {
       return;
     }
     setGisApiBase(getStoredGisApiBase());
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadLiveStatus() {
-      try {
-        const payload = await fetchFromApiBase<DashboardLiveStatusPayload>(API_BASE, "/api/live-status/topline");
-        if (!cancelled) {
-          setLiveStatus(payload);
-          setLiveStatusError("");
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setLiveStatusError(error instanceof Error ? error.message : "Live status unavailable");
-        }
-      }
-    }
-
-    loadLiveStatus();
-    const intervalId = window.setInterval(loadLiveStatus, 300000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
   }, []);
 
   useEffect(() => {
@@ -984,11 +888,6 @@ export function DashboardPage() {
     }),
     [estimatedDistributionPoleScale, fiberStrands.length, layerFilteredFccMicrowaveLinks.length, layerFilteredFccUtilityTowers.length, layerFilteredPublicSubstations.length, layerFilteredPublicTransmissionLines.length, layerFilteredSpliceClosures.length, layerFilteredTransmissionStructures.length, opgwPlanningMetrics.assumedRouteCount, opgwPlanningMetrics.availableStrands, opgwPlanningMetrics.criticalRidingCircuits, opgwPlanningMetrics.openWorkOrders, opgwPlanningMetrics.outageImpactCount, opgwPlanningMetrics.plannedRouteCount, opgwPlanningMetrics.spanInspectionIssues, opgwPlanningMetrics.verifiedRouteCount, strandContinuityRecords.length, streetLayers, visibleDesignAssetRecords.length, visibleDistributionFiberAssignments.length, visibleDistributionPoleDensity.length, visibleDistributionPoleFiberRoutes.length, visibleDistributionPoles.length, visibleDistributionSlackLoops.length, visibleDistributionSplicePoints.length, visibleFccMicrowaveLinks.length, visibleFccUtilityTowers.length, visibleFiberAssignments.length, visibleNodes.length, visibleOpgwCableSections.length, visibleOpgwCables.length, visibleOpgwRoutes.length, visibleOpgwSpanSegments.length, visibleOpgwSplicePoints.length, visiblePatchPanels.length, visiblePublicSubstations.length, visiblePublicTransmissionLines.length, visibleSpliceClosures.length, visibleSyntheticSubstations.length, visibleTransmissionLines.length, visibleTransmissionStructures.length],
   );
-  const terminalLayerOptions = useMemo(
-    () => buildTerminalLayerOptions(dashboardLayerSummaries),
-    [dashboardLayerSummaries],
-  );
-
   const summaryCards = useMemo(
     () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleFccUtilityTowers, visibleFccMicrowaveLinks, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visibleSpliceClosures, visibleFiberAssignments, visibleDistributionPoles, visibleDistributionPoleFiberRoutes, visibleDistributionPoleDensity, visibleDistributionSplicePoints, visibleDistributionSlackLoops, visibleDistributionFiberAssignments, estimatedDistributionPoleScale, visiblePatchPanels),
     [estimatedDistributionPoleScale, visibleDistributionFiberAssignments, visibleDistributionPoleDensity, visibleDistributionPoleFiberRoutes, visibleDistributionPoles, visibleDistributionSlackLoops, visibleDistributionSplicePoints, visibleFccMicrowaveLinks, visibleFccUtilityTowers, visibleFiberAssignments, visibleNodes, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visiblePublicSubstations, visiblePublicTransmissionLines, visibleSpliceClosures, visibleSubstations, visibleSyntheticSubstations, visibleTransmissionLines, visibleTransmissionMaps, visibleTransmissionStructures],
@@ -2019,213 +1918,6 @@ export function DashboardPage() {
     window.setTimeout(() => setToast(""), 3800);
   }
 
-  async function submitTerminalCommand(rawCommand: string) {
-    const command = rawCommand.trim();
-    if (!command || terminalBusy) return;
-    const userMessage: DashboardTerminalMessage = {
-      id: `terminal-user-${Date.now()}`,
-      role: "user",
-      text: command,
-    };
-    appendTerminalMessage(userMessage);
-    const localLayerMessage = applyTerminalLayerCommand(command);
-    if (localLayerMessage) {
-      appendTerminalMessage(localLayerMessage);
-      return;
-    }
-    setTerminalBusy(true);
-    try {
-      const result = await fetchFromApiBase<DesignTerminalCommandResult>(API_BASE, "/api/design-assets/terminal-command", {
-        method: "POST",
-        body: JSON.stringify({
-          command,
-          materialize: true,
-          context: buildTerminalContext(command),
-        }),
-      });
-      const assistantMessage = terminalMessageFromResult(result);
-      appendTerminalMessage(assistantMessage);
-      if (result.actions.length) {
-        setStreetLayers((current) => ({ ...current, designAssets: true }));
-        const refreshed = await refreshDesignAssetsForTerminal();
-        const createdKey = [...result.actions].reverse().find((action) => action.record_key)?.record_key;
-        const createdRecord = createdKey ? refreshed.find((record) => record.record_key === createdKey) : undefined;
-        if (createdRecord?.geometry || createdRecord?.geometry_json) {
-          const selection: StreetMapSelection = { kind: "design_asset_record", id: String(createdRecord.id), label: createdRecord.display_label || createdRecord.record_key, record: createdRecord };
-          setSelectedAsset(selection);
-          setFocusRequest({ selection, sequence: Date.now() });
-          setRightMode("details");
-          setRightCollapsed(false);
-        }
-      }
-      showToast(result.needs_input ? "Command terminal needs more parameters." : result.summary);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      appendTerminalMessage({ id: `terminal-error-${Date.now()}`, role: "assistant", text: "I could not complete that command.", details: [message] });
-      showToast("Command terminal error.");
-    } finally {
-      setTerminalBusy(false);
-    }
-  }
-
-  function appendTerminalMessage(message: DashboardTerminalMessage) {
-    setTerminalHistory((current) => [...current.slice(-10), message]);
-  }
-
-  function applyTerminalLayerCommand(command: string): DashboardTerminalMessage | null {
-    const parsed = parseTerminalLayerCommand(command, terminalLayerOptions);
-    if (!parsed) return null;
-
-    if (parsed.action === "help") {
-      return terminalLayerHelpMessage(terminalLayerOptions, dashboardLayerSummaries);
-    }
-
-    if (parsed.action === "list") {
-      return terminalLayerListMessage(terminalLayerOptions, dashboardLayerSummaries);
-    }
-
-    if (parsed.action === "reset") {
-      setStreetLayers(dashboardStreetLayers);
-      setSearchLayerFilter("all");
-      setVisibilityFilter("all");
-      setRightMode("layers");
-      setRightCollapsed(false);
-      issueMapCommand("fitActiveMap");
-      showToast("Map layers reset to dashboard defaults.");
-      return {
-        id: `terminal-layer-reset-${Date.now()}`,
-        role: "assistant",
-        text: "Reset map visibility to dashboard defaults.",
-        details: enabledLayerDetails(dashboardStreetLayers, terminalLayerOptions),
-      };
-    }
-
-    if (parsed.action === "clear") {
-      const cleared = clearStreetLayerState(streetLayers);
-      setStreetLayers(cleared);
-      setSearchLayerFilter("all");
-      setVisibilityFilter("all");
-      setRightMode("layers");
-      setRightCollapsed(false);
-      showToast("All map layers hidden.");
-      return {
-        id: `terminal-layer-clear-${Date.now()}`,
-        role: "assistant",
-        text: "All map layers are hidden. Use @layer show <name> or @layer reset to bring layers back.",
-        details: ["Example: @layer show HIFLD transmission lines", "Example: @layer show Distribution Network"],
-      };
-    }
-
-    if (!parsed.targets.length) {
-      return {
-        id: `terminal-layer-missing-${Date.now()}`,
-        role: "assistant",
-        text: "I could not find that layer.",
-        details: [
-          ...parsed.missingTargets.map((target) => `No match: ${target}`),
-          "Try @layer list to see available layer names.",
-          "Examples: @layer only Distribution Network, @layer show OPGW cable sections, @layer hide FCC microwave paths.",
-        ],
-      };
-    }
-
-    const nextLayers = applyTerminalLayerState(parsed, streetLayers);
-    setStreetLayers(nextLayers);
-    const firstKey = parsed.targets[0]?.key;
-    const searchLayer = firstKey ? searchLayerForStreetLayer(firstKey) : null;
-    if (searchLayer) setSearchLayerFilter(searchLayer);
-    setVisibilityFilter(firstKey ? visibilityForStreetLayer(firstKey) : "all");
-    setRightMode("layers");
-    setRightCollapsed(false);
-    issueMapCommand("fitActiveMap");
-    const actionLabel = parsed.action === "only"
-      ? "isolated"
-      : parsed.action === "hide"
-        ? "hidden"
-        : parsed.action === "toggle"
-          ? "toggled"
-          : "shown";
-    const targetLabels = parsed.targets.map((target) => target.label);
-    showToast(`Layer ${actionLabel}: ${targetLabels.slice(0, 2).join(", ")}${targetLabels.length > 2 ? "..." : ""}`);
-    return {
-      id: `terminal-layer-${Date.now()}`,
-      role: "assistant",
-      text: `Layer visibility ${actionLabel}: ${targetLabels.join(", ")}.`,
-      details: [
-        ...targetLabels.map((label) => `Selected: ${label}`),
-        ...enabledLayerDetails(nextLayers, terminalLayerOptions).slice(0, 8),
-      ],
-    };
-  }
-
-  async function refreshDesignAssetsForTerminal() {
-    const payload = await fetchFromApiBase<DesignAssetMapPayload>(API_BASE, "/api/design-assets/map-records");
-    const records = payload.records || [];
-    setDesignAssetTypes(payload.asset_types || []);
-    setDesignAssetRecords(records);
-    setSelectedDesignAssetTypeSlug((current) => current || payload.asset_types?.[0]?.slug || "");
-    setDesignAssetMessage(payload.synthetic_data_notice || "Command-created records use synthetic/demo planning data only.");
-    return records;
-  }
-
-  function terminalMessageFromResult(result: DesignTerminalCommandResult): DashboardTerminalMessage {
-    const details = [
-      ...result.answers.map((answer) => `${answer.entity} ${answer.id}: ${answer.summary}`),
-      ...result.actions.map((action) => `${action.action.replaceAll("_", " ")}: ${action.label || action.record_key || action.status}${action.materialization?.entity ? ` -> ${action.materialization.entity} ${action.materialization.action}` : ""}`),
-      ...result.parameter_prompts.map((prompt) => `${prompt.field}: ${prompt.question}`),
-    ];
-    return {
-      id: `terminal-assistant-${Date.now()}`,
-      role: "assistant",
-      text: result.summary,
-      details,
-    };
-  }
-
-  function buildTerminalContext(command: string) {
-    return {
-      operating_mode: operatingMode,
-      search,
-      active_layers: dashboardLayerSummaries.filter((layer) => layer.enabled).map((layer) => layer.key),
-      selected_asset: selectedAsset ? terminalContextForSelection(selectedAsset) : null,
-      reference_assets: extractTerminalReferenceLabels(command).flatMap((label) => {
-        const asset = findTerminalReferenceAsset(label);
-        return asset ? [asset] : [{ id: label, label, kind: "typed_reference" as const }];
-      }),
-    };
-  }
-
-  function findTerminalReferenceAsset(label: string): DashboardTerminalContextAsset | null {
-    const lowered = label.toLowerCase();
-    const structure = visibleTransmissionStructures.find((feature) => [feature.properties.id, feature.properties.structureNumber].some((value) => String(value).toLowerCase() === lowered));
-    if (structure) {
-      return { id: structure.properties.id, label: structure.properties.structureNumber, kind: "transmission_structure", coordinates: structure.geometry.coordinates };
-    }
-    const distributionPole = visibleDistributionPoles.find((feature) => [feature.properties.id, feature.properties.poleNumber].some((value) => String(value).toLowerCase() === lowered));
-    if (distributionPole) {
-      return { id: distributionPole.properties.id, label: distributionPole.properties.poleNumber, kind: "distribution_pole", coordinates: distributionPole.geometry.coordinates };
-    }
-    const splicePoint = visibleOpgwSplicePoints.find((feature) => [feature.properties.splicePointId, feature.properties.structureNumber].some((value) => String(value).toLowerCase() === lowered));
-    if (splicePoint) {
-      return { id: splicePoint.properties.splicePointId, label: splicePoint.properties.splicePointId, kind: "opgw_splice_point", coordinates: splicePoint.geometry.coordinates };
-    }
-    const designRecord = visibleDesignAssetRecords.find((record) => [record.record_key, record.display_label].some((value) => String(value).toLowerCase() === lowered));
-    const designCoordinates = designRecord ? firstCoordinateFromDesignGeometry(designRecord.geometry || designRecord.geometry_json) : undefined;
-    if (designRecord) {
-      return { id: String(designRecord.id), label: designRecord.display_label || designRecord.record_key, kind: "design_asset_record", coordinates: designCoordinates };
-    }
-    return null;
-  }
-
-  function terminalContextForSelection(selection: StreetMapSelection): DashboardTerminalContextAsset {
-    return {
-      id: selection.id,
-      label: selection.label,
-      kind: selection.kind,
-      coordinates: terminalCoordinatesForSelection(selection),
-    };
-  }
-
   function updateFiberStrands(cableId: string, strandNumbers: number[], status: FiberStrand["status"], assignmentId?: string) {
     const selected = new Set(strandNumbers);
     setFiberStrands((current) => current.map((strand) => {
@@ -2277,7 +1969,7 @@ export function DashboardPage() {
           <div>
             <X size={20} />
             <strong>Dashboard map window closed</strong>
-            <span>The command terminal and module drawers are still available. Reopen the map when you want to browse assets again.</span>
+            <span>Module drawers and layer controls are still available. Reopen the map when you want to browse assets again.</span>
           </div>
           <button type="button" onClick={() => {
             setMapWindowClosed(false);
@@ -2333,7 +2025,6 @@ export function DashboardPage() {
           <strong>GridAssetLink</strong>
         <span>HIFLD references plus synthetic OPGW fiber planning</span>
         </div>
-        <DashboardLiveStatusStrip status={liveStatus} error={liveStatusError} />
         <div className="dashboard-mode-toggle" aria-label="Dashboard mode">
           {[
             ["in_service", "In Service"],
@@ -2583,156 +2274,8 @@ export function DashboardPage() {
           <button type="button" onClick={() => setContinuityHighlight(undefined)}>Clear</button>
         </div>
       ) : null}
-      <DashboardCommandTerminal
-        open={terminalOpen}
-        busy={terminalBusy}
-        history={terminalHistory}
-        contextLabel={selectedAsset?.label}
-        onOpen={() => setTerminalOpen(true)}
-        onClose={() => setTerminalOpen(false)}
-        onSubmit={(command) => void submitTerminalCommand(command)}
-      />
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
-  );
-}
-
-const DashboardCommandTerminal = memo(function DashboardCommandTerminal({
-  open,
-  busy,
-  history,
-  contextLabel,
-  onOpen,
-  onClose,
-  onSubmit,
-}: {
-  open: boolean;
-  busy: boolean;
-  history: DashboardTerminalMessage[];
-  contextLabel?: string;
-  onOpen: () => void;
-  onClose: () => void;
-  onSubmit: (command: string) => void;
-}) {
-  const [input, setInput] = useState("");
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const historyRef = useRef<HTMLDivElement | null>(null);
-  const visibleHistory = useMemo(() => history.slice(-12), [history]);
-  const canRun = Boolean(input.trim()) && !busy;
-
-  useEffect(() => {
-    if (!open) return;
-    const focusId = window.setTimeout(() => inputRef.current?.focus(), 20);
-    return () => window.clearTimeout(focusId);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const historyNode = historyRef.current;
-    if (!historyNode) return;
-    historyNode.scrollTop = historyNode.scrollHeight;
-  }, [busy, open, visibleHistory.length]);
-
-  function submit() {
-    const command = input.trim();
-    if (!command || busy) return;
-    setInput("");
-    onSubmit(command);
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      submit();
-    }
-    if (event.key === "Escape") {
-      onClose();
-    }
-  }
-
-  return (
-    <div className={`dashboard-command-terminal ${open ? "open" : ""}`} aria-label="Dashboard command terminal">
-      {!open ? (
-        <button className="dashboard-command-terminal-toggle" type="button" onClick={onOpen}>
-          <Terminal size={16} />
-          Command Terminal
-        </button>
-      ) : (
-        <section className="dashboard-command-terminal-panel">
-          <div className="dashboard-command-terminal-header">
-            <span><Terminal size={15} /><strong>Dashboard Command Terminal</strong></span>
-            <em className="dashboard-command-terminal-status">{busy ? "Working..." : contextLabel ? `Context: ${contextLabel}` : "Ready"}</em>
-            <button type="button" onClick={onClose} aria-label="Close command terminal"><X size={15} /></button>
-          </div>
-          <div className="dashboard-command-terminal-help">
-            <span>@layer list</span>
-            <span>@layer only Distribution Network</span>
-            <span>@layer show OPGW cable sections</span>
-          </div>
-          <div className="dashboard-command-terminal-history" aria-live="polite" ref={historyRef}>
-            {visibleHistory.map((message) => (
-              <article className={`terminal-message ${message.role}`} key={message.id}>
-                <span>{message.role}</span>
-                <p>{message.text}</p>
-                {message.details?.length ? (
-                  <ul>
-                    {message.details.slice(0, 8).map((detail) => <li key={detail}>{detail}</li>)}
-                  </ul>
-                ) : null}
-              </article>
-            ))}
-          </div>
-          <div className="dashboard-command-terminal-entry">
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(event) => setInput(event.currentTarget.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="@layer show splice closures, or add splice can to my pole..."
-              disabled={busy}
-              spellCheck={false}
-            />
-            <button type="button" onClick={submit} disabled={!canRun}>
-              <Send size={14} />
-              {busy ? "Working" : "Run"}
-            </button>
-          </div>
-        </section>
-      )}
-    </div>
-  );
-});
-
-function DashboardLiveStatusStrip({ status, error }: { status: DashboardLiveStatusPayload | null; error: string }) {
-  const intel = status?.intel;
-  const nba = status?.nba;
-  const marketMove = typeof intel?.change === "number" ? (intel.change > 0 ? "up" : intel.change < 0 ? "down" : "flat") : "flat";
-  const nbaDetail = formatNbaGameDetail(nba);
-  return (
-    <div className="dashboard-live-status-strip" aria-label="Live Intel stock and NBA postseason status">
-      <a
-        className={`dashboard-live-status-card market ${marketMove}`}
-        href={intel?.source_url || "https://finance.yahoo.com/quote/INTC/"}
-        target="_blank"
-        rel="noreferrer"
-        title={intel?.message || intel?.source || "Intel quote source"}
-      >
-        <span className="dashboard-live-status-kicker">Intel Stock</span>
-        <strong>{formatCurrency(intel?.price, intel?.currency)}</strong>
-        <span className="dashboard-live-status-detail">{formatMarketChange(intel)}</span>
-      </a>
-      <a
-        className="dashboard-live-status-card nba"
-        href={nba?.source_url || "https://www.espn.com/nba/scoreboard"}
-        target="_blank"
-        rel="noreferrer"
-        title={nba?.source || "NBA postseason scoreboard source"}
-      >
-        <span className="dashboard-live-status-kicker">NBA Playoffs</span>
-        <strong>{nba?.short_name || "Postseason"}</strong>
-        <span className="dashboard-live-status-detail">{error && !status ? "Live feed unavailable" : nbaDetail}</span>
-      </a>
-    </div>
   );
 }
 
@@ -2795,33 +2338,6 @@ function formatFilterOption(value: string) {
 
 function uniqueStrings(values: Array<string | undefined | null>) {
   return Array.from(new Set(values.filter(Boolean) as string[]));
-}
-
-function extractTerminalReferenceLabels(command: string) {
-  return uniqueStrings(Array.from(command.matchAll(/\b[A-Za-z0-9][A-Za-z0-9_.:-]*(?:-STR-\d{2,6}|-POLE-\d{2,6}|-SPLICE-\d{2,6})\b/gi)).map((match) => match[0]));
-}
-
-function terminalCoordinatesForSelection(selection: StreetMapSelection): Coordinate | undefined {
-  if (selection.kind === "public_substation" || selection.kind === "fcc_utility_tower" || selection.kind === "synthetic_substation" || selection.kind === "transmission_structure" || selection.kind === "opgw_splice_point" || selection.kind === "splice_closure" || selection.kind === "distribution_pole_density" || selection.kind === "distribution_pole" || selection.kind === "distribution_splice_point" || selection.kind === "distribution_slack_loop") {
-    return selection.record.geometry.coordinates as Coordinate;
-  }
-  if (selection.kind === "design_asset_record") return firstCoordinateFromDesignGeometry(selection.record.geometry || selection.record.geometry_json);
-  if (selection.kind === "patch_panel") return undefined;
-  if ("longitude" in selection.record && "latitude" in selection.record) {
-    const longitude = Number(selection.record.longitude);
-    const latitude = Number(selection.record.latitude);
-    if (Number.isFinite(longitude) && Number.isFinite(latitude)) return [longitude, latitude];
-  }
-  if (selection.kind === "opgw_cable" || selection.kind === "opgw_route" || selection.kind === "opgw_cable_section" || selection.kind === "opgw_span_segment" || selection.kind === "distribution_pole_fiber" || selection.kind === "distribution_fiber_assignment" || selection.kind === "fcc_microwave_link" || selection.kind === "public_transmission_line") {
-    const coordinates = "coordinates" in selection.record.geometry ? selection.record.geometry.coordinates : [];
-    return firstCoordinateFromAnyGeometry(coordinates);
-  }
-  return undefined;
-}
-
-function firstCoordinateFromDesignGeometry(geometry: DesignAssetGeoJsonGeometry | null | undefined): Coordinate | undefined {
-  if (!geometry) return undefined;
-  return firstCoordinateFromAnyGeometry(geometry.coordinates);
 }
 
 function firstCoordinateFromAnyGeometry(value: unknown): Coordinate | undefined {
@@ -3004,26 +2520,26 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
       ...current,
       publicTransmissionLines: true,
       publicSubstations: true,
-      fccUtilityTowers: true,
-      fccMicrowaveLinks: true,
+      fccUtilityTowers: false,
+      fccMicrowaveLinks: false,
       syntheticSubstations: false,
-      transmissionStructures: true,
+      transmissionStructures: false,
       syntheticOpgwCables: true,
       assumedOpgwRoutes: false,
       plannedOpgwFiber: false,
       verifiedOpgwFiber: true,
       opgwRoutes: true,
-      opgwCableSections: true,
+      opgwCableSections: false,
       opgwSpanSegments: false,
       opgwSplicePoints: false,
-      existingFiberSplices: true,
+      existingFiberSplices: false,
       proposedFiberSplices: false,
       compareSpliceLayers: false,
-      spliceClosures: true,
-      patchPanels: true,
+      spliceClosures: false,
+      patchPanels: false,
       distributionPoleDensity: true,
       distributionPoles: false,
-      distributionFiberRoutes: true,
+      distributionFiberRoutes: false,
       distributionSplicePoints: false,
       distributionSlackLoops: false,
       distributionFiberAssignments: false,
@@ -3039,35 +2555,35 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
     ...current,
     publicTransmissionLines: true,
     publicSubstations: true,
-    fccUtilityTowers: true,
-    fccMicrowaveLinks: true,
-    transmissionStructures: true,
-    syntheticSubstations: true,
+    fccUtilityTowers: false,
+    fccMicrowaveLinks: false,
+    transmissionStructures: false,
+    syntheticSubstations: false,
     syntheticOpgwCables: true,
     assumedOpgwRoutes: true,
     plannedOpgwFiber: true,
-    verifiedOpgwFiber: true,
+    verifiedOpgwFiber: false,
     opgwRoutes: true,
-    opgwCableSections: true,
-    opgwSpanSegments: true,
-    opgwSplicePoints: true,
-    existingFiberSplices: true,
-    proposedFiberSplices: true,
+    opgwCableSections: false,
+    opgwSpanSegments: false,
+    opgwSplicePoints: false,
+    existingFiberSplices: false,
+    proposedFiberSplices: false,
     compareSpliceLayers: false,
-    spliceClosures: true,
-    patchPanels: true,
+    spliceClosures: false,
+    patchPanels: false,
     distributionPoleDensity: true,
     distributionPoles: false,
-    distributionFiberRoutes: true,
-    distributionSplicePoints: true,
+    distributionFiberRoutes: false,
+    distributionSplicePoints: false,
     distributionSlackLoops: false,
-    distributionFiberAssignments: true,
-    fiberAssignments: true,
-    availableStrandCapacity: true,
-    criticalRidingCircuits: true,
-    opgwOutageImpact: true,
-    opgwOpenWorkOrders: true,
-    opgwSpanInspectionIssues: true,
+    distributionFiberAssignments: false,
+    fiberAssignments: false,
+    availableStrandCapacity: false,
+    criticalRidingCircuits: false,
+    opgwOutageImpact: false,
+    opgwOpenWorkOrders: false,
+    opgwSpanInspectionIssues: false,
   };
 }
 
@@ -5460,40 +4976,6 @@ function dashboardStrandStats(opgw: OpgwCableFeature[], strands: FiberStrand[]) 
   return stats;
 }
 
-function formatCurrency(value: number | null | undefined, currency = "USD") {
-  if (typeof value !== "number" || Number.isNaN(value)) return "--";
-  return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(value);
-}
-
-function formatMarketChange(intel: DashboardLiveStatusPayload["intel"] | undefined) {
-  if (!intel) return "Loading quote";
-  if (intel.status === "unavailable") return "Quote unavailable";
-  if (typeof intel.change !== "number" || typeof intel.change_percent !== "number") return intel.exchange || "NASDAQ";
-  const sign = intel.change > 0 ? "+" : "";
-  return `${sign}${intel.change.toFixed(2)} (${sign}${intel.change_percent.toFixed(2)}%)`;
-}
-
-function formatNbaGameDetail(nba: DashboardLiveStatusPayload["nba"] | undefined) {
-  if (!nba) return "Loading postseason";
-  if (nba.status === "unavailable") return "Scoreboard unavailable";
-  const scoresReady = nba.home_score !== null && nba.home_score !== undefined && nba.away_score !== null && nba.away_score !== undefined;
-  if (scoresReady) {
-    const away = nba.away_abbreviation || nba.away_team || "Away";
-    const home = nba.home_abbreviation || nba.home_team || "Home";
-    return `${away} ${nba.away_score} - ${home} ${nba.home_score}${nba.status_detail ? ` / ${nba.status_detail}` : ""}`;
-  }
-  const gameTime = formatShortDateTime(nba.game_date);
-  const venue = nba.venue ? ` / ${nba.venue}` : "";
-  return `${nba.status_detail || gameTime || "Next postseason game"}${venue}`;
-}
-
-function formatShortDateTime(value: string | null | undefined) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
-}
-
 function dashboardFallbackStrandStats(fiberCount: number) {
   return { available: fiberCount };
 }
@@ -5696,7 +5178,7 @@ function buildDashboardLayerSummaries({
     layer("transmissionLines", "Editable transmission lines", "Planning assets", transmissionLineCount, transmissionLineCount, "/transmission-lines", "Local planning line records", "Demo planning records only."),
     layer("workOrderLocations", "Work order locations", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/work-orders", "Synthetic work-order markers", "Demo work orders only."),
     layer("proposedChanges", "Proposed changes", "Planning assets", workOrderLocationCount, workOrderLocationCount, "/deviceops/change-requests", "Synthetic proposed planning changes", "Proposed/demo records only."),
-    layer("designAssets", "Command-created planning assets", "Planning assets", designAssetRecordCount, designAssetRecordCount, "/dashboard?drawer=layers", "Schema-backed command terminal records", "Synthetic/demo records only; do not enter sensitive utility data."),
+    layer("designAssets", "Design-mode planning assets", "Planning assets", designAssetRecordCount, designAssetRecordCount, "/dashboard?drawer=layers", "Schema-backed design records", "Synthetic/demo records only; do not enter sensitive utility data."),
   ];
 }
 
@@ -5900,214 +5382,6 @@ function withDistributionNetworkLayerState(current: Record<StreetMapLayerKey, bo
     next[key] = enabled;
   });
   return next;
-}
-
-function clearStreetLayerState(current: Record<StreetMapLayerKey, boolean>) {
-  return Object.fromEntries(
-    (Object.keys(current) as StreetMapLayerKey[]).map((key) => [key, false]),
-  ) as Record<StreetMapLayerKey, boolean>;
-}
-
-function buildTerminalLayerOptions(summaries: DashboardLayerSummary[]): TerminalLayerOption[] {
-  const byKey = new Map<StreetMapLayerKey, TerminalLayerOption>();
-  summaries.forEach((summary) => {
-    byKey.set(summary.key, {
-      key: summary.key,
-      label: summary.label,
-      summary,
-      aliases: terminalLayerAliases(summary.key, summary.label),
-    });
-  });
-  const distributionSummary = byKey.get("distributionFiberRoutes");
-  byKey.set("distributionFiberRoutes", {
-    key: "distributionFiberRoutes",
-    label: "Distribution Network",
-    summary: distributionSummary?.summary,
-    aliases: uniqueStrings([
-      ...(distributionSummary?.aliases || []),
-      "distribution",
-      "distribution network",
-      "distribution fiber",
-      "distribution fiber planner",
-      "distribution poles",
-      "distribution splices",
-      "distribution slack",
-      "distribution assignments",
-    ]),
-  });
-  return Array.from(byKey.values()).sort((a, b) => a.label.localeCompare(b.label));
-}
-
-function terminalLayerAliases(key: StreetMapLayerKey, label: string) {
-  const extras: Partial<Record<StreetMapLayerKey, string[]>> = {
-    publicTransmissionLines: ["hifld", "hifld lines", "transmission lines", "public lines", "public transmission"],
-    publicSubstations: ["substations", "substation nodes", "public substations", "verified substations"],
-    fccUtilityTowers: ["fcc towers", "tower nodes", "utility towers", "fcc utility"],
-    fccMicrowaveLinks: ["fcc microwave", "microwave links", "microwave paths", "frequency paths"],
-    transmissionStructures: ["structures", "transmission structures", "structure points"],
-    spliceClosures: ["splice closures", "splice cans", "closures"],
-    syntheticOpgwCables: ["opgw cables", "synthetic opgw", "opgw fiber"],
-    assumedOpgwRoutes: ["assumed opgw", "opgw assumptions"],
-    plannedOpgwFiber: ["planned opgw", "planned fiber"],
-    verifiedOpgwFiber: ["verified opgw", "verified fiber"],
-    opgwRoutes: ["opgw routes", "routes"],
-    opgwCableSections: ["opgw sections", "cable sections", "splice to splice", "sections"],
-    opgwSpanSegments: ["opgw spans", "span segments", "spans"],
-    opgwSplicePoints: ["opgw splice points", "splice points", "two splice points"],
-    existingFiberSplices: ["existing splices", "existing fiber splices"],
-    proposedFiberSplices: ["proposed splices", "proposed fiber splices"],
-    compareSpliceLayers: ["splice compare", "compare splices"],
-    fiberStrandsLayer: ["fiber strands", "strands", "strand table"],
-    fiberAssignments: ["fiber assignments", "assignments"],
-    strandContinuity: ["strand continuity", "full strand view", "continuity"],
-    patchPanels: ["patch panels", "fiber patch panels", "panels"],
-    availableStrandCapacity: ["available strands", "strand capacity", "available capacity"],
-    criticalRidingCircuits: ["critical circuits", "riding circuits"],
-    opgwOutageImpact: ["outage impact", "impact"],
-    opgwOpenWorkOrders: ["open work orders", "work orders"],
-    opgwSpanInspectionIssues: ["inspection issues", "span issues"],
-    telecomNodes: ["telecom nodes", "devices"],
-    selIconNodes: ["sel icon", "sel icon nodes", "icon nodes"],
-    c3794Nodes: ["c37.94", "c3794", "relay endpoints"],
-    transmissionLines: ["editable lines", "planning transmission lines"],
-    workOrderLocations: ["work order locations"],
-    proposedChanges: ["proposed changes"],
-    designAssets: ["design assets", "command assets", "terminal assets"],
-  };
-  return uniqueStrings([key, label, camelCaseToWords(key), ...(extras[key] || [])]);
-}
-
-function parseTerminalLayerCommand(command: string, options: TerminalLayerOption[]): ParsedTerminalLayerCommand | null {
-  const match = command.match(/^@layer(?:\s+(.+))?$/i);
-  if (!match) return null;
-  const rawArgument = (match[1] || "").trim();
-  if (!rawArgument || /^(help|\?)$/i.test(rawArgument)) return { action: "help", targets: [], missingTargets: [] };
-
-  const firstToken = rawArgument.split(/\s+/)[0]?.toLowerCase() || "";
-  const actionAliases: Record<string, TerminalLayerAction> = {
-    list: "list",
-    ls: "list",
-    options: "list",
-    show: "show",
-    on: "show",
-    enable: "show",
-    add: "show",
-    hide: "hide",
-    off: "hide",
-    disable: "hide",
-    remove: "hide",
-    only: "only",
-    isolate: "only",
-    solo: "only",
-    toggle: "toggle",
-    switch: "toggle",
-    reset: "reset",
-    default: "reset",
-    defaults: "reset",
-    clear: "clear",
-    none: "clear",
-  };
-  const action = actionAliases[firstToken] || "show";
-  if (action === "list" || action === "reset" || action === "clear") return { action, targets: [], missingTargets: [] };
-  const targetText = actionAliases[firstToken] ? rawArgument.slice(firstToken.length).trim() : rawArgument;
-  const targetQueries = targetText
-    .split(/\s*(?:,|\+|\band\b)\s*/i)
-    .map((value) => value.trim())
-    .filter(Boolean);
-  if (!targetQueries.length) return { action: "help", targets: [], missingTargets: [] };
-
-  const targets: TerminalLayerOption[] = [];
-  const missingTargets: string[] = [];
-  targetQueries.forEach((query) => {
-    const option = findTerminalLayerOption(query, options);
-    if (option && !targets.some((target) => target.key === option.key)) targets.push(option);
-    if (!option) missingTargets.push(query);
-  });
-  return { action, targets, missingTargets };
-}
-
-function findTerminalLayerOption(query: string, options: TerminalLayerOption[]) {
-  const normalizedQuery = normalizeLayerSearchText(query);
-  if (!normalizedQuery) return null;
-  const scored = options
-    .map((option) => {
-      const normalizedAliases = option.aliases.map(normalizeLayerSearchText);
-      const exact = normalizedAliases.some((alias) => alias === normalizedQuery);
-      const startsWith = normalizedAliases.some((alias) => alias.startsWith(normalizedQuery) || normalizedQuery.startsWith(alias));
-      const contains = normalizedAliases.some((alias) => alias.includes(normalizedQuery) || normalizedQuery.includes(alias));
-      const wordHits = normalizedQuery.split(" ").filter((word) => normalizedAliases.some((alias) => alias.includes(word))).length;
-      const score = exact ? 100 : startsWith ? 75 : contains ? 55 : wordHits ? wordHits * 12 : 0;
-      return { option, score };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score || a.option.label.localeCompare(b.option.label));
-  return scored[0]?.option || null;
-}
-
-function applyTerminalLayerState(parsed: ParsedTerminalLayerCommand, current: Record<StreetMapLayerKey, boolean>) {
-  let next = parsed.action === "only" ? clearStreetLayerState(current) : { ...current };
-  parsed.targets.forEach((target) => {
-    const enabled = parsed.action === "hide" ? false : parsed.action === "toggle" ? !next[target.key] : true;
-    if (isDistributionLayerKey(target.key)) {
-      next = withDistributionNetworkLayerState(next, enabled);
-      return;
-    }
-    if (target.key === "strandContinuity" && enabled) {
-      next = parsed.action === "only" ? strandContinuityLayerState(next) : { ...next, strandContinuity: true, opgwRoutes: true, opgwCableSections: true, opgwSplicePoints: true, spliceClosures: true, patchPanels: true, fiberAssignments: true };
-      return;
-    }
-    next[target.key] = enabled;
-  });
-  return next;
-}
-
-function terminalLayerHelpMessage(options: TerminalLayerOption[], summaries: DashboardLayerSummary[]): DashboardTerminalMessage {
-  const enabled = summaries.filter((summary) => summary.enabled).slice(0, 6).map((summary) => `Active: ${summary.label}`);
-  return {
-    id: `terminal-layer-help-${Date.now()}`,
-    role: "assistant",
-    text: "Use @layer to change map visibility instantly without sending a backend design command.",
-    details: [
-      "@layer list",
-      "@layer show Distribution Network",
-      "@layer hide FCC microwave paths",
-      "@layer only OPGW cable sections",
-      "@layer toggle patch panels",
-      "@layer reset",
-      ...enabled,
-      `Available layer names: ${options.slice(0, 8).map((option) => option.label).join(", ")}...`,
-    ],
-  };
-}
-
-function terminalLayerListMessage(options: TerminalLayerOption[], summaries: DashboardLayerSummary[]): DashboardTerminalMessage {
-  const enabledKeys = new Set(summaries.filter((summary) => summary.enabled).map((summary) => summary.key));
-  return {
-    id: `terminal-layer-list-${Date.now()}`,
-    role: "assistant",
-    text: "Available map layers for @layer commands:",
-    details: options.slice(0, 28).map((option) => `${enabledKeys.has(option.key) ? "on" : "off"} - ${option.label} (${option.key})`),
-  };
-}
-
-function enabledLayerDetails(layers: Record<StreetMapLayerKey, boolean>, options: TerminalLayerOption[]) {
-  return options
-    .filter((option) => layers[option.key])
-    .map((option) => `Visible: ${option.label}`);
-}
-
-function normalizeLayerSearchText(value: string) {
-  return value
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .toLowerCase()
-    .replace(/c37[\s.-]*94/g, "c3794")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function camelCaseToWords(value: string) {
-  return value.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
 function strandContinuityLayerState(current: Record<StreetMapLayerKey, boolean>) {
