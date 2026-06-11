@@ -92,8 +92,8 @@ const dashboardStreetLayers: Record<StreetMapLayerKey, boolean> = {
   opgwSpanSegments: false,
   opgwSplicePoints: false,
   distributionPoleDensity: true,
-  distributionPoles: false,
-  distributionFiberRoutes: false,
+  distributionPoles: true,
+  distributionFiberRoutes: true,
   distributionSplicePoints: false,
   distributionSlackLoops: false,
   distributionFiberAssignments: false,
@@ -158,7 +158,9 @@ type DashboardMapDataGroup =
   | "fiberDetails"
   | "patchPanels"
   | "spliceContinuity"
-  | "distributionDetails"
+  | "distributionFiberRoutes"
+  | "distributionRouteDetails"
+  | "distributionFiberAssignments"
   | "distributionPoleSample";
 
 const availableDeviceIds = ["NODE-WBS-ICON", "NODE-AUB-ICON", "NODE-BOS-OTN", "NODE-RI-RTR", "NODE-NH-MW"];
@@ -491,14 +493,19 @@ export function DashboardPage() {
           setStrandContinuityRecords(strandContinuity);
         }
 
-        if (group === "distributionDetails") {
-          const [distributionFiberRoutes, distributionSpliceRecords, distributionSlackRecords, distributionFiberAssignmentRecords] = await Promise.all([
-            fetchGeoJson<DistributionPoleFiberRouteCollection>("/data/iso-ne-synthetic-distribution-pole-fiber.geojson")
-              .then((collection) => collection.features || [])
-              .catch((error) => {
-                warnings.distributionPoleFiberRoutes = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-                return [] as DistributionPoleFiberRouteFeature[];
-              }),
+        if (group === "distributionFiberRoutes") {
+          const distributionFiberRoutes = await fetchGeoJson<DistributionPoleFiberRouteCollection>("/data/iso-ne-synthetic-distribution-pole-fiber.geojson")
+            .then((collection) => collection.features || [])
+            .catch((error) => {
+              warnings.distributionPoleFiberRoutes = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+              return [] as DistributionPoleFiberRouteFeature[];
+            });
+          if (!mountedRef.current) return;
+          setDistributionPoleFiberRoutes(distributionFiberRoutes);
+        }
+
+        if (group === "distributionRouteDetails") {
+          const [distributionSpliceRecords, distributionSlackRecords] = await Promise.all([
             fetchGeoJson<DistributionPoleSplicePointCollection>("/data/iso-ne-synthetic-distribution-splice-points.geojson")
               .then((collection) => collection.features || [])
               .catch((error) => {
@@ -511,31 +518,36 @@ export function DashboardPage() {
                 warnings.distributionSlackLoops = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
                 return [] as DistributionSlackLoopFeature[];
               }),
-            fetchGeoJson<DistributionFiberAssignmentCollection>("/data/iso-ne-synthetic-distribution-fiber-assignments.geojson")
-              .then((collection) => collection.features || [])
-              .catch((error) => {
-                warnings.distributionFiberAssignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
-                return [] as DistributionFiberAssignmentFeature[];
-              }),
           ]);
           if (!mountedRef.current) return;
-          setDistributionPoleFiberRoutes(distributionFiberRoutes);
           setDistributionSplicePoints(distributionSpliceRecords);
           setDistributionSlackLoops(distributionSlackRecords);
+        }
+
+        if (group === "distributionFiberAssignments") {
+          const distributionFiberAssignmentRecords = await fetchGeoJson<DistributionFiberAssignmentCollection>("/data/iso-ne-synthetic-distribution-fiber-assignments.geojson")
+            .then((collection) => collection.features || [])
+            .catch((error) => {
+              warnings.distributionFiberAssignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+              return [] as DistributionFiberAssignmentFeature[];
+            });
+          if (!mountedRef.current) return;
           setDistributionFiberAssignments(distributionFiberAssignmentRecords);
         }
 
         if (group === "distributionPoleSample") {
-          const distributionPoleRecords = LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE
-            ? await fetchGeoJson<DistributionPoleCollection>("/data/iso-ne-synthetic-distribution-poles.geojson")
+          const distributionPoleRecords = await fetchGeoJson<DistributionPoleCollection>(
+            LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE
+              ? "/data/iso-ne-synthetic-distribution-poles.geojson"
+              : "/data/iso-ne-synthetic-distribution-poles-lite.geojson",
+          )
               .then((collection) => collection.features || [])
               .catch((error) => {
                 warnings.distributionPoles = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
                 return [] as DistributionPoleFeature[];
-              })
-            : [] as DistributionPoleFeature[];
+              });
           if (!LOAD_STATIC_DISTRIBUTION_POLE_SAMPLE) {
-            warnings.distributionPoles = "Static pole point sample disabled. Production-scale poles are served through PostGIS vector tiles at street zoom.";
+            warnings.distributionPoles = "Using lightweight street-path pole display sample. Full-scale pole inventories should be served through PostGIS vector tiles at street zoom.";
           }
           if (!mountedRef.current) return;
           setDistributionPoles(distributionPoleRecords);
@@ -595,7 +607,13 @@ export function DashboardPage() {
       groups.push("spliceContinuity");
     }
     if (streetLayers.distributionFiberRoutes || streetLayers.distributionSplicePoints || streetLayers.distributionSlackLoops || streetLayers.distributionFiberAssignments || searchLayerFilter === "distributionFiberRoutes") {
-      groups.push("distributionDetails");
+      groups.push("distributionFiberRoutes");
+    }
+    if (streetLayers.distributionSplicePoints || streetLayers.distributionSlackLoops) {
+      groups.push("distributionRouteDetails");
+    }
+    if (streetLayers.distributionFiberAssignments) {
+      groups.push("distributionFiberAssignments");
     }
     if (streetLayers.distributionPoles) groups.push("distributionPoleSample");
     if (groups.length) void loadMapDataGroups(groups);
@@ -2660,8 +2678,8 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
       spliceClosures: false,
       patchPanels: false,
       distributionPoleDensity: true,
-      distributionPoles: false,
-      distributionFiberRoutes: false,
+      distributionPoles: true,
+      distributionFiberRoutes: true,
       distributionSplicePoints: false,
       distributionSlackLoops: false,
       distributionFiberAssignments: false,
@@ -2695,8 +2713,8 @@ function layerStateForOperatingMode(mode: DashboardOperatingMode, current: Recor
     spliceClosures: false,
     patchPanels: false,
     distributionPoleDensity: true,
-    distributionPoles: false,
-    distributionFiberRoutes: false,
+    distributionPoles: true,
+    distributionFiberRoutes: true,
     distributionSplicePoints: false,
     distributionSlackLoops: false,
     distributionFiberAssignments: false,
@@ -5501,8 +5519,13 @@ function isDistributionLayerKey(layer: StreetMapLayerKey) {
 function withDistributionNetworkLayerState(current: Record<StreetMapLayerKey, boolean>, enabled: boolean) {
   const next = { ...current };
   distributionNetworkLayerKeys.forEach((key) => {
-    next[key] = enabled;
+    next[key] = false;
   });
+  if (enabled) {
+    next.distributionPoleDensity = true;
+    next.distributionPoles = true;
+    next.distributionFiberRoutes = true;
+  }
   return next;
 }
 
@@ -5869,11 +5892,11 @@ function publicLayerSet(layers: Record<StreetMapLayerKey, boolean>) {
     proposedFiberSplices: false,
     compareSpliceLayers: false,
     distributionPoleDensity: true,
-    distributionPoles: false,
+    distributionPoles: true,
     distributionFiberRoutes: true,
     distributionSplicePoints: false,
     distributionSlackLoops: false,
-    distributionFiberAssignments: true,
+    distributionFiberAssignments: false,
     circuitEndpoints: false,
     workOrderLocations: false,
     proposedChanges: false,

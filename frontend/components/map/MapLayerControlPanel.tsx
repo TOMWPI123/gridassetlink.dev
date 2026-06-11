@@ -190,7 +190,7 @@ export function MapLayerControlPanel({
   onClearOpgwFocus,
 }: MapLayerControlPanelProps) {
   const distributionLayerEnabled = distributionLayerKeys.some((key) => layers[key]);
-  const distributionLayerComplete = distributionLayerKeys.every((key) => layers[key]);
+  const distributionLayerComplete = layers.distributionPoleDensity && layers.distributionPoles && layers.distributionFiberRoutes;
   const distributionLayerVisibleCount = distributionPoleDensityCount + distributionPoleCount + distributionPoleFiberRouteCount + distributionSplicePointCount + distributionSlackLoopCount + distributionFiberAssignmentCount;
   const handleDistributionLayerToggle = (enabled: boolean) => {
     if (onDistributionLayerGroupChange) {
@@ -395,8 +395,8 @@ export function MapLayerControlPanel({
                 <em>{distributionLayerVisibleCount.toLocaleString()}</em>
               </strong>
               <small>
-                One layer for distribution pole density, close-zoom poles, street fiber routes, splice points, slack loops, and fiber assignments.
-                {distributionLayerComplete ? " All distribution sublayers are visible." : " Toggle this on to show the full module layer set."}
+                One fast layer for density rollups, close-zoom street-path poles, and distribution fiber routes.
+                {distributionLayerComplete ? " Lightweight map view is visible." : " Toggle this on to show the lightweight module layer set."}
               </small>
               <span className="street-layer-badges">
                 <b>Synthetic</b>
@@ -409,7 +409,7 @@ export function MapLayerControlPanel({
             <span>
               <strong>Distribution Network Module</strong>
               <small>
-                {distributionPoleDensityCount.toLocaleString()} density cells, {distributionPoleFiberRouteCount.toLocaleString()} routes, {distributionSplicePointCount.toLocaleString()} splice points, {distributionSlackLoopCount.toLocaleString()} slack loops, {distributionFiberAssignmentCount.toLocaleString()} assignments.
+                {distributionPoleDensityCount.toLocaleString()} density cells, {distributionPoleCount.toLocaleString()} sampled street-path poles, {distributionPoleFiberRouteCount.toLocaleString()} routes. Detail module has {distributionSplicePointCount.toLocaleString()} splice points, {distributionSlackLoopCount.toLocaleString()} slack loops, and {distributionFiberAssignmentCount.toLocaleString()} assignments.
               </small>
             </span>
             <a className="street-layer-action-link" href="/distribution-fiber">Open module</a>
@@ -419,7 +419,7 @@ export function MapLayerControlPanel({
       <div className="street-layer-warning">
         Synthetic planning assumption only. Not active fiber. Requires engineer/as-built verification.
         <small>Conversion workflow: synthetic assumption -&gt; planned OPGW -&gt; designed -&gt; work order -&gt; as-built verified.</small>
-        <small>Distribution telecom pole layer: {distributionPoleCount.toLocaleString()} rendered sample poles representing an estimated {estimatedDistributionPoleScale.toLocaleString()} regional-scale poles. Clustering and close-zoom labels keep the map smooth.</small>
+        <small>Distribution telecom pole layer: {distributionPoleCount.toLocaleString()} lightweight sampled street-path poles representing an estimated {estimatedDistributionPoleScale.toLocaleString()} regional-scale poles. Full-scale pole inventories stay on backend/vector-tile paths.</small>
       </div>
       <div className="street-map-todo-note">
         Dashboard map is limited to public HIFLD transmission-line references, verified-owner public substation nodes, public FCC ULS utility tower/site records, public FCC ULS microwave path links, close OpenStreetMap owner/operator matches, and synthetic demo planning layers. FCC records are public license/path references only; OPGW cables, strand capacity, assignments, splice closures, patch panels, critical circuits, and outage-impact overlays are synthetic/demo records unless imported and verified later.
