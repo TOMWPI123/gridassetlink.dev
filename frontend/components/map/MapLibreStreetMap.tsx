@@ -63,6 +63,7 @@ type MapFeature = {
 type MapFeatureCollection = {
   type: "FeatureCollection";
   features: MapFeature[];
+  signature?: string;
 };
 
 const sourceIds = {
@@ -233,6 +234,7 @@ export function MapLibreStreetMap({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const loadedRef = useRef(false);
   const lastFeatureClickRef = useRef(0);
+  const sourceSignatureRef = useRef<Record<string, string>>({});
   const onMapClickRef = useRef(onMapClick);
   const onSelectRef = useRef(onSelect);
   const activeToolRef = useRef(activeTool);
@@ -344,33 +346,33 @@ export function MapLibreStreetMap({
 
   useEffect(() => {
     if (!styleReady || !mapRef.current) return;
-    updateSource(mapRef.current, sourceIds.regions, datasets.regions);
-    updateSource(mapRef.current, sourceIds.reference, datasets.reference);
-    updateSource(mapRef.current, sourceIds.lines, datasets.lines);
-    updateSource(mapRef.current, sourceIds.publicLines, datasets.publicLines);
-    updateSource(mapRef.current, sourceIds.publicSubstations, datasets.publicSubstations);
-    updateSource(mapRef.current, sourceIds.fccMicrowaveLinks, datasets.fccMicrowaveLinks);
-    updateSource(mapRef.current, sourceIds.fccUtilityTowers, datasets.fccUtilityTowers);
-    updateSource(mapRef.current, sourceIds.structures, datasets.structures);
-    updateSource(mapRef.current, sourceIds.opgwCables, datasets.opgwCables);
-    updateSource(mapRef.current, sourceIds.opgwRoutes, datasets.opgwRoutes);
-    updateSource(mapRef.current, sourceIds.opgwCableSections, datasets.opgwCableSections);
-    updateSource(mapRef.current, sourceIds.opgwSpanSegments, datasets.opgwSpanSegments);
-    updateSource(mapRef.current, sourceIds.opgwSplicePoints, datasets.opgwSplicePoints);
-    updateSource(mapRef.current, sourceIds.spliceClosures, datasets.spliceClosures);
-    updateSource(mapRef.current, sourceIds.fiberAssignments, datasets.fiberAssignments);
-    updateSource(mapRef.current, sourceIds.distributionPoleDensity, datasets.distributionPoleDensity);
-    updateSource(mapRef.current, sourceIds.distributionPoleFiberRoutes, datasets.distributionPoleFiberRoutes);
-    updateSource(mapRef.current, sourceIds.distributionFiberAssignments, datasets.distributionFiberAssignments);
-    updateSource(mapRef.current, sourceIds.distributionSplicePoints, datasets.distributionSplicePoints);
-    updateSource(mapRef.current, sourceIds.distributionSlackLoops, datasets.distributionSlackLoops);
-    updateSource(mapRef.current, sourceIds.distributionPoles, datasets.distributionPoles);
-    updateSource(mapRef.current, sourceIds.patchPanels, datasets.patchPanels);
-    updateSource(mapRef.current, sourceIds.designAssets, datasets.designAssets);
-    updateSource(mapRef.current, sourceIds.substations, datasets.substations);
-    updateSource(mapRef.current, sourceIds.syntheticSubstations, datasets.syntheticSubstations);
-    updateSource(mapRef.current, sourceIds.nodes, datasets.nodes);
-    updateSource(mapRef.current, sourceIds.workOrders, datasets.workOrders);
+    updateSource(mapRef.current, sourceIds.regions, datasets.regions, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.reference, datasets.reference, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.lines, datasets.lines, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.publicLines, datasets.publicLines, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.publicSubstations, datasets.publicSubstations, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.fccMicrowaveLinks, datasets.fccMicrowaveLinks, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.fccUtilityTowers, datasets.fccUtilityTowers, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.structures, datasets.structures, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.opgwCables, datasets.opgwCables, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.opgwRoutes, datasets.opgwRoutes, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.opgwCableSections, datasets.opgwCableSections, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.opgwSpanSegments, datasets.opgwSpanSegments, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.opgwSplicePoints, datasets.opgwSplicePoints, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.spliceClosures, datasets.spliceClosures, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.fiberAssignments, datasets.fiberAssignments, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.distributionPoleDensity, datasets.distributionPoleDensity, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.distributionPoleFiberRoutes, datasets.distributionPoleFiberRoutes, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.distributionFiberAssignments, datasets.distributionFiberAssignments, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.distributionSplicePoints, datasets.distributionSplicePoints, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.distributionSlackLoops, datasets.distributionSlackLoops, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.distributionPoles, datasets.distributionPoles, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.patchPanels, datasets.patchPanels, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.designAssets, datasets.designAssets, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.substations, datasets.substations, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.syntheticSubstations, datasets.syntheticSubstations, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.nodes, datasets.nodes, sourceSignatureRef);
+    updateSource(mapRef.current, sourceIds.workOrders, datasets.workOrders, sourceSignatureRef);
   }, [datasets, styleReady]);
 
   useEffect(() => {
@@ -1672,26 +1674,50 @@ function buildDatasets(
   layers: Record<StreetMapLayerKey, boolean>,
   continuityHighlight?: ContinuityHighlight,
 ) {
-  const structureById = new Map(transmissionStructures.map((feature) => [feature.properties.id, feature]));
-  const cableById = new Map(opgwCables.map((feature) => [feature.properties.id, feature]));
-  const publicLineById = new Map(publicTransmissionLines.map((feature) => [feature.properties.id, feature]));
+  const hasContinuityHighlight = Boolean(continuityHighlight);
+  const opgwCableLayerRequested = layers.syntheticOpgwCables
+    || layers.assumedOpgwRoutes
+    || layers.plannedOpgwFiber
+    || layers.verifiedOpgwFiber
+    || layers.availableStrandCapacity
+    || layers.opgwOutageImpact
+    || layers.strandContinuity
+    || hasContinuityHighlight;
+  const spliceMetricLayerRequested = layers.opgwSplicePoints
+    || layers.spliceClosures
+    || layers.existingFiberSplices
+    || layers.proposedFiberSplices
+    || layers.compareSpliceLayers
+    || layers.strandContinuity
+    || hasContinuityHighlight;
+  let structureByIdCache: Map<string, TransmissionStructureFeature> | undefined;
+  let cableByIdCache: Map<string, OpgwCableFeature> | undefined;
+  let publicLineByIdCache: Map<string, PublicTransmissionLineFeature> | undefined;
+  const getStructureById = () => structureByIdCache ??= new Map(transmissionStructures.map((feature) => [feature.properties.id, feature]));
+  const getCableById = () => cableByIdCache ??= new Map(opgwCables.map((feature) => [feature.properties.id, feature]));
+  const getPublicLineById = () => publicLineByIdCache ??= new Map(publicTransmissionLines.map((feature) => [feature.properties.id, feature]));
   const continuitySets = buildContinuityHighlightSets(continuityHighlight, opgwCables, opgwCableSections);
-  const strandStatsByCable = buildCableStrandStats(opgwCables, fiberStrands);
-  const assignmentStatsByCable = buildCableAssignmentStats(fiberAssignments);
-  const spliceClosureCountByCable = buildCableSpliceClosureCounts(spliceClosures);
-  const patchPanelCountByCable = buildCablePatchPanelCounts(patchPanels);
-  const spliceMetricsByPoint = buildSpliceNodeMetrics({
-    opgwCables,
-    opgwCableSections,
-    opgwSpanSegments,
-    opgwSplicePoints,
-    spliceClosures,
-    fiberSplices,
-    fiberAssignments,
-    syntheticServices,
-    patchPanels,
-  });
-  const closureToSplicePointId = buildClosureToSplicePointId(opgwSplicePoints);
+  const strandStatsByCable = opgwCableLayerRequested ? buildCableStrandStats(opgwCables, fiberStrands) : new Map<string, CableStrandStats>();
+  const assignmentStatsByCable = opgwCableLayerRequested ? buildCableAssignmentStats(fiberAssignments) : new Map<string, CableAssignmentStats>();
+  const spliceClosureCountByCable = opgwCableLayerRequested ? buildCableSpliceClosureCounts(spliceClosures) : new Map<string, number>();
+  const patchPanelCountByCable = opgwCableLayerRequested ? buildCablePatchPanelCounts(patchPanels) : new Map<string, number>();
+  const spliceMetricsByPoint = spliceMetricLayerRequested
+    ? buildSpliceNodeMetrics({
+        opgwCables,
+        opgwCableSections,
+        opgwSpanSegments,
+        opgwSplicePoints,
+        spliceClosures,
+        fiberSplices,
+        fiberAssignments,
+        syntheticServices,
+        patchPanels,
+      })
+    : new Map();
+  const closureToSplicePointId = spliceMetricLayerRequested ? buildClosureToSplicePointId(opgwSplicePoints) : new Map<string, string>();
+  const splicePointByClosureId = spliceMetricLayerRequested
+    ? new Map(opgwSplicePoints.filter((point) => point.properties.closureId).map((point) => [point.properties.closureId as string, point]))
+    : new Map<string, OpgwSplicePointFeature>();
   return {
     regions: layers.planningRegions ? collection(planningRegions.map((region) => ({
       type: "Feature",
@@ -1972,7 +1998,7 @@ function buildDatasets(
       geometry: feature.geometry,
       }];
     })) : emptyCollection,
-    opgwCables: collection(opgwCables.flatMap((feature) => {
+    opgwCables: opgwCableLayerRequested ? collection(opgwCables.flatMap((feature) => {
       const status = opgwPlanningStatus(feature);
       const featureRouteId = opgwRouteIdForCable(feature);
       const isContinuityHighlight = continuitySets.cableIds.has(feature.properties.id) || continuitySets.routeIds.has(featureRouteId);
@@ -1991,9 +2017,9 @@ function buildDatasets(
       const capacityLayerVisible = layers.availableStrandCapacity;
       const outageLayerVisible = layers.opgwOutageImpact && hasOutageImpact;
       if (!routeLayerVisible && !capacityLayerVisible && !outageLayerVisible && !isContinuityHighlight) return [];
-      const startStructure = structureById.get(feature.properties.startStructureId)?.properties;
-      const endStructure = structureById.get(feature.properties.endStructureId)?.properties;
-      const line = publicLineById.get(feature.properties.lineId)?.properties;
+      const startStructure = getStructureById().get(feature.properties.startStructureId)?.properties;
+      const endStructure = getStructureById().get(feature.properties.endStructureId)?.properties;
+      const line = getPublicLineById().get(feature.properties.lineId)?.properties;
       return [{
         type: "Feature" as const,
         properties: {
@@ -2032,7 +2058,7 @@ function buildDatasets(
         },
         geometry: feature.geometry,
       }];
-    })),
+    })) : emptyCollection,
     spliceClosures: layers.spliceClosures || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers || layers.strandContinuity ? collection(spliceClosures.flatMap((feature) => {
       const pointId = closureToSplicePointId.get(feature.properties.id) || "";
       const isContinuityHighlight = continuitySets.splicePointIds.has(pointId);
@@ -2053,13 +2079,13 @@ function buildDatasets(
         closureId: feature.properties.id,
         structureId: feature.properties.structureId,
         locationType: feature.properties.installType === "terminal" ? "patch panel entrance" : "transmission structure",
-        transmissionLineId: opgwSplicePoints.find((point) => point.properties.closureId === feature.properties.id)?.properties.transmissionLineId || null,
-        opgwRouteId: opgwSplicePoints.find((point) => point.properties.closureId === feature.properties.id)?.properties.opgwRouteId || null,
-        fiberCount: Math.max(...feature.properties.cableIds.map((cableId) => cableById.get(cableId)?.properties.fiberCount || 0), 0),
-        incomingCableSections: spliceMetricsByPoint.get(closureToSplicePointId.get(feature.properties.id) || "")?.incomingCableSections || 0,
-        outgoingCableSections: spliceMetricsByPoint.get(closureToSplicePointId.get(feature.properties.id) || "")?.outgoingCableSections || 0,
-        activeSyntheticServices: spliceMetricsByPoint.get(closureToSplicePointId.get(feature.properties.id) || "")?.activeSyntheticServices || 0,
-        proposedSyntheticServices: spliceMetricsByPoint.get(closureToSplicePointId.get(feature.properties.id) || "")?.proposedSyntheticServices || 0,
+        transmissionLineId: splicePointByClosureId.get(feature.properties.id)?.properties.transmissionLineId || null,
+        opgwRouteId: splicePointByClosureId.get(feature.properties.id)?.properties.opgwRouteId || null,
+        fiberCount: Math.max(...feature.properties.cableIds.map((cableId) => getCableById().get(cableId)?.properties.fiberCount || 0), 0),
+        incomingCableSections: metrics?.incomingCableSections || 0,
+        outgoingCableSections: metrics?.outgoingCableSections || 0,
+        activeSyntheticServices: metrics?.activeSyntheticServices || 0,
+        proposedSyntheticServices: metrics?.proposedSyntheticServices || 0,
         closureType: feature.properties.closureType,
         structureNumber: feature.properties.structureNumber,
         spliceCount: feature.properties.spliceCount,
@@ -2076,7 +2102,7 @@ function buildDatasets(
       if (layers.strandContinuity && !isContinuityHighlight) return [];
       if (layers.criticalRidingCircuits && !layers.fiberAssignments && !isCriticalFiberAssignment(assignment) && !isContinuityHighlight) return [];
       const coordinates = assignment.cableIds
-        .map((cableId) => cableById.get(cableId))
+        .map((cableId) => getCableById().get(cableId))
         .filter(Boolean)
         .map((feature) => feature!.geometry.type === "LineString" ? feature!.geometry.coordinates : feature!.geometry.coordinates.flat());
       if (!coordinates.length) return [];
@@ -2249,7 +2275,7 @@ function buildDatasets(
       const isContinuityHighlight = panel.fiberCableIds.some((cableId) => continuitySets.cableIds.has(cableId));
       if (layers.strandContinuity && !isContinuityHighlight) return [];
       if (panel.locationType !== "structure") return [];
-      const structure = structureById.get(panel.locationId);
+      const structure = getStructureById().get(panel.locationId);
       if (!structure) return [];
       return [{
         type: "Feature" as const,
@@ -2655,13 +2681,57 @@ async function fetchGisAssetDetailForSelection(assetType: string, assetId: strin
   }
 }
 
-function updateSource(map: MapLibreMap, sourceId: string, data: MapFeatureCollection) {
+function updateSource(
+  map: MapLibreMap,
+  sourceId: string,
+  data: MapFeatureCollection,
+  signatureCache: { current: Record<string, string> },
+) {
   const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+  const signature = data.signature || featureCollectionSignature(data.features);
+  if (signatureCache.current[sourceId] === signature) return;
   source?.setData(data as Parameters<GeoJSONSource["setData"]>[0]);
+  signatureCache.current[sourceId] = signature;
 }
 
 function collection(features: MapFeature[]): MapFeatureCollection {
-  return { type: "FeatureCollection", features };
+  return { type: "FeatureCollection", features, signature: featureCollectionSignature(features) };
+}
+
+function featureCollectionSignature(features: MapFeature[]) {
+  let hash = 2166136261 ^ features.length;
+  for (const feature of features) {
+    const properties = feature.properties;
+    hash = mixSignature(hash, String(properties.kind || ""));
+    hash = mixSignature(hash, String(properties.id || ""));
+    hash = mixSignature(hash, String(properties.status || ""));
+    hash = mixSignature(hash, String(properties.label || ""));
+    hash = mixSignature(hash, String(properties.showCapacity || ""));
+    hash = mixSignature(hash, String(properties.showOutageImpact || ""));
+    hash = mixSignature(hash, String(properties.isContinuityHighlight || ""));
+    hash = mixSignature(hash, feature.geometry.type);
+    hash = mixSignature(hash, geometrySignature(feature.geometry.coordinates));
+  }
+  return `${features.length}:${hash >>> 0}`;
+}
+
+function geometrySignature(coordinates: unknown): string {
+  if (Array.isArray(coordinates) && coordinates.length >= 2 && typeof coordinates[0] === "number" && typeof coordinates[1] === "number") {
+    return `${Number(coordinates[0]).toFixed(5)},${Number(coordinates[1]).toFixed(5)}`;
+  }
+  if (!Array.isArray(coordinates)) return "";
+  const first = coordinates.length ? geometrySignature(coordinates[0]) : "";
+  const last = coordinates.length > 1 ? geometrySignature(coordinates[coordinates.length - 1]) : first;
+  return `${coordinates.length}:${first}:${last}`;
+}
+
+function mixSignature(hash: number, value: string) {
+  let next = hash;
+  for (let index = 0; index < value.length; index += 1) {
+    next ^= value.charCodeAt(index);
+    next = Math.imul(next, 16777619);
+  }
+  return next;
 }
 
 function nodeVisibleForLayers(node: MapNode, layers: Record<StreetMapLayerKey, boolean>) {
