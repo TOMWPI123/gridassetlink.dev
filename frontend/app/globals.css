@@ -4448,7 +4448,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   left: 18px;
   right: 560px;
   display: grid;
-  grid-template-columns: auto auto minmax(240px, 1fr);
+  grid-template-columns: auto minmax(252px, 360px) auto minmax(240px, 1fr);
   gap: 10px;
   align-items: center;
   min-height: 48px;
@@ -4491,6 +4491,71 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   color: var(--dash-muted);
   font-size: 11px;
   font-weight: 700;
+}
+
+.dashboard-live-status-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.dashboard-live-status-card {
+  display: grid;
+  min-width: 0;
+  min-height: 46px;
+  align-content: center;
+  gap: 1px;
+  padding: 7px 9px;
+  border: 1px solid rgba(238,252,251,.12);
+  border-radius: 8px;
+  background: rgba(7,16,18,.74);
+  color: var(--dash-text);
+  box-shadow: 0 18px 48px rgba(0,0,0,.28);
+  text-decoration: none;
+  backdrop-filter: blur(16px);
+}
+
+.dashboard-live-status-card:hover {
+  border-color: rgba(105,215,228,.38);
+  background: rgba(105,215,228,.12);
+}
+
+.dashboard-live-status-card strong,
+.dashboard-live-status-detail,
+.dashboard-live-status-kicker {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-live-status-kicker {
+  color: rgba(238,252,251,.6);
+  font-size: 8px;
+  font-weight: 880;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.dashboard-live-status-card strong {
+  color: var(--dash-text);
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.dashboard-live-status-detail {
+  color: var(--dash-muted);
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.dashboard-live-status-card.market.up .dashboard-live-status-detail {
+  color: #8bf1b8;
+}
+
+.dashboard-live-status-card.market.down .dashboard-live-status-detail {
+  color: #ffb3aa;
 }
 
 .dashboard-side-layer-digest {
@@ -6476,7 +6541,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 @media (max-width: 1280px) {
   .dashboard-floating-topbar {
     right: 420px;
-    grid-template-columns: minmax(0,1fr) auto;
+    grid-template-columns: minmax(230px, 340px) auto minmax(240px, 1fr);
   }
   .dashboard-compact-brand {
     display: none;
@@ -6508,22 +6573,25 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   .dashboard-floating-topbar {
     left: 12px;
     right: 12px;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
+  }
+  .dashboard-live-status-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .dashboard-top-right-toolbar {
-    top: 68px;
+    top: 176px;
     left: 12px;
     right: 12px;
     max-width: none;
     justify-content: flex-start;
   }
   .dashboard-active-map-floating {
-    top: 118px;
+    top: 226px;
     left: 12px;
     width: min(420px, calc(100vw - 24px));
   }
   .dashboard-left-filter-panel {
-    top: 238px;
+    top: 296px;
     left: 12px;
     bottom: 88px;
     width: min(310px, calc(100vw - 24px));

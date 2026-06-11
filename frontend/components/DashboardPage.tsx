@@ -131,6 +131,42 @@ type DashboardTerminalContextAsset = {
   kind: StreetMapSelection["kind"] | "typed_reference";
   coordinates?: Coordinate;
 };
+type DashboardLiveStatusPayload = {
+  intel: {
+    symbol: string;
+    name?: string;
+    exchange?: string;
+    currency?: string;
+    price?: number | null;
+    previous_close?: number | null;
+    change?: number | null;
+    change_percent?: number | null;
+    as_of?: string | null;
+    status?: string;
+    source?: string;
+    source_url?: string;
+    message?: string;
+  };
+  nba: {
+    league?: string;
+    season_type?: string;
+    status?: string;
+    status_detail?: string | null;
+    game_date?: string | null;
+    short_name?: string | null;
+    home_team?: string | null;
+    away_team?: string | null;
+    home_abbreviation?: string | null;
+    away_abbreviation?: string | null;
+    home_score?: string | number | null;
+    away_score?: string | number | null;
+    venue?: string | null;
+    series_summary?: string | null;
+    source?: string;
+    source_url?: string;
+  };
+  updated_at?: string;
+};
 type DashboardContinuitySummary = {
   label: string;
   serviceIds: string[];
@@ -333,6 +369,8 @@ export function DashboardPage() {
     },
   ]);
   const [gisApiBase, setGisApiBase] = useState(API_BASE);
+  const [liveStatus, setLiveStatus] = useState<DashboardLiveStatusPayload | null>(null);
+  const [liveStatusError, setLiveStatusError] = useState("");
   const designFeaturesEnabled = MAP_EDITING_ENABLED || designModeEnabled;
 
   useEffect(() => {
@@ -343,6 +381,31 @@ export function DashboardPage() {
       return;
     }
     setGisApiBase(getStoredGisApiBase());
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLiveStatus() {
+      try {
+        const payload = await fetchFromApiBase<DashboardLiveStatusPayload>(API_BASE, "/api/live-status/topline");
+        if (!cancelled) {
+          setLiveStatus(payload);
+          setLiveStatusError("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLiveStatusError(error instanceof Error ? error.message : "Live status unavailable");
+        }
+      }
+    }
+
+    loadLiveStatus();
+    const intervalId = window.setInterval(loadLiveStatus, 300000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {
@@ -2031,6 +2094,7 @@ export function DashboardPage() {
           <strong>GridAssetLink</strong>
         <span>HIFLD references plus synthetic OPGW fiber planning</span>
         </div>
+        <DashboardLiveStatusStrip status={liveStatus} error={liveStatusError} />
         <div className="dashboard-mode-toggle" aria-label="Dashboard mode">
           {[
             ["in_service", "In Service"],
@@ -2321,6 +2385,39 @@ export function DashboardPage() {
       </div>
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
     </main>
+  );
+}
+
+function DashboardLiveStatusStrip({ status, error }: { status: DashboardLiveStatusPayload | null; error: string }) {
+  const intel = status?.intel;
+  const nba = status?.nba;
+  const marketMove = typeof intel?.change === "number" ? (intel.change > 0 ? "up" : intel.change < 0 ? "down" : "flat") : "flat";
+  const nbaDetail = formatNbaGameDetail(nba);
+  return (
+    <div className="dashboard-live-status-strip" aria-label="Live Intel stock and NBA postseason status">
+      <a
+        className={`dashboard-live-status-card market ${marketMove}`}
+        href={intel?.source_url || "https://finance.yahoo.com/quote/INTC/"}
+        target="_blank"
+        rel="noreferrer"
+        title={intel?.message || intel?.source || "Intel quote source"}
+      >
+        <span className="dashboard-live-status-kicker">Intel Stock</span>
+        <strong>{formatCurrency(intel?.price, intel?.currency)}</strong>
+        <span className="dashboard-live-status-detail">{formatMarketChange(intel)}</span>
+      </a>
+      <a
+        className="dashboard-live-status-card nba"
+        href={nba?.source_url || "https://www.espn.com/nba/scoreboard"}
+        target="_blank"
+        rel="noreferrer"
+        title={nba?.source || "NBA postseason scoreboard source"}
+      >
+        <span className="dashboard-live-status-kicker">NBA Playoffs</span>
+        <strong>{nba?.short_name || "Postseason"}</strong>
+        <span className="dashboard-live-status-detail">{error && !status ? "Live feed unavailable" : nbaDetail}</span>
+      </a>
+    </div>
   );
 }
 
@@ -4980,6 +5077,40 @@ function dashboardStrandStats(opgw: OpgwCableFeature[], strands: FiberStrand[]) 
     stats.set(strand.cableId, current);
   });
   return stats;
+}
+
+function formatCurrency(value: number | null | undefined, currency = "USD") {
+  if (typeof value !== "number" || Number.isNaN(value)) return "--";
+  return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(value);
+}
+
+function formatMarketChange(intel: DashboardLiveStatusPayload["intel"] | undefined) {
+  if (!intel) return "Loading quote";
+  if (intel.status === "unavailable") return "Quote unavailable";
+  if (typeof intel.change !== "number" || typeof intel.change_percent !== "number") return intel.exchange || "NASDAQ";
+  const sign = intel.change > 0 ? "+" : "";
+  return `${sign}${intel.change.toFixed(2)} (${sign}${intel.change_percent.toFixed(2)}%)`;
+}
+
+function formatNbaGameDetail(nba: DashboardLiveStatusPayload["nba"] | undefined) {
+  if (!nba) return "Loading postseason";
+  if (nba.status === "unavailable") return "Scoreboard unavailable";
+  const scoresReady = nba.home_score !== null && nba.home_score !== undefined && nba.away_score !== null && nba.away_score !== undefined;
+  if (scoresReady) {
+    const away = nba.away_abbreviation || nba.away_team || "Away";
+    const home = nba.home_abbreviation || nba.home_team || "Home";
+    return `${away} ${nba.away_score} - ${home} ${nba.home_score}${nba.status_detail ? ` / ${nba.status_detail}` : ""}`;
+  }
+  const gameTime = formatShortDateTime(nba.game_date);
+  const venue = nba.venue ? ` / ${nba.venue}` : "";
+  return `${nba.status_detail || gameTime || "Next postseason game"}${venue}`;
+}
+
+function formatShortDateTime(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
 function dashboardFallbackStrandStats(fiberCount: number) {

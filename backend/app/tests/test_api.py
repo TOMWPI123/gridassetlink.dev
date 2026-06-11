@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
 from app.seed.seed import seed_database  # noqa: E402
+from app.routers import live_status  # noqa: E402
 from app.routers.gis import _extract_geojson_geometry, _is_safe_tile_warm_plan, _like_pattern, _proposed_edit_target, _recursive_trace_sql, _search_target, import_service_territory, validate_service_territory  # noqa: E402
 from app.services.gis_vector_tiles import _tile_sql, choose_plan, supported_layers  # noqa: E402
 from app.jobs import synthetic_telecom_generation_worker as generation_worker  # noqa: E402
@@ -28,6 +29,49 @@ def test_login_and_dashboard() -> None:
     assert response.status_code == 200
     assert response.json()["metrics"]
     assert response.json()["recent_work_orders"]
+
+
+def test_live_status_topline(monkeypatch) -> None:
+    monkeypatch.setattr(
+        live_status,
+        "_fetch_intel_stock",
+        lambda: {
+            "symbol": "INTC",
+            "name": "Intel Corporation",
+            "price": 21.68,
+            "change": -0.71,
+            "change_percent": -3.17,
+            "currency": "USD",
+            "status": "live",
+            "source": "test",
+            "source_url": "https://example.com/intc",
+        },
+    )
+    monkeypatch.setattr(
+        live_status,
+        "_fetch_nba_postseason_game",
+        lambda: {
+            "league": "NBA",
+            "season_type": "postseason",
+            "status": "pre",
+            "short_name": "SAS @ NYK",
+            "home_team": "New York Knicks",
+            "away_team": "San Antonio Spurs",
+            "home_score": None,
+            "away_score": None,
+            "status_detail": "8:30 PM EDT",
+            "source": "test",
+            "source_url": "https://example.com/nba",
+        },
+    )
+    response = client.get("/api/live-status/topline")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intel"]["symbol"] == "INTC"
+    assert payload["intel"]["status"] == "live"
+    assert payload["nba"]["season_type"] == "postseason"
+    assert payload["nba"]["short_name"] == "SAS @ NYK"
+    assert payload["updated_at"]
 
 
 def test_dashboard_map_payload() -> None:
