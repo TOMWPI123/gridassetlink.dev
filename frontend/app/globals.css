@@ -4702,6 +4702,8 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   display: grid;
   justify-items: center;
   pointer-events: none;
+  contain: layout paint style;
+  transform: translateZ(0);
 }
 
 .dashboard-command-terminal.open {
@@ -4737,6 +4739,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   width: 100%;
   max-height: min(52vh, 440px);
   padding: 10px;
+  contain: layout paint style;
 }
 
 .dashboard-command-terminal-header,
@@ -4771,6 +4774,27 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   white-space: nowrap;
 }
 
+.dashboard-command-terminal-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dashboard-command-terminal-help span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid rgba(105,215,228,.18);
+  border-radius: 6px;
+  background: rgba(105,215,228,.08);
+  color: #dffefd;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .dashboard-command-terminal-header button {
   display: grid;
   place-items: center;
@@ -4790,6 +4814,8 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   overflow: auto;
   padding: 2px;
   overscroll-behavior: contain;
+  contain: content;
+  content-visibility: auto;
 }
 
 .terminal-message {
