@@ -118,6 +118,7 @@ const distributionLayerKeys: StreetMapLayerKey[] = [
   "distributionSlackLoops",
   "distributionFiberAssignments",
 ];
+const SUBLAYER_RENDER_LIMIT = 80;
 
 export function MapLayerControlPanel({
   layers,
@@ -448,6 +449,16 @@ function OwnerSublayerList({
   onOwnerChange?: (owner: string, enabled: boolean) => void;
   onAllOwnersChange?: (enabled: boolean) => void;
 }) {
+  const [ownerQuery, setOwnerQuery] = useState("");
+  const normalizedOwnerQuery = ownerQuery.trim().toLowerCase();
+  const filteredOwnerCounts = useMemo(
+    () => normalizedOwnerQuery
+      ? ownerCounts.filter(({ owner }) => owner.toLowerCase().includes(normalizedOwnerQuery))
+      : ownerCounts,
+    [normalizedOwnerQuery, ownerCounts],
+  );
+  const visibleOwnerRows = filteredOwnerCounts.slice(0, SUBLAYER_RENDER_LIMIT);
+  const hiddenOwnerRowCount = Math.max(filteredOwnerCounts.length - visibleOwnerRows.length, 0);
   return (
     <div className="street-owner-sublayers" aria-label={title}>
       <div className="street-owner-sublayer-heading">
@@ -460,8 +471,25 @@ function OwnerSublayerList({
           <button type="button" onClick={() => onAllOwnersChange?.(false)}>None</button>
         </span>
       </div>
+      {ownerCounts.length > SUBLAYER_RENDER_LIMIT ? (
+        <label className="street-opgw-sublayer-search" style={opgwSublayerSearchStyle}>
+          <Search size={13} />
+          <input
+            value={ownerQuery}
+            onChange={(event) => setOwnerQuery(event.currentTarget.value)}
+            placeholder="Search owner sublayers"
+            aria-label={`Search ${title}`}
+            style={opgwSublayerSearchInputStyle}
+          />
+          {ownerQuery ? (
+            <button type="button" onClick={() => setOwnerQuery("")} title="Clear owner sublayer search" style={opgwSublayerSearchButtonStyle}>
+              <X size={12} />
+            </button>
+          ) : null}
+        </label>
+      ) : null}
       <div className="street-owner-sublayer-list">
-        {ownerCounts.map(({ owner, count }) => (
+        {visibleOwnerRows.map(({ owner, count }) => (
           <label className="street-owner-sublayer-toggle" key={owner}>
             <input
               type="checkbox"
@@ -473,6 +501,11 @@ function OwnerSublayerList({
           </label>
         ))}
       </div>
+      {hiddenOwnerRowCount ? (
+        <div className="street-opgw-section-more">
+          Showing {visibleOwnerRows.length} of {filteredOwnerCounts.length} matching owner sublayers. Search to narrow the list.
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -498,6 +531,16 @@ function FrequencySublayerList({
   onFrequencyBandChange?: (frequencyBand: string, enabled: boolean) => void;
   onAllFrequencyBandsChange?: (enabled: boolean) => void;
 }) {
+  const [frequencyQuery, setFrequencyQuery] = useState("");
+  const normalizedFrequencyQuery = frequencyQuery.trim().toLowerCase();
+  const filteredFrequencyBandCounts = useMemo(
+    () => normalizedFrequencyQuery
+      ? frequencyBandCounts.filter(({ frequencyBand }) => frequencyBand.toLowerCase().includes(normalizedFrequencyQuery))
+      : frequencyBandCounts,
+    [frequencyBandCounts, normalizedFrequencyQuery],
+  );
+  const visibleFrequencyRows = filteredFrequencyBandCounts.slice(0, SUBLAYER_RENDER_LIMIT);
+  const hiddenFrequencyRowCount = Math.max(filteredFrequencyBandCounts.length - visibleFrequencyRows.length, 0);
   return (
     <div className="street-owner-sublayers" aria-label={title}>
       <div className="street-owner-sublayer-heading">
@@ -510,8 +553,25 @@ function FrequencySublayerList({
           <button type="button" onClick={() => onAllFrequencyBandsChange?.(false)}>None</button>
         </span>
       </div>
+      {frequencyBandCounts.length > SUBLAYER_RENDER_LIMIT ? (
+        <label className="street-opgw-sublayer-search" style={opgwSublayerSearchStyle}>
+          <Search size={13} />
+          <input
+            value={frequencyQuery}
+            onChange={(event) => setFrequencyQuery(event.currentTarget.value)}
+            placeholder="Search frequency groups"
+            aria-label={`Search ${title}`}
+            style={opgwSublayerSearchInputStyle}
+          />
+          {frequencyQuery ? (
+            <button type="button" onClick={() => setFrequencyQuery("")} title="Clear frequency sublayer search" style={opgwSublayerSearchButtonStyle}>
+              <X size={12} />
+            </button>
+          ) : null}
+        </label>
+      ) : null}
       <div className="street-owner-sublayer-list">
-        {frequencyBandCounts.map(({ frequencyBand, count }) => (
+        {visibleFrequencyRows.map(({ frequencyBand, count }) => (
           <label className="street-owner-sublayer-toggle" key={frequencyBand}>
             <input
               type="checkbox"
@@ -523,6 +583,11 @@ function FrequencySublayerList({
           </label>
         ))}
       </div>
+      {hiddenFrequencyRowCount ? (
+        <div className="street-opgw-section-more">
+          Showing {visibleFrequencyRows.length} of {filteredFrequencyBandCounts.length} matching frequency groups. Search to narrow the list.
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -192,6 +192,7 @@ type DashboardLiveStatusPayload = {
 };
 type DashboardContinuitySummary = {
   label: string;
+  filterLabel: string;
   serviceIds: string[];
   primaryServiceName: string;
   endpointA: string;
@@ -1004,8 +1005,9 @@ export function DashboardPage() {
       fiberSplices,
       fiberAssignments: visibleFiberAssignments,
       patchPanels: visiblePatchPanels,
+      filterContext: { searchLayerFilter },
     }),
-    [continuityHighlight, fiberSplices, syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSpliceClosures],
+    [continuityHighlight, fiberSplices, searchLayerFilter, syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSpliceClosures],
   );
   const ownerOptions = useMemo(
     () => buildOwnerOptions(visiblePublicSubstations, visiblePublicTransmissionLines, visibleFccUtilityTowers, visibleFccMicrowaveLinks),
@@ -2770,6 +2772,7 @@ function ContinuitySummaryPanel({ summary }: { summary: DashboardContinuitySumma
         <div><span>Services</span><strong>{summary.servicesCarried}</strong></div>
       </div>
       <div className="dashboard-continuity-tags">
+        <span>Filter: {summary.filterLabel}</span>
         <span>{summary.criticality}</span>
         <span>{summary.protectionLevel}</span>
         <span>{summary.layerType}</span>
@@ -2853,6 +2856,7 @@ function buildDashboardContinuitySummary({
   fiberSplices,
   fiberAssignments,
   patchPanels,
+  filterContext,
 }: {
   continuityHighlight: ContinuityHighlight | undefined;
   syntheticServices: SyntheticService[];
@@ -2864,8 +2868,10 @@ function buildDashboardContinuitySummary({
   fiberSplices: FiberSplice[];
   fiberAssignments: FiberAssignment[];
   patchPanels: PatchPanel[];
+  filterContext: { searchLayerFilter: DashboardSearchLayer };
 }): DashboardContinuitySummary | undefined {
   if (!continuityHighlight) return undefined;
+  if (!isContinuitySearchLayerFilter(filterContext.searchLayerFilter)) return undefined;
   const assignmentIds = new Set(continuityHighlight.assignmentIds);
   const cableIds = new Set(continuityHighlight.cableIds);
   const splicePointIds = new Set(continuityHighlight.splicePointIds);
@@ -2886,8 +2892,14 @@ function buildDashboardContinuitySummary({
   const data = { opgwCables, opgwCableSections, opgwSpanSegments, opgwSplicePoints, spliceClosures, fiberSplices, fiberAssignments, syntheticServices, patchPanels };
   const selectedSplicePointId = continuityHighlight.splicePointIds[0];
   const paths = matchedServices.map((service) => traceSyntheticService(service, data, selectedSplicePointId));
-  const firstService = matchedServices[0];
-  const firstPath = paths[0];
+  const filteredPaths = filterContinuityPathsForSelectedLayer(paths, filterContext.searchLayerFilter);
+  if (!filteredPaths.length && filterContext.searchLayerFilter !== "all") return undefined;
+  const filteredServiceIds = new Set(filteredPaths.map((path) => path.serviceId));
+  const filteredServices = matchedServices.filter((service) => filteredServiceIds.has(service.serviceId));
+  const displayPaths = filterContext.searchLayerFilter === "all" ? paths : filteredPaths;
+  const displayServices = filterContext.searchLayerFilter === "all" ? matchedServices : filteredServices;
+  const firstService = displayServices[0] || matchedServices[0];
+  const firstPath = displayPaths[0];
   const traceHref = continuityHighlight.serviceId
     ? `/fiber-trace?service=${encodeURIComponent(continuityHighlight.serviceId)}`
     : continuityHighlight.label.startsWith("SYN-SPLICE-")
@@ -2897,24 +2909,80 @@ function buildDashboardContinuitySummary({
         : `/fiber-trace`;
   return {
     label: continuityHighlight.label,
-    serviceIds: matchedServices.map((service) => service.serviceId),
+    filterLabel: searchLayerLabel(filterContext.searchLayerFilter),
+    serviceIds: displayServices.map((service) => service.serviceId),
     primaryServiceName: firstService ? `${firstService.serviceId} / ${firstService.serviceName}` : "No synthetic service matched this map highlight",
     endpointA: firstService?.fromSiteName || "Endpoint A",
     endpointZ: firstService?.toSiteName || "Endpoint Z",
-    pathStatus: worstPathStatus(paths),
-    totalTransmissionLines: uniqueStrings(paths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId))).length || firstPath?.totalTransmissionLines || 0,
-    totalCableSections: uniqueStrings(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId))).length || continuityHighlight.sectionIds?.length || 0,
-    totalSpanSegments: uniqueStrings(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "span_segment").map((segment) => segment.objectId))).length,
-    totalSplicePoints: uniqueStrings(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "splice_point").map((segment) => segment.objectId))).length || continuityHighlight.splicePointIds.length,
-    totalPatchPanels: uniqueStrings(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "patch_panel").map((segment) => segment.objectId))).length || firstPath?.totalPatchPanels || 0,
-    estimatedLossDb: paths.length ? Math.max(...paths.map((path) => path.totalEstimatedLossDb)) : 0,
-    criticality: highestCriticality(matchedServices),
-    protectionLevel: uniqueStrings(matchedServices.map((service) => service.protectionLevel)).join(", ") || "no service",
-    layerType: uniqueStrings(matchedServices.map((service) => service.layerType)).join(" + ") || "compare",
-    servicesCarried: matchedServices.length,
-    warningSummary: uniqueStrings(paths.flatMap((path) => path.warningSummary)),
+    pathStatus: worstPathStatus(displayPaths),
+    totalTransmissionLines: uniqueStrings(displayPaths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId))).length || firstPath?.totalTransmissionLines || 0,
+    totalCableSections: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId))).length,
+    totalSpanSegments: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "span_segment").map((segment) => segment.objectId))).length,
+    totalSplicePoints: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "splice_point" || segment.objectType === "splice_connection").map((segment) => segment.splicePointId || segment.spliceConnectionId || segment.objectId))).length,
+    totalPatchPanels: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "patch_panel").map((segment) => segment.objectId))).length,
+    estimatedLossDb: displayPaths.length ? Math.max(...displayPaths.map((path) => path.totalEstimatedLossDb)) : 0,
+    criticality: highestCriticality(displayServices),
+    protectionLevel: uniqueStrings(displayServices.map((service) => service.protectionLevel)).join(", ") || "no service",
+    layerType: uniqueStrings(displayServices.map((service) => service.layerType)).join(" + ") || searchLayerLabel(filterContext.searchLayerFilter),
+    servicesCarried: displayServices.length,
+    warningSummary: uniqueStrings([
+      ...displayPaths.flatMap((path) => path.warningSummary),
+      filterContext.searchLayerFilter === "all" ? undefined : `Summary scoped to selected filter: ${searchLayerLabel(filterContext.searchLayerFilter)}.`,
+    ]),
     traceHref,
   };
+}
+
+function isContinuitySearchLayerFilter(layer: DashboardSearchLayer) {
+  return continuityFilterMode(layer) !== "none";
+}
+
+function filterContinuityPathsForSelectedLayer(paths: FiberContinuityPath[], layer: DashboardSearchLayer) {
+  const mode = continuityFilterMode(layer);
+  if (mode === "all" || mode === "path") return paths;
+  if (mode === "none") return [];
+  return paths.flatMap((path) => {
+    const segments = path.segments.filter((segment) => mode.includes(segment.objectType));
+    if (!segments.length) return [];
+    return [summarizeContinuityPathSegments(path, segments, searchLayerLabel(layer))];
+  });
+}
+
+function continuityFilterMode(layer: DashboardSearchLayer): "all" | "path" | "none" | Array<FiberContinuityPath["segments"][number]["objectType"]> {
+  if (layer === "all") return "all";
+  if (layer === "fiberAssignments" || layer === "strandContinuity" || layer === "syntheticOpgwCables" || layer === "opgwRoutes") return "path";
+  if (layer === "opgwCableSections") return ["cable_section"];
+  if (layer === "opgwSpanSegments") return ["span_segment"];
+  if (layer === "opgwSplicePoints" || layer === "spliceClosures") return ["splice_point", "splice_connection"];
+  if (layer === "patchPanels") return ["patch_panel"];
+  return "none";
+}
+
+function summarizeContinuityPathSegments(path: FiberContinuityPath, segments: FiberContinuityPath["segments"], filterLabel: string): FiberContinuityPath {
+  const totalEstimatedLossDb = Number(segments.reduce((sum, segment) => sum + (segment.estimatedLossDb || 0), 0).toFixed(3));
+  const status = continuityPathStatusForSegments(segments);
+  return {
+    ...path,
+    pathStatus: status,
+    totalTransmissionLines: uniqueStrings(segments.map((segment) => segment.transmissionLineId)).length,
+    totalCableSections: uniqueStrings(segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId)).length,
+    totalSpanSegments: uniqueStrings(segments.filter((segment) => segment.objectType === "span_segment").map((segment) => segment.objectId)).length,
+    totalSplicePoints: uniqueStrings(segments.filter((segment) => segment.objectType === "splice_point" || segment.objectType === "splice_connection").map((segment) => segment.splicePointId || segment.spliceConnectionId || segment.objectId)).length,
+    totalPatchPanels: uniqueStrings(segments.filter((segment) => segment.objectType === "patch_panel").map((segment) => segment.objectId)).length,
+    totalEstimatedLossDb,
+    hasBrokenContinuity: segments.some((segment) => segment.segmentStatus === "broken"),
+    hasFaultedSection: path.hasFaultedSection && segments.some((segment) => segment.segmentStatus === "broken" || segment.segmentStatus === "warning"),
+    hasProposedChanges: segments.some((segment) => segment.segmentStatus === "proposed"),
+    warningSummary: uniqueStrings([...path.warningSummary, `Continuity summary filtered to ${filterLabel}.`]),
+    segments,
+  };
+}
+
+function continuityPathStatusForSegments(segments: FiberContinuityPath["segments"]): FiberContinuityPath["pathStatus"] {
+  if (segments.some((segment) => segment.segmentStatus === "broken")) return "broken";
+  if (segments.some((segment) => segment.segmentStatus === "warning")) return "warning";
+  if (segments.some((segment) => segment.segmentStatus === "proposed")) return "proposed";
+  return "complete";
 }
 
 function worstPathStatus(paths: FiberContinuityPath[]): DashboardContinuitySummary["pathStatus"] {
@@ -5713,6 +5781,8 @@ function buildSearchResults(
   designRecords: DesignAssetRecord[],
   query: string,
 ): StreetMapSelection[] {
+  const lowered = query.trim().toLowerCase();
+  if (lowered.length < 2) return [];
   const all: StreetMapSelection[] = [
     ...publicLines.map((record) => ({ kind: "public_transmission_line" as const, id: record.properties.id, label: publicLineLabel(record), record })),
     ...publicSubstations.map((record) => ({ kind: "public_substation" as const, id: record.properties.id, label: publicSubstationLabel(record), record })),
@@ -5739,9 +5809,7 @@ function buildSearchResults(
     ...nodes.map((record) => ({ kind: "node" as const, id: record.id, label: record.name, record })),
     ...lines.map((record) => ({ kind: "transmission_line" as const, id: record.id, label: record.name, record })),
   ];
-  const lowered = query.trim().toLowerCase();
-  if (!lowered) return all;
-  return all.filter((asset) => selectionSearchText(asset).toLowerCase().includes(lowered));
+  return all.filter((asset) => selectionSearchText(asset).toLowerCase().includes(lowered)).slice(0, 120);
 }
 
 function publicLineLabel(record: PublicTransmissionLineFeature) {
