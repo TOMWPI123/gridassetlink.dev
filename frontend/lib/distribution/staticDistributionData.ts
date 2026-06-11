@@ -5,6 +5,8 @@ import type {
   DistributionFiberAssignmentFeature,
   DistributionPoleCollection,
   DistributionPoleContinuityRecord,
+  DistributionPoleDensityCollection,
+  DistributionPoleDensityFeature,
   DistributionPoleFeature,
   DistributionPoleFiberRouteCollection,
   DistributionPoleFiberRouteFeature,
@@ -19,12 +21,33 @@ const DATA_DIR = path.join(process.cwd(), "public", "data");
 
 export type DistributionPoleNetworkData = {
   poles: DistributionPoleFeature[];
+  poleDensity: DistributionPoleDensityFeature[];
   fiberRoutes: DistributionPoleFiberRouteFeature[];
   splicePoints: DistributionPoleSplicePointFeature[];
   slackLoops: DistributionSlackLoopFeature[];
   fiberAssignments: DistributionFiberAssignmentFeature[];
   continuityRecords: DistributionPoleContinuityRecord[];
   patchPanels: PatchPanel[];
+  meta: DistributionPoleNetworkMeta;
+};
+
+export type DistributionPoleNetworkMeta = {
+  generatedAt?: string;
+  seed?: string;
+  source?: string;
+  displayPoleCount?: number;
+  fiberRouteCount?: number;
+  densityCellCount?: number;
+  distributionSplicePointCount?: number;
+  distributionSlackLoopCount?: number;
+  distributionFiberAssignmentCount?: number;
+  continuityRecordCount?: number;
+  estimatedRegionalPoleScale?: number;
+  estimatedPolesRepresentedPerDisplayPole?: number;
+  coveredStates?: string[];
+  coveredPublicSubstationAnchors?: number;
+  optimizationNote?: string;
+  disclaimer?: string;
 };
 
 export type DistributionPoleContinuityView = {
@@ -50,24 +73,28 @@ export type DistributionPoleContinuityView = {
 };
 
 export async function loadDistributionPoleNetworkData(): Promise<DistributionPoleNetworkData> {
-  const [poles, fiberRoutes, splicePoints, slackLoops, fiberAssignments, continuityRecords, patchPanels] = await Promise.all([
+  const [poles, poleDensity, fiberRoutes, splicePoints, slackLoops, fiberAssignments, continuityRecords, patchPanels, meta] = await Promise.all([
     readData<DistributionPoleCollection>("iso-ne-synthetic-distribution-poles.geojson", { type: "FeatureCollection", features: [] }),
+    readData<DistributionPoleDensityCollection>("iso-ne-synthetic-distribution-pole-density.geojson", { type: "FeatureCollection", features: [] }),
     readData<DistributionPoleFiberRouteCollection>("iso-ne-synthetic-distribution-pole-fiber.geojson", { type: "FeatureCollection", features: [] }),
     readData<DistributionPoleSplicePointCollection>("iso-ne-synthetic-distribution-splice-points.geojson", { type: "FeatureCollection", features: [] }),
     readData<DistributionSlackLoopCollection>("iso-ne-synthetic-distribution-slack-loops.geojson", { type: "FeatureCollection", features: [] }),
     readData<DistributionFiberAssignmentCollection>("iso-ne-synthetic-distribution-fiber-assignments.geojson", { type: "FeatureCollection", features: [] }),
     readData<DistributionPoleContinuityRecord[]>("iso-ne-synthetic-distribution-continuity.json", []),
     readData<PatchPanel[]>("iso-ne-synthetic-patch-panels.json", []),
+    readData<DistributionPoleNetworkMeta>("iso-ne-synthetic-distribution-poles.meta.json", {}),
   ]);
 
   return {
     poles: poles.features,
+    poleDensity: poleDensity.features,
     fiberRoutes: fiberRoutes.features,
     splicePoints: splicePoints.features,
     slackLoops: slackLoops.features,
     fiberAssignments: fiberAssignments.features,
     continuityRecords,
     patchPanels,
+    meta,
   };
 }
 

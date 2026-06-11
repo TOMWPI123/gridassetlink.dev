@@ -371,6 +371,8 @@ export function DashboardPage() {
   const [gisApiBase, setGisApiBase] = useState(API_BASE);
   const [liveStatus, setLiveStatus] = useState<DashboardLiveStatusPayload | null>(null);
   const [liveStatusError, setLiveStatusError] = useState("");
+  const terminalInputRef = useRef<HTMLInputElement | null>(null);
+  const terminalHistoryRef = useRef<HTMLDivElement | null>(null);
   const designFeaturesEnabled = MAP_EDITING_ENABLED || designModeEnabled;
 
   useEffect(() => {
@@ -1001,6 +1003,18 @@ export function DashboardPage() {
     setActiveSearchIndex(0);
   }, [search, searchLayerFilter]);
 
+  useEffect(() => {
+    if (!terminalOpen) return;
+    window.setTimeout(() => terminalInputRef.current?.focus(), 20);
+  }, [terminalOpen]);
+
+  useEffect(() => {
+    if (!terminalOpen) return;
+    const history = terminalHistoryRef.current;
+    if (!history) return;
+    history.scrollTop = history.scrollHeight;
+  }, [terminalHistory, terminalBusy, terminalOpen]);
+
   const handleMapStatusChange = useCallback((status: MapStatus, message?: string) => {
     setMapStatus(status);
     setMapStatusMessage(message || "");
@@ -1249,6 +1263,11 @@ export function DashboardPage() {
     setSearchOpen(Boolean(value.trim()));
   }
 
+  function handleSearchLayerFilterChange(layer: DashboardSearchLayer) {
+    setSearchLayerFilter(layer);
+    setVisibilityFilter(visibilityForSearchLayer(layer));
+  }
+
   function handleGlobalSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       setSearchOpen(false);
@@ -1317,6 +1336,20 @@ export function DashboardPage() {
 
   function handleStreetLayerChange(layer: StreetMapLayerKey, enabled: boolean) {
     setStreetLayers((current) => ({ ...current, [layer]: enabled }));
+    applyDashboardLayerFilterContext(layer, enabled);
+  }
+
+  function applyDashboardLayerFilterContext(layer: StreetMapLayerKey, enabled: boolean) {
+    const searchLayer = searchLayerForStreetLayer(layer);
+    if (enabled) {
+      if (searchLayer) setSearchLayerFilter(searchLayer);
+      setVisibilityFilter(visibilityForStreetLayer(layer));
+      return;
+    }
+    if (searchLayer) {
+      setSearchLayerFilter((current) => current === searchLayer ? "all" : current);
+    }
+    setVisibilityFilter("all");
   }
 
   function handleGisApiBaseChange(value: string) {
@@ -1769,6 +1802,9 @@ export function DashboardPage() {
   function handleTransmissionLineOwnerLayerChange(owner: string, enabled: boolean) {
     setVisibleTransmissionLineOwners((current) => ({ ...current, [owner]: enabled }));
     if (enabled) {
+      setSearchLayerFilter("publicTransmissionLines");
+      setVisibilityFilter("public");
+      setOwnerFilter(owner);
       setStreetLayers((current) => ({ ...current, publicTransmissionLines: true }));
     }
   }
@@ -1776,6 +1812,9 @@ export function DashboardPage() {
   function handleAllTransmissionLineOwnersChange(enabled: boolean) {
     setVisibleTransmissionLineOwners(Object.fromEntries(transmissionLineOwnerCounts.map(({ owner }) => [owner, enabled])));
     if (enabled) {
+      setSearchLayerFilter("publicTransmissionLines");
+      setVisibilityFilter("public");
+      setOwnerFilter("all");
       setStreetLayers((current) => ({ ...current, publicTransmissionLines: true }));
     }
   }
@@ -1783,6 +1822,9 @@ export function DashboardPage() {
   function handleSubstationOwnerLayerChange(owner: string, enabled: boolean) {
     setVisibleSubstationOwners((current) => ({ ...current, [owner]: enabled }));
     if (enabled) {
+      setSearchLayerFilter("publicSubstations");
+      setVisibilityFilter("public");
+      setOwnerFilter(owner);
       setStreetLayers((current) => ({ ...current, publicSubstations: true }));
     }
   }
@@ -1790,6 +1832,9 @@ export function DashboardPage() {
   function handleAllSubstationOwnersChange(enabled: boolean) {
     setVisibleSubstationOwners(Object.fromEntries(substationOwnerCounts.map(({ owner }) => [owner, enabled])));
     if (enabled) {
+      setSearchLayerFilter("publicSubstations");
+      setVisibilityFilter("public");
+      setOwnerFilter("all");
       setStreetLayers((current) => ({ ...current, publicSubstations: true }));
     }
   }
@@ -1797,6 +1842,9 @@ export function DashboardPage() {
   function handleFccTowerOwnerLayerChange(owner: string, enabled: boolean) {
     setVisibleFccTowerOwners((current) => ({ ...current, [owner]: enabled }));
     if (enabled) {
+      setSearchLayerFilter("fccUtilityTowers");
+      setVisibilityFilter("public");
+      setOwnerFilter(owner);
       setStreetLayers((current) => ({ ...current, fccUtilityTowers: true }));
     }
   }
@@ -1804,6 +1852,9 @@ export function DashboardPage() {
   function handleAllFccTowerOwnersChange(enabled: boolean) {
     setVisibleFccTowerOwners(Object.fromEntries(fccTowerOwnerCounts.map(({ owner }) => [owner, enabled])));
     if (enabled) {
+      setSearchLayerFilter("fccUtilityTowers");
+      setVisibilityFilter("public");
+      setOwnerFilter("all");
       setStreetLayers((current) => ({ ...current, fccUtilityTowers: true }));
     }
   }
@@ -1811,6 +1862,9 @@ export function DashboardPage() {
   function handleFccLinkOwnerLayerChange(owner: string, enabled: boolean) {
     setVisibleFccLinkOwners((current) => ({ ...current, [owner]: enabled }));
     if (enabled) {
+      setSearchLayerFilter("fccMicrowaveLinks");
+      setVisibilityFilter("public");
+      setOwnerFilter(owner);
       setStreetLayers((current) => ({ ...current, fccMicrowaveLinks: true }));
     }
   }
@@ -1818,6 +1872,9 @@ export function DashboardPage() {
   function handleAllFccLinkOwnersChange(enabled: boolean) {
     setVisibleFccLinkOwners(Object.fromEntries(fccLinkOwnerCounts.map(({ owner }) => [owner, enabled])));
     if (enabled) {
+      setSearchLayerFilter("fccMicrowaveLinks");
+      setVisibilityFilter("public");
+      setOwnerFilter("all");
       setStreetLayers((current) => ({ ...current, fccMicrowaveLinks: true }));
     }
   }
@@ -1825,6 +1882,8 @@ export function DashboardPage() {
   function handleFccFrequencyBandChange(frequencyBand: string, enabled: boolean) {
     setVisibleFccFrequencyBands((current) => ({ ...current, [frequencyBand]: enabled }));
     if (enabled) {
+      setSearchLayerFilter("fccMicrowaveLinks");
+      setVisibilityFilter("public");
       setStreetLayers((current) => ({ ...current, fccMicrowaveLinks: true }));
     }
   }
@@ -1832,6 +1891,8 @@ export function DashboardPage() {
   function handleAllFccFrequencyBandsChange(enabled: boolean) {
     setVisibleFccFrequencyBands(Object.fromEntries(fccFrequencyBandCounts.map(({ frequencyBand }) => [frequencyBand, enabled])));
     if (enabled) {
+      setSearchLayerFilter("fccMicrowaveLinks");
+      setVisibilityFilter("public");
       setStreetLayers((current) => ({ ...current, fccMicrowaveLinks: true }));
     }
   }
@@ -2114,7 +2175,7 @@ export function DashboardPage() {
           <div className="dashboard-map-global-search-shell">
             <label className="dashboard-map-layer-select">
               <span>Layer</span>
-              <select value={searchLayerFilter} onChange={(event) => setSearchLayerFilter(event.currentTarget.value as DashboardSearchLayer)}>
+              <select value={searchLayerFilter} onChange={(event) => handleSearchLayerFilterChange(event.currentTarget.value as DashboardSearchLayer)}>
                 {searchLayerOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
               </select>
             </label>
@@ -2194,7 +2255,7 @@ export function DashboardPage() {
                   ownerOptions={ownerOptions}
                   searchResults={searchResults}
                   onSearchChange={setSearch}
-                  onSearchLayerChange={(value) => setSearchLayerFilter(value as DashboardSearchLayer)}
+                  onSearchLayerChange={(value) => handleSearchLayerFilterChange(value as DashboardSearchLayer)}
                   onAssetTypeChange={setAssetTypeFilter}
                   onStatusChange={setStatusFilter}
                   onRegionChange={setRegionFilter}
@@ -2352,9 +2413,10 @@ export function DashboardPage() {
           <section className="dashboard-command-terminal-panel">
             <div className="dashboard-command-terminal-header">
               <span><Terminal size={15} /><strong>Dashboard Command Terminal</strong></span>
+              <em className="dashboard-command-terminal-status">{terminalBusy ? "Working..." : selectedAsset ? `Context: ${selectedAsset.label}` : "Ready"}</em>
               <button type="button" onClick={() => setTerminalOpen(false)} aria-label="Close command terminal"><X size={15} /></button>
             </div>
-            <div className="dashboard-command-terminal-history" aria-live="polite">
+            <div className="dashboard-command-terminal-history" aria-live="polite" ref={terminalHistoryRef}>
               {terminalHistory.map((message) => (
                 <article className={`terminal-message ${message.role}`} key={message.id}>
                   <span>{message.role}</span>
@@ -2369,6 +2431,7 @@ export function DashboardPage() {
             </div>
             <div className="dashboard-command-terminal-entry">
               <input
+                ref={terminalInputRef}
                 value={terminalInput}
                 onChange={(event) => setTerminalInput(event.currentTarget.value)}
                 onKeyDown={handleTerminalKeyDown}
@@ -5469,6 +5532,42 @@ function matchesSearchLayer(selection: StreetMapSelection, layer: string) {
   if (layer === "all") return true;
   const option = searchLayerOptions.find((item) => item.value === layer);
   return option ? option.kinds.includes(selection.kind) : true;
+}
+
+function searchLayerForStreetLayer(layer: StreetMapLayerKey): DashboardSearchLayer | null {
+  if (layer === "publicTransmissionLines") return "publicTransmissionLines";
+  if (layer === "publicSubstations") return "publicSubstations";
+  if (layer === "fccUtilityTowers") return "fccUtilityTowers";
+  if (layer === "fccMicrowaveLinks") return "fccMicrowaveLinks";
+  if (layer === "transmissionStructures") return "transmissionStructures";
+  if (layer === "spliceClosures" || layer === "existingFiberSplices" || layer === "proposedFiberSplices" || layer === "compareSpliceLayers") return "spliceClosures";
+  if (layer === "syntheticOpgwCables" || layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber") return "syntheticOpgwCables";
+  if (layer === "opgwRoutes") return "opgwRoutes";
+  if (layer === "opgwCableSections") return "opgwCableSections";
+  if (layer === "opgwSpanSegments" || layer === "opgwOutageImpact" || layer === "opgwSpanInspectionIssues") return "opgwSpanSegments";
+  if (layer === "opgwSplicePoints") return "opgwSplicePoints";
+  if (layer === "fiberAssignments" || layer === "availableStrandCapacity" || layer === "criticalRidingCircuits") return "fiberAssignments";
+  if (layer === "distributionPoleDensity") return "distributionPoleDensity";
+  if (layer === "distributionPoles") return "distributionPoles";
+  if (layer === "distributionFiberRoutes") return "distributionFiberRoutes";
+  if (layer === "distributionSplicePoints") return "distributionSplicePoints";
+  if (layer === "distributionSlackLoops") return "distributionSlackLoops";
+  if (layer === "distributionFiberAssignments") return "distributionFiberAssignments";
+  if (layer === "patchPanels") return "patchPanels";
+  if (layer === "syntheticSubstations") return "syntheticSubstations";
+  if (layer === "designAssets") return "designAssets";
+  return null;
+}
+
+function visibilityForStreetLayer(layer: StreetMapLayerKey) {
+  if (layer === "publicTransmissionLines" || layer === "publicSubstations" || layer === "fccUtilityTowers" || layer === "fccMicrowaveLinks") return "public";
+  return "synthetic-demo";
+}
+
+function visibilityForSearchLayer(layer: DashboardSearchLayer) {
+  if (layer === "all") return "all";
+  if (layer === "publicTransmissionLines" || layer === "publicSubstations" || layer === "fccUtilityTowers" || layer === "fccMicrowaveLinks") return "public";
+  return "synthetic-demo";
 }
 
 function gisSearchTypesForLayer(layer: string): Array<"pole" | "circuit" | "fiber" | "splice" | "handhole" | "mux"> {
