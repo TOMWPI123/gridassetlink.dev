@@ -8,6 +8,7 @@ import type { OpgwCableSectionFeature, OpgwRouteFeature, OpgwSplicePointFeature,
 type MapLayerControlPanelProps = {
   layers: Record<StreetMapLayerKey, boolean>;
   onLayerChange?: (layer: StreetMapLayerKey, enabled: boolean) => void;
+  onDistributionLayerGroupChange?: (enabled: boolean) => void;
   publicLineCount?: number;
   visiblePublicLineCount?: number;
   publicSubstationCount?: number;
@@ -36,6 +37,7 @@ type MapLayerControlPanelProps = {
   designAssetCount?: number;
   estimatedDistributionPoleScale?: number;
   availableStrandCount?: number;
+  strandContinuityCount?: number;
   criticalRidingCircuitCount?: number;
   outageImpactCount?: number;
   openOpgwWorkOrderCount?: number;
@@ -98,14 +100,9 @@ const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string
   { key: "compareSpliceLayers", label: "Compare Existing vs Proposed", note: "Shows existing and proposed splice layers together for review.", badges: ["Compare"] },
   { key: "spliceClosures", label: "Splice Closures", note: "Synthetic closures at terminal and junction structures.", badges: ["Synthetic", "Splices"] },
   { key: "patchPanels", label: "Patch Panels", note: "Synthetic termination panels at structures and nodes.", badges: ["Synthetic", "Panels"] },
-  { key: "distributionPoleDensity", label: "Distribution Pole Density", note: "Optimized rollups representing millions of synthetic street-path poles without rendering every pole.", badges: ["Synthetic", "Million-scale", "Fast"] },
-  { key: "distributionPoles", label: "Distribution Telecom Poles", note: "Synthetic utility-style pole placements following generated street paths; clustered for smooth million-scale viewing.", badges: ["Synthetic", "Telecom", "Clustered"] },
-  { key: "distributionFiberRoutes", label: "Distribution Pole Fiber", note: "Synthetic street-following telecom feeder continuity linked into patch panels and OPGW planning records.", badges: ["Telecom", "Continuity"] },
-  { key: "distributionSplicePoints", label: "Distribution Splice Points", note: "Synthetic splice nodes, risers, taps, and branch points placed on generated pole routes.", badges: ["Synthetic", "Splices"] },
-  { key: "distributionSlackLoops", label: "Distribution Slack Loops", note: "Synthetic slack storage and maintenance loops tied to splice or pole positions.", badges: ["Synthetic", "Slack"] },
-  { key: "distributionFiberAssignments", label: "Distribution Fiber Assignments", note: "Synthetic SCADA, automation, telecom backhaul, and spare assignments riding generated pole fiber routes.", badges: ["Synthetic", "Assignments"] },
   { key: "fiberStrandsLayer", label: "Fiber Strands", note: "Strand records belong to cable sections in this engineering view.", badges: ["Strands"] },
   { key: "fiberAssignments", label: "Fiber Assignments", note: "Synthetic service assignments on OPGW cable sections.", badges: ["Assignments"] },
+  { key: "strandContinuity", label: "Strand Continuity", note: "Isolated full-strand view from patch panels through splices to terminated devices.", badges: ["Trace", "Strand view"] },
   { key: "availableStrandCapacity", label: "Available Strand Capacity", note: "Capacity coloring from synthetic strand records.", badges: ["Capacity"] },
   { key: "criticalRidingCircuits", label: "Critical Riding Circuits", note: "Synthetic SEL ICON, C37.94, DTT, Protection, and SCADA assignments.", badges: ["Critical"] },
   { key: "opgwOutageImpact", label: "Outage Impact", note: "Synthetic high-risk routes, sections, and spans.", badges: ["Impact"] },
@@ -113,9 +110,19 @@ const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string
   { key: "opgwSpanInspectionIssues", label: "Span Inspection Issues", note: "Synthetic span inspection or midspan issue highlights.", badges: ["Inspection"] },
 ];
 
+const distributionLayerKeys: StreetMapLayerKey[] = [
+  "distributionPoleDensity",
+  "distributionPoles",
+  "distributionFiberRoutes",
+  "distributionSplicePoints",
+  "distributionSlackLoops",
+  "distributionFiberAssignments",
+];
+
 export function MapLayerControlPanel({
   layers,
   onLayerChange,
+  onDistributionLayerGroupChange,
   publicLineCount = 0,
   visiblePublicLineCount = publicLineCount,
   publicSubstationCount = 0,
@@ -144,6 +151,7 @@ export function MapLayerControlPanel({
   designAssetCount = 0,
   estimatedDistributionPoleScale = 0,
   availableStrandCount = 0,
+  strandContinuityCount = 0,
   criticalRidingCircuitCount = 0,
   outageImpactCount = 0,
   openOpgwWorkOrderCount = 0,
@@ -180,6 +188,16 @@ export function MapLayerControlPanel({
   onFocusOpgwSplicePoint,
   onClearOpgwFocus,
 }: MapLayerControlPanelProps) {
+  const distributionLayerEnabled = distributionLayerKeys.some((key) => layers[key]);
+  const distributionLayerComplete = distributionLayerKeys.every((key) => layers[key]);
+  const distributionLayerVisibleCount = distributionPoleDensityCount + distributionPoleCount + distributionPoleFiberRouteCount + distributionSplicePointCount + distributionSlackLoopCount + distributionFiberAssignmentCount;
+  const handleDistributionLayerToggle = (enabled: boolean) => {
+    if (onDistributionLayerGroupChange) {
+      onDistributionLayerGroupChange(enabled);
+      return;
+    }
+    distributionLayerKeys.forEach((key) => onLayerChange?.(key, enabled));
+  };
   const counts: Partial<Record<StreetMapLayerKey, number>> = {
     publicTransmissionLines: publicLineCount,
     publicSubstations: publicSubstationCount,
@@ -320,6 +338,7 @@ export function MapLayerControlPanel({
                     spliceClosureCount,
                     patchPanelCount,
                     availableStrandCount,
+                    strandContinuityCount,
                     criticalRidingCircuitCount,
                     outageImpactCount,
                     openOpgwWorkOrderCount,
@@ -356,6 +375,45 @@ export function MapLayerControlPanel({
             ) : null}
           </div>
         ))}
+      </div>
+      <div className="street-layer-section-heading">
+        <span>Distribution Network</span>
+        <em>{estimatedDistributionPoleScale.toLocaleString()} synthetic poles</em>
+      </div>
+      <div className="street-layer-grid">
+        <div className={`street-layer-group ${distributionLayerEnabled ? "active" : ""}`}>
+          <label className={`street-layer-toggle ${distributionLayerEnabled ? "active" : ""}`}>
+            <input
+              type="checkbox"
+              checked={distributionLayerEnabled}
+              onChange={(event) => handleDistributionLayerToggle(event.currentTarget.checked)}
+            />
+            <span>
+              <strong>
+                Distribution Network
+                <em>{distributionLayerVisibleCount.toLocaleString()}</em>
+              </strong>
+              <small>
+                One layer for distribution pole density, close-zoom poles, street fiber routes, splice points, slack loops, and fiber assignments.
+                {distributionLayerComplete ? " All distribution sublayers are visible." : " Toggle this on to show the full module layer set."}
+              </small>
+              <span className="street-layer-badges">
+                <b>Synthetic</b>
+                <b>One module</b>
+                <b>Fast LOD</b>
+              </span>
+            </span>
+          </label>
+          <div className="street-owner-sublayer-heading">
+            <span>
+              <strong>Distribution Network Module</strong>
+              <small>
+                {distributionPoleDensityCount.toLocaleString()} density cells, {distributionPoleFiberRouteCount.toLocaleString()} routes, {distributionSplicePointCount.toLocaleString()} splice points, {distributionSlackLoopCount.toLocaleString()} slack loops, {distributionFiberAssignmentCount.toLocaleString()} assignments.
+              </small>
+            </span>
+            <a className="street-layer-action-link" href="/distribution-fiber">Open module</a>
+          </div>
+        </div>
       </div>
       <div className="street-layer-warning">
         Synthetic planning assumption only. Not active fiber. Requires engineer/as-built verification.
@@ -838,6 +896,7 @@ function opgwCountForLayer(
     distributionSlackLoopCount: number;
     distributionFiberAssignmentCount: number;
     availableStrandCount: number;
+    strandContinuityCount: number;
     criticalRidingCircuitCount: number;
     outageImpactCount: number;
     openOpgwWorkOrderCount: number;
@@ -867,6 +926,7 @@ function opgwCountForLayer(
   if (layer === "distributionFiberAssignments") return counts.distributionFiberAssignmentCount;
   if (layer === "fiberStrandsLayer") return counts.availableStrandCount;
   if (layer === "fiberAssignments") return counts.criticalRidingCircuitCount;
+  if (layer === "strandContinuity") return counts.strandContinuityCount;
   if (layer === "availableStrandCapacity") return counts.availableStrandCount;
   if (layer === "criticalRidingCircuits") return counts.criticalRidingCircuitCount;
   if (layer === "opgwOutageImpact") return counts.outageImpactCount;
@@ -887,7 +947,7 @@ function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string,
   if (layer === "distributionSplicePoints") return warnings?.distributionSplicePoints;
   if (layer === "distributionSlackLoops") return warnings?.distributionSlackLoops;
   if (layer === "distributionFiberAssignments") return warnings?.distributionFiberAssignments;
-  if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "existingFiberSplices" || layer === "proposedFiberSplices" || layer === "compareSpliceLayers" || layer === "fiberStrandsLayer" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments || warnings?.syntheticServices;
+  if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "existingFiberSplices" || layer === "proposedFiberSplices" || layer === "compareSpliceLayers" || layer === "fiberStrandsLayer" || layer === "strandContinuity" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.strandContinuity || warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments || warnings?.syntheticServices;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   if (layer === "patchPanels") return warnings?.patchPanels;
   if (layer === "criticalRidingCircuits") return warnings?.fiberAssignments;

@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { DataTable } from "@/components/DataTable";
-import type { FiberAssignment, FiberSplice, FiberStrand, OpgwCableCollection, PatchPanel, SpliceClosureCollection, TransmissionStructureCollection } from "@/lib/types/assets";
+import type { FiberAssignment, FiberSplice, FiberStrand, OpgwCableCollection, PatchPanel, SpliceClosureCollection, StrandContinuityRecord, TransmissionStructureCollection } from "@/lib/types/assets";
 import type { JsonRecord } from "@/types";
 
 type SyntheticFiberData = {
@@ -14,6 +15,7 @@ type SyntheticFiberData = {
   splices: FiberSplice[];
   panels: PatchPanel[];
   assignments: FiberAssignment[];
+  strandContinuity: StrandContinuityRecord[];
   error: string;
 };
 
@@ -25,6 +27,7 @@ const emptyData: SyntheticFiberData = {
   splices: [],
   panels: [],
   assignments: [],
+  strandContinuity: [],
   error: "",
 };
 
@@ -65,6 +68,50 @@ export function FiberAssignmentPlannerPage() {
   return <SyntheticPage title="Fiber Assignment Planner" subtitle="Synthetic planned, reserved, and active fiber assignments. Use the dashboard Assign tab for interactive local reservations." error={data.error}><DataTable rows={rows} columns={["assignmentName", "serviceType", "status", "cableCount", "strandSet", "estimatedDistanceMiles", "estimatedLossDb"]} filterField="serviceType" /></SyntheticPage>;
 }
 
+export function StrandContinuityPage() {
+  const data = useSyntheticFiberData();
+  const rows = data.strandContinuity.map((record) => ({
+    ...record,
+    cable_count: record.cableIds.length,
+    strand_set: record.strandNumbers.join(", "),
+    splice_closure_count: record.spliceClosureIds.length,
+    segment_count: record.continuitySegments.length,
+    map_view: `/dashboard?drawer=layers&strandContinuity=${encodeURIComponent(record.id)}`,
+  }) as unknown as JsonRecord);
+  const panelIds = new Set(data.strandContinuity.flatMap((record) => [record.aEndPatchPanelId, record.zEndPatchPanelId].filter(Boolean)));
+  const deviceIds = new Set(data.strandContinuity.map((record) => record.terminatedDeviceId).filter(Boolean));
+  return (
+    <SyntheticPage title="Strand Continuity" subtitle="Synthetic end-to-end strand paths from substation patch panels through splices to terminated telecom devices." error={data.error}>
+      <section className="metric-grid" aria-label="Strand continuity metrics">
+        <Metric label="Continuity paths" value={data.strandContinuity.length.toLocaleString()} detail="Generated strand-level demos" />
+        <Metric label="Patch panels" value={panelIds.size.toLocaleString()} detail="A/Z panel terminations" />
+        <Metric label="Terminated devices" value={deviceIds.size.toLocaleString()} detail="Synthetic end hardware" />
+        <Metric label="Splice references" value={data.strandContinuity.reduce((sum, record) => sum + record.spliceClosureIds.length, 0).toLocaleString()} detail="Diverse splice path hops" />
+      </section>
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <div className="panel-header">
+          <strong>Map Strand View</strong>
+          <span className="badge active">isolated layer mode</span>
+        </div>
+        <div className="panel-body">
+          <p className="subtle">Open any row on the map to turn off unrelated layers, highlight the strand assignment, show patch panels/splices, and follow the path to its terminated synthetic device port.</p>
+          <div className="strand-continuity-card-grid">
+            {data.strandContinuity.slice(0, 12).map((record) => (
+              <article className="strand-continuity-card" key={record.id}>
+                <strong>{record.continuityName}</strong>
+                <span>{record.serviceType} / {record.strandNumbers.join(", ")} strands / {record.estimatedLossDb.toFixed(2)} dB</span>
+                <small>{record.aEndPatchPanelId || "A-end panel"} to {record.terminatedDeviceName || record.zEndPatchPanelId || "Z-end device"}</small>
+                <Link href={`/dashboard?drawer=layers&strandContinuity=${encodeURIComponent(record.id)}`}>Open Strand View</Link>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+      <DataTable rows={rows} columns={["strandContinuityId", "continuityName", "serviceType", "status", "strand_set", "aEndPatchPanelId", "zEndPatchPanelId", "terminatedDeviceName", "terminatedDevicePortName", "cable_count", "splice_closure_count", "routeMiles", "estimatedLossDb", "map_view"]} filterField="serviceType" />
+    </SyntheticPage>
+  );
+}
+
 function SyntheticPage({ title, subtitle, error, children }: { title: string; subtitle: string; error: string; children: ReactNode }) {
   return (
     <>
@@ -91,7 +138,7 @@ function useSyntheticFiberData() {
     let cancelled = false;
     async function load() {
       try {
-        const [structures, opgw, closures, strands, splices, panels, assignments] = await Promise.all([
+        const [structures, opgw, closures, strands, splices, panels, assignments, strandContinuity] = await Promise.all([
           fetchJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson"),
           fetchJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson"),
           fetchJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson"),
@@ -99,6 +146,7 @@ function useSyntheticFiberData() {
           fetchJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json"),
           fetchJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json"),
           fetchJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json"),
+          fetchJson<StrandContinuityRecord[]>("/data/iso-ne-synthetic-strand-continuity.json").catch(() => []),
         ]);
         if (cancelled) return;
         setData({
@@ -109,6 +157,7 @@ function useSyntheticFiberData() {
           splices,
           panels,
           assignments,
+          strandContinuity,
           error: "",
         });
       } catch (error) {
@@ -121,6 +170,16 @@ function useSyntheticFiberData() {
     };
   }, []);
   return data;
+}
+
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <article className="metric-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </article>
+  );
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

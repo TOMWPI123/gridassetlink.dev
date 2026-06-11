@@ -6,7 +6,7 @@ import type { DistributionFiberAssignmentFeature, DistributionPoleFeature, Distr
 export default async function Page() {
   const data = await loadDistributionPoleNetworkData();
   const stats = buildDistributionPlannerStats(data);
-  const layerRows = buildLayerRows(data, stats);
+  const moduleLayer = buildCombinedLayerRow(data, stats);
   const ownerRows = buildOwnerRows(data);
   const stateRows = buildStateRows(data);
   const routeRows = data.fiberRoutes
@@ -21,7 +21,7 @@ export default async function Page() {
     <main>
       <div className="page-header distribution-planner-header">
         <div>
-          <h1 className="eyebrowless-title">Distribution Fiber Planner</h1>
+          <h1 className="eyebrowless-title">Distribution Network</h1>
           <div className="subtle">Synthetic street-path distribution poles, density layers, fiber routes, splices, slack loops, assignments, continuity, and patch panel handoffs.</div>
         </div>
         <div className="toolbar">
@@ -52,10 +52,10 @@ export default async function Page() {
       <section className="panel distribution-planner-section">
         <div className="panel-header">
           <div>
-            <strong>Distribution Layer Inventory</strong>
-            <div className="subtle">Every distribution pole/fiber layer used by the dashboard is embedded into this planner.</div>
+            <strong>Distribution Network Module</strong>
+            <div className="subtle">One dashboard layer feeds this module: density, poles, routes, splices, slack, assignments, continuity, and patch panel handoffs.</div>
           </div>
-          <span className="badge planned">{formatCount(layerRows.length)} layers</span>
+          <span className="badge planned">1 layer</span>
         </div>
         <div className="table-wrap">
           <table>
@@ -63,23 +63,21 @@ export default async function Page() {
               <tr>
                 <th>Layer</th>
                 <th>Records</th>
-                <th>Represents</th>
+                <th>Includes</th>
                 <th>Map key</th>
                 <th>Status</th>
                 <th>Safety boundary</th>
               </tr>
             </thead>
             <tbody>
-              {layerRows.map((row) => (
-                <tr key={row.layer}>
-                  <td><strong>{row.layer}</strong><br /><small>{row.source}</small></td>
-                  <td>{row.records}</td>
-                  <td>{row.represents}</td>
-                  <td><code>{row.mapKey}</code></td>
-                  <td><Badge value={row.status} /></td>
-                  <td>{row.boundary}</td>
-                </tr>
-              ))}
+              <tr>
+                <td><strong>{moduleLayer.layer}</strong><br /><small>{moduleLayer.source}</small></td>
+                <td>{moduleLayer.records}</td>
+                <td>{moduleLayer.includes}</td>
+                <td><code>{moduleLayer.mapKey}</code></td>
+                <td><Badge value={moduleLayer.status} /></td>
+                <td>{moduleLayer.boundary}</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -321,21 +319,24 @@ function buildDistributionPlannerStats(data: DistributionPoleNetworkData) {
   };
 }
 
-function buildLayerRows(data: DistributionPoleNetworkData, stats: ReturnType<typeof buildDistributionPlannerStats>) {
-  return [
-    layer("Pole Density", data.poleDensity.length, formatCount(stats.estimatedPoleScale), "distributionPoleDensity", "planned", "Synthetic rollup layer for large-scale browsing."),
-    layer("Distribution Poles", data.poles.length, `${formatCount(data.meta.estimatedPolesRepresentedPerDisplayPole || 200)} represented per display pole`, "distributionPoles", "in_service_synthetic", "Synthetic display sample, not actual pole inventory."),
-    layer("Distribution Fiber Routes", data.fiberRoutes.length, `${formatMiles(stats.routeMiles)} street-path fiber`, "distributionFiberRoutes", "planned", "Synthetic route continuity, not real telecom routing."),
-    layer("Distribution Splice Points", data.splicePoints.length, "Pole-mounted synthetic splice nodes", "distributionSplicePoints", "planned", "Synthetic splice records only."),
-    layer("Distribution Slack Loops", data.slackLoops.length, `${formatCount(stats.totalSlackFeet)} ft slack`, "distributionSlackLoops", "planned", "Synthetic slack/storage records only."),
-    layer("Distribution Assignments", data.fiberAssignments.length, "Synthetic services carried on routes", "distributionFiberAssignments", "planned", "Synthetic assignment records only."),
-    layer("Continuity Records", data.continuityRecords.length, "Route-to-pole trace records", "fiberTrace", "planned", "Demo continuity logic only."),
-    layer("Patch Panel Handoffs", stats.distributionPatchPanels, "Parent patch panel links", "patchPanels", "planned", "Synthetic terminal handoffs only."),
-  ];
-}
-
-function layer(layerName: string, records: number, represents: string, mapKey: string, status: string, boundary: string) {
-  return { layer: layerName, records: formatCount(records), represents, mapKey, status, boundary, source: "synthetic-demo" };
+function buildCombinedLayerRow(data: DistributionPoleNetworkData, stats: ReturnType<typeof buildDistributionPlannerStats>) {
+  const browsableRecords = data.poleDensity.length
+    + data.poles.length
+    + data.fiberRoutes.length
+    + data.splicePoints.length
+    + data.slackLoops.length
+    + data.fiberAssignments.length
+    + data.continuityRecords.length
+    + stats.distributionPatchPanels;
+  return {
+    layer: "Distribution Network",
+    records: `${formatCount(browsableRecords)} browsable records / ${formatCount(stats.estimatedPoleScale)} represented poles`,
+    includes: `${formatCount(data.poleDensity.length)} density cells, ${formatCount(data.poles.length)} display poles, ${formatCount(data.fiberRoutes.length)} routes, ${formatCount(data.splicePoints.length)} splice points, ${formatCount(data.slackLoops.length)} slack loops, ${formatCount(data.fiberAssignments.length)} assignments, ${formatCount(data.continuityRecords.length)} continuity records, and ${formatCount(stats.distributionPatchPanels)} patch panel handoffs.`,
+    mapKey: "distributionNetwork",
+    status: "planned",
+    boundary: "Synthetic distribution planning records only; not real pole, splice, fiber, assignment, or service inventory.",
+    source: "one synthetic-demo module layer",
+  };
 }
 
 function buildOwnerRows(data: DistributionPoleNetworkData): PlannerSummaryRow[] {

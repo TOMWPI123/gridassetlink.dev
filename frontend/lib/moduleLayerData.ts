@@ -1,4 +1,5 @@
 import type {
+  DistributionFiberAssignmentCollection,
   FccMicrowaveLinkCollection,
   FccUtilityTowerCollection,
   FiberAssignment,
@@ -40,8 +41,12 @@ export async function loadModuleLayerData(key: string): Promise<ModuleLayerData 
       return loadTransmissionLines();
     case "devices":
       return loadDevices();
+    case "device-ports":
+      return loadDevicePorts();
     case "circuits":
       return loadCircuits();
+    case "leased-services":
+      return loadLeasedServices();
     case "opgw":
     case "fiber-cables":
       return loadOpgwCables(key);
@@ -229,14 +234,20 @@ async function loadTransmissionLines(): Promise<ModuleLayerData> {
 }
 
 async function loadDevices(): Promise<ModuleLayerData> {
-  const [nodes, fccTowers] = await Promise.all([
+  const [nodes, fccTowers, hardware] = await Promise.all([
     fetchJson<GeoJsonCollection>("/data/telecomNodes.geojson"),
     fetchJson<FccUtilityTowerCollection>("/data/fcc-uls-utility-towers.geojson"),
+    fetchJson<SyntheticTelecomHardwareData>("/data/iso-ne-synthetic-telecom-hardware.json").catch(() => emptyHardware()),
   ]);
+  const hardwareNodesById = new Map(hardware.nodes.map((node) => [clean(node.nodeId), node]));
+  const assignedPortsByNode = countHardwarePortsByNode(hardware.ports, (port) => clean(port.status) === "assigned");
+  const availablePortsByNode = countHardwarePortsByNode(hardware.ports, (port) => ["available", "reserved"].includes(clean(port.status)));
   const telecomRows = nodes.features.map<JsonRecord>((feature) => {
     const properties = feature.properties as Record<string, unknown>;
+    const nodeId = clean(properties.id);
+    const hardwareNode = hardwareNodesById.get(nodeId);
     return {
-      id: clean(properties.id),
+      id: nodeId,
       device_name: properties.name,
       device_type: properties.role,
       manufacturer: properties.manufacturer,
@@ -247,6 +258,13 @@ async function loadDevices(): Promise<ModuleLayerData> {
       status: properties.status,
       criticality: properties.criticality,
       lifecycle_state: properties.lifecycleState,
+      service_count: toNumber(properties.serviceCount) || hardwareNode?.serviceIds?.length || 0,
+      hardware_cards: toNumber(properties.cardCount) || hardwareNode?.cardIds?.length || 0,
+      hardware_ports: toNumber(properties.portCount) || hardwareNode?.portIds?.length || 0,
+      assigned_ports: assignedPortsByNode.get(nodeId) || 0,
+      available_ports: availablePortsByNode.get(nodeId) || 0,
+      hardware_card_ids: hardwareNode?.cardIds?.join(", "),
+      hardware_port_ids: hardwareNode?.portIds?.slice(0, 24).join(", "),
       layer: "Synthetic telecom nodes",
       source: "synthetic-demo",
       source_type: "synthetic-planning",
@@ -284,11 +302,13 @@ async function loadDevices(): Promise<ModuleLayerData> {
   const rows = [...telecomRows, ...towerRows];
   return {
     title: "Layer-backed device and tower inventory",
-    notice: "Device rows include synthetic telecom nodes and the public FCC utility tower node layer. FCC rows are public reference records, not private operational nodes.",
+    notice: "Device rows include synthetic telecom nodes with generated chassis/card/port inventories, plus the public FCC utility tower node layer. FCC rows are public reference records, not private operational nodes.",
     rows,
     disableDetailLinks: true,
     metrics: [
       metric("Synthetic telecom nodes", telecomRows.length, "Demo devices from the map layer.", "Synthetic node layer", "Not real operational inventory"),
+      metric("Synthetic hardware cards", hardware.cards.length, "Generated chassis cards across telecom nodes.", "Synthetic telecom hardware", "Planning/demo only"),
+      metric("Synthetic device ports", hardware.ports.length, "Generated physical/logical ports assigned to services, patch panels, and circuits.", "Synthetic telecom hardware", "Planning/demo only"),
       metric("FCC utility tower nodes", towerRows.length, "Public FCC ULS utility microwave site records.", "FCC ULS public layer", "Reference only"),
       metric("Utility owners", uniqueCount(towerRows.map((row) => row.utility_owner)), "FCC utility-owner sublayers available in the module.", "FCC ULS licensee names", "Public utility records only"),
       metric("Linked microwave paths", sum(towerRows.map((row) => toNumber(row.linked_paths))), "Path relationships exposed from FCC tower layer.", "FCC ULS public layer", "Reference only"),
@@ -296,14 +316,65 @@ async function loadDevices(): Promise<ModuleLayerData> {
   };
 }
 
+async function loadDevicePorts(): Promise<ModuleLayerData> {
+  const hardware = await fetchJson<SyntheticTelecomHardwareData>("/data/iso-ne-synthetic-telecom-hardware.json");
+  const nodeById = new Map(hardware.nodes.map((node) => [clean(node.nodeId), node]));
+  const cardById = new Map(hardware.cards.map((card) => [clean(card.cardId), card]));
+  const rows = hardware.ports.map<JsonRecord>((port) => {
+    const node = nodeById.get(clean(port.nodeId));
+    const card = cardById.get(clean(port.cardId));
+    return {
+      id: port.portId,
+      device_id: port.nodeId,
+      device_name: node?.nodeName,
+      device_type: node?.deviceRole,
+      card_id: port.cardId,
+      slot_number: port.slotNumber,
+      card_type: card?.cardType,
+      port_name: port.portName,
+      port_type: port.portType,
+      port_role: card?.serviceRole,
+      physical_label: `${node?.nodeName || port.nodeId} / slot ${port.slotNumber} / ${port.portName}`,
+      speed: port.speed,
+      connector_type: port.connectorType,
+      status: port.status,
+      connected_circuit_id: port.assignedCircuitId,
+      connected_service_id: port.assignedServiceId,
+      patch_panel_id: port.patchPanelId,
+      patch_panel_port: port.patchPanelPort,
+      fiber_assignment_id: port.fiberAssignmentId,
+      layer: "Synthetic telecom hardware ports",
+      source: "synthetic-demo",
+      source_type: "synthetic-planning",
+      synthetic: true,
+      data_boundary: hardware.synthetic_data_notice || DATA_BOUNDARY,
+    };
+  });
+  return {
+    title: "Layer-backed device port inventory",
+    notice: "Device Port rows now come from the generated synthetic telecom hardware model: devices, cards, slots, ports, patch panel handoffs, service IDs, circuit IDs, and fiber assignment references stay in sync with the map-layer service data.",
+    rows,
+    disableDetailLinks: true,
+    metrics: [
+      metric("Synthetic ports", rows.length, "Generated port records across telecom devices.", "Synthetic telecom hardware", "Planning/demo only"),
+      metric("Assigned ports", rows.filter((row) => row.status === "assigned").length, "Ports linked to synthetic services/circuits.", "Synthetic telecom hardware", "Not real operational state"),
+      metric("Available/reserved ports", rows.filter((row) => ["available", "reserved"].includes(String(row.status))).length, "Capacity exposed for planning views.", "Synthetic telecom hardware", "Planning only"),
+      metric("Hardware cards", hardware.cards.length, "Card and slot records backing the port inventory.", "Synthetic telecom hardware", "Planning/demo only"),
+    ],
+  };
+}
+
 async function loadCircuits(): Promise<ModuleLayerData> {
-  const [telecomCircuits, microwaveLinks, syntheticServices, assignments] = await Promise.all([
+  const [telecomCircuits, microwaveLinks, syntheticServices, assignments, distributionAssignments, verizonServices] = await Promise.all([
     fetchJson<GeoJsonCollection>("/data/telecomCircuits.geojson"),
     fetchJson<FccMicrowaveLinkCollection>("/data/fcc-uls-utility-microwave-links.geojson"),
     fetchJson<SyntheticService[]>("/data/iso-ne-synthetic-services.json"),
     fetchJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json"),
+    fetchJson<DistributionFiberAssignmentCollection>("/data/iso-ne-synthetic-distribution-fiber-assignments.geojson"),
+    fetchJson<VerizonLeasedServiceRecord[]>("/data/iso-ne-synthetic-verizon-leased-services.json").catch(() => []),
   ]);
-  const telecomRows = telecomCircuits.features.map<JsonRecord>((feature) => {
+  const mergedSyntheticCircuitIds = new Set(syntheticServices.flatMap((service) => [service.serviceId, service.circuitId]).filter(Boolean).map(String));
+  const telecomRows = telecomCircuits.features.filter((feature) => !mergedSyntheticCircuitIds.has(String((feature.properties as Record<string, unknown>).circuitId || ""))).map<JsonRecord>((feature) => {
     const properties = feature.properties as Record<string, unknown>;
     return {
       id: properties.circuitId,
@@ -355,24 +426,66 @@ async function loadCircuits(): Promise<ModuleLayerData> {
   });
   const serviceRows = syntheticServices.map<JsonRecord>((service) => ({
     id: service.serviceId,
-    circuit_id: service.serviceId,
+    circuit_id: service.circuitId || service.serviceId,
     circuit_name: service.serviceName,
     service_type: service.serviceType,
     ownership_type: "synthetic-demo",
-    provider_id: "internal-demo",
+    provider_id: service.providerName || "internal-demo",
+    provider_name: service.providerName,
     criticality: service.criticality,
     status: service.operationalStatus,
     a_end: service.fromSiteName,
     z_end: service.toSiteName,
     primary_route: service.primaryPathAssignmentId,
     backup_route: service.backupPathAssignmentId,
+    bandwidth_profile: service.bandwidthProfile,
+    vlan_or_timeslot: service.vlanOrTimeslot,
+    distribution_assignment_id: service.distributionAssignmentId,
+    endpoint_a_patch_panel: service.endpointAPatchPanelId,
+    endpoint_a_port: service.endpointAPort,
+    endpoint_z_patch_panel: service.endpointZPatchPanelId,
+    endpoint_z_port: service.endpointZPort,
+    telecom_node_ids: service.telecomNodeIds?.join(", "),
+    hardware_port_ids: service.hardwarePortIds?.join(", "),
     continuity_status: service.continuityStatus,
-    layer: "Synthetic service continuity",
+    layer: "Merged synthetic telecom services",
     source: "synthetic-demo",
     source_type: "synthetic-planning",
     synthetic: true,
     data_boundary: "Synthetic service continuity record. Not a real relay, SCADA, microwave, or fiber service.",
   }));
+  const syntheticServiceAssignmentIds = new Set(syntheticServices.map((service) => service.distributionAssignmentId).filter(Boolean).map(String));
+  const distributionAssignmentRows = distributionAssignments.features
+    .filter((feature) => !syntheticServiceAssignmentIds.has(feature.properties.id))
+    .map<JsonRecord>((feature) => {
+      const properties = feature.properties;
+      return {
+        id: properties.serviceId || properties.id,
+        circuit_id: properties.circuitId || properties.serviceId || properties.id,
+        circuit_name: properties.serviceName || properties.assignmentName,
+        service_type: properties.serviceType,
+        ownership_type: "synthetic-demo",
+        provider_id: "distribution-fiber-demo",
+        utility_owner: properties.utilityOwner,
+        criticality: properties.criticality,
+        status: properties.status,
+        a_end: properties.endpointAPatchPanelId || properties.aEndPoleId,
+        z_end: properties.zEndPoleId,
+        primary_route: properties.routeId,
+        bandwidth_profile: properties.bandwidthProfile,
+        endpoint_a_patch_panel: properties.endpointAPatchPanelId,
+        endpoint_a_port: properties.endpointAPort,
+        endpoint_z_patch_panel: properties.endpointZPatchPanelId,
+        endpoint_z_port: properties.endpointZPort,
+        telecom_node_ids: properties.telecomNodeIds?.join(", "),
+        hardware_port_ids: properties.hardwarePortIds?.join(", "),
+        layer: "Synthetic distribution fiber services",
+        source: properties.source,
+        source_type: "synthetic-planning",
+        synthetic: true,
+        data_boundary: properties.notes,
+      };
+    });
   const assignmentRows = assignments.map<JsonRecord>((assignment) => ({
     id: assignment.id,
     circuit_id: assignment.id,
@@ -393,17 +506,81 @@ async function loadCircuits(): Promise<ModuleLayerData> {
     synthetic: true,
     data_boundary: "Synthetic strand assignment. Not a real circuit route.",
   }));
-  const rows = [...telecomRows, ...microwaveRows, ...serviceRows, ...assignmentRows];
+  const verizonRows = verizonServices.map<JsonRecord>((service) => ({
+    id: service.provider_circuit_id,
+    circuit_id: service.provider_circuit_id,
+    circuit_name: `${service.service_type} backing ${service.backup_for_service_id || "synthetic service"}`,
+    service_type: service.service_type,
+    ownership_type: "leased_service",
+    provider_id: service.provider_id,
+    provider_name: service.provider_name,
+    criticality: service.service_type.includes("protected") ? "high" : "medium",
+    status: service.status,
+    a_end: service.a_end,
+    z_end: service.z_end,
+    bandwidth_profile: service.bandwidth,
+    sla_latency_ms: service.sla_latency_ms,
+    backup_for_service_id: service.backup_for_service_id,
+    endpoint_a_patch_panel: service.demarc_patch_panel_id,
+    layer: "Verizon leased service overlay",
+    source: "synthetic-demo",
+    source_type: "synthetic-planning",
+    synthetic: true,
+    data_boundary: service.data_boundary,
+  }));
+  const rows = [...microwaveRows, ...serviceRows, ...distributionAssignmentRows, ...telecomRows, ...assignmentRows, ...verizonRows];
   return {
     title: "Layer-backed circuit and service inventory",
-    notice: "Circuit rows include synthetic telecom circuits, synthetic fiber assignments/services, and public FCC microwave links. No row represents a verified private utility service path.",
+    notice: "Circuit rows merge synthetic telecom circuits into the larger synthetic service inventory, add distribution-fiber services from patch panels to random pole endpoints, include Verizon leased-service overlays, and keep public FCC microwave links as reference-only rows.",
     rows,
     disableDetailLinks: true,
     metrics: [
-      metric("Synthetic telecom circuits", telecomRows.length, "Demo circuit path layer records.", "Synthetic circuit layer", "Not real services"),
+      metric("Merged synthetic services", serviceRows.length, "Generated OPGW, distribution, SEL ICON, SCADA, timing, protection, and telecom services.", "Synthetic service layer", "Not real services"),
+      metric("Distribution service fallbacks", distributionAssignmentRows.length, "Distribution assignments exposed directly when not already merged into services.", "Synthetic distribution layer", "Planning/demo only"),
+      metric("Legacy telecom rows", telecomRows.length, "Unmerged legacy circuit path records retained only if not already present in services.", "Synthetic circuit layer", "Not real services"),
+      metric("Verizon leased overlays", verizonRows.length, "Synthetic Verizon services associated to backup/diverse service needs.", "Synthetic leased service layer", "Not real Verizon circuits"),
       metric("FCC microwave links", microwaveRows.length, "Public microwave path records grouped by link type and frequency.", "FCC ULS public layer", "Reference only"),
-      metric("Synthetic services", serviceRows.length, "Service continuity records from the map layer.", "Synthetic service layer", "Not real relay/SCADA paths"),
       metric("Fiber assignments", assignmentRows.length, "Synthetic strand assignment records exposed as planning services.", "Synthetic fiber layer", "Not real routing"),
+    ],
+  };
+}
+
+async function loadLeasedServices(): Promise<ModuleLayerData> {
+  const services = await fetchJson<VerizonLeasedServiceRecord[]>("/data/iso-ne-synthetic-verizon-leased-services.json");
+  const rows = services.map<JsonRecord>((service) => ({
+    id: service.provider_circuit_id,
+    provider_circuit_id: service.provider_circuit_id,
+    service_type: service.service_type,
+    provider_id: service.provider_id,
+    provider_name: service.provider_name,
+    bandwidth: service.bandwidth,
+    monthly_cost: service.monthly_cost,
+    contract_end: service.contract_end,
+    status: service.status,
+    a_end: service.a_end,
+    z_end: service.z_end,
+    handoff_type: service.handoff_type,
+    sla_availability: service.sla_availability,
+    sla_latency_ms: service.sla_latency_ms,
+    backup_for_service_id: service.backup_for_service_id,
+    demarc_patch_panel_id: service.demarc_patch_panel_id,
+    renewal_risk: renewalRisk(service.contract_end),
+    layer: "Verizon synthetic leased services",
+    source: "synthetic-demo",
+    source_type: "synthetic-planning",
+    synthetic: true,
+    data_boundary: service.data_boundary,
+  }));
+  return {
+    title: "Layer-backed Verizon leased service inventory",
+    notice: "Leased Service rows include generated Verizon network service examples associated to synthetic backup, diverse-path, DS1, Ethernet, and provider NID handoff scenarios. These are demo rows only and do not represent real Verizon circuits.",
+    rows,
+    disableDetailLinks: true,
+    metrics: [
+      metric("Verizon synthetic services", rows.length, "Generated provider-circuit rows in the static service layer.", "Synthetic Verizon layer", "Not real provider data"),
+      metric("Active synthetic", rows.filter((row) => row.status === "active_synthetic").length, "Demo active-like leased services.", "Synthetic Verizon layer", "Not operational state"),
+      metric("Ordered / disconnect", rows.filter((row) => ["ordered", "pending_disconnect"].includes(String(row.status))).length, "Planning rows for lifecycle workflows.", "Synthetic Verizon layer", "Planning/demo only"),
+      metric("Renewal risk", rows.filter((row) => row.renewal_risk !== "low").length, "Contract dates due within the demo planning horizon.", "Synthetic Verizon layer", "Planning/demo only"),
     ],
   };
 }
@@ -509,8 +686,11 @@ async function loadFiberStrands(): Promise<ModuleLayerData> {
 }
 
 async function loadFiberAssignments(): Promise<ModuleLayerData> {
-  const assignments = await fetchJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json");
-  const rows = assignments.map<JsonRecord>((assignment) => ({
+  const [assignments, distributionAssignments] = await Promise.all([
+    fetchJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json"),
+    fetchJson<DistributionFiberAssignmentCollection>("/data/iso-ne-synthetic-distribution-fiber-assignments.geojson"),
+  ]);
+  const opgwRows = assignments.map<JsonRecord>((assignment) => ({
     id: assignment.id,
     assignment_id: assignment.id,
     assignment_name: assignment.assignmentName,
@@ -533,14 +713,51 @@ async function loadFiberAssignments(): Promise<ModuleLayerData> {
     synthetic: true,
     data_boundary: assignment.notes || "Synthetic fiber assignment. Not a real service route.",
   }));
+  const distributionRows = distributionAssignments.features.map<JsonRecord>((feature) => {
+    const properties = feature.properties;
+    return {
+      id: properties.id,
+      assignment_id: properties.id,
+      assignment_name: properties.serviceName || properties.assignmentName,
+      assignment_type: properties.serviceType,
+      assignment_status: properties.status,
+      fiber_strand_id: properties.strandNumbers[0] ? `${properties.routeId}:${properties.strandNumbers[0]}` : undefined,
+      circuit_id: properties.circuitId || properties.serviceId,
+      device_port_id: properties.hardwarePortIds?.[0],
+      work_order_id: undefined,
+      a_end_structure_id: properties.endpointAPatchPanelId || properties.aEndPoleId,
+      z_end_structure_id: properties.zEndPoleId,
+      cable_ids: properties.routeId,
+      strand_count: properties.strandNumbers.length,
+      splice_count: properties.splicePointIds.length,
+      estimated_distance_miles: properties.routeMiles,
+      estimated_loss_db: properties.estimatedLossDb,
+      bandwidth_profile: properties.bandwidthProfile,
+      endpoint_a_patch_panel: properties.endpointAPatchPanelId,
+      endpoint_a_port: properties.endpointAPort,
+      endpoint_z_patch_panel: properties.endpointZPatchPanelId,
+      endpoint_z_port: properties.endpointZPort,
+      telecom_node_ids: properties.telecomNodeIds?.join(", "),
+      hardware_port_ids: properties.hardwarePortIds?.join(", "),
+      utility_owner: properties.utilityOwner,
+      layer: "Synthetic distribution patch-panel-to-pole assignment",
+      source: properties.source,
+      source_type: "synthetic-planning",
+      synthetic: true,
+      data_boundary: properties.notes,
+    };
+  });
+  const rows = [...opgwRows, ...distributionRows];
   return {
     title: "Layer-backed fiber assignments",
-    notice: "Fiber assignment module rows now include the synthetic map-layer assignment planner output.",
+    notice: "Fiber assignment module rows now include synthetic OPGW assignments plus distribution patch-panel-to-random-pole services, endpoint ports, telecom nodes, and hardware port references.",
     rows,
     disableDetailLinks: true,
     metrics: [
       metric("Synthetic assignments", rows.length, "Generated assignment planner records.", "Synthetic assignment layer", "Planning/demo only"),
-      metric("Active synthetic", rows.filter((row) => row.assignment_status === "active").length, "Synthetic active-like records for demo views.", "Synthetic assignment layer", "Not operational state"),
+      metric("OPGW assignments", opgwRows.length, "Generated OPGW strand assignment records.", "Synthetic OPGW assignment layer", "Planning/demo only"),
+      metric("Distribution assignments", distributionRows.length, "Patch-panel to distribution-pole service assignments.", "Synthetic distribution layer", "Planning/demo only"),
+      metric("Active synthetic", rows.filter((row) => ["active", "active_synthetic"].includes(String(row.assignment_status))).length, "Synthetic active-like records for demo views.", "Synthetic assignment layer", "Not operational state"),
       metric("Planned/proposed", rows.filter((row) => ["planned", "proposed"].includes(String(row.assignment_status))).length, "Future-state planning records.", "Synthetic assignment layer", "Planning only"),
       metric("Reserved", rows.filter((row) => row.assignment_status === "reserved").length, "Capacity reservation records.", "Synthetic assignment layer", "Planning only"),
     ],
@@ -699,6 +916,71 @@ type GeoJsonCollection = {
   features: Array<{ type: "Feature"; properties: GeoJsonRecord; geometry: unknown }>;
 };
 
+type SyntheticTelecomHardwareNode = {
+  nodeId: string;
+  nodeName: string;
+  siteId?: string;
+  deviceRole?: string;
+  serviceIds?: string[];
+  cardIds?: string[];
+  portIds?: string[];
+  [key: string]: unknown;
+};
+
+type SyntheticTelecomHardwareCard = {
+  cardId: string;
+  nodeId: string;
+  slotNumber?: number;
+  cardType?: string;
+  serviceRole?: string;
+  [key: string]: unknown;
+};
+
+type SyntheticTelecomHardwarePort = {
+  portId: string;
+  nodeId: string;
+  cardId: string;
+  slotNumber?: number;
+  portName?: string;
+  portType?: string;
+  speed?: string;
+  connectorType?: string;
+  status?: string;
+  assignedServiceId?: string;
+  assignedCircuitId?: string;
+  patchPanelId?: string;
+  patchPanelPort?: string;
+  fiberAssignmentId?: string;
+  [key: string]: unknown;
+};
+
+type SyntheticTelecomHardwareData = {
+  nodes: SyntheticTelecomHardwareNode[];
+  cards: SyntheticTelecomHardwareCard[];
+  ports: SyntheticTelecomHardwarePort[];
+  synthetic_data_notice?: string;
+};
+
+type VerizonLeasedServiceRecord = {
+  provider_circuit_id: string;
+  service_type: string;
+  provider_id: string;
+  provider_name: string;
+  bandwidth: string;
+  monthly_cost: number;
+  contract_end: string;
+  status: string;
+  a_end: string;
+  z_end: string;
+  handoff_type: string;
+  sla_availability: string;
+  sla_latency_ms: number;
+  backup_for_service_id?: string;
+  demarc_patch_panel_id?: string;
+  data_boundary?: string;
+  [key: string]: unknown;
+};
+
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(path, { cache: "no-store" });
   if (!response.ok) throw new Error(`Could not load ${path}`);
@@ -743,6 +1025,31 @@ function sum(values: number[]): number {
 
 function toNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function emptyHardware(): SyntheticTelecomHardwareData {
+  return { nodes: [], cards: [], ports: [], synthetic_data_notice: DATA_BOUNDARY };
+}
+
+function countHardwarePortsByNode(ports: SyntheticTelecomHardwarePort[], predicate: (port: SyntheticTelecomHardwarePort) => boolean): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const port of ports) {
+    if (!predicate(port)) continue;
+    const nodeId = clean(port.nodeId);
+    if (!nodeId) continue;
+    counts.set(nodeId, (counts.get(nodeId) || 0) + 1);
+  }
+  return counts;
+}
+
+function renewalRisk(contractEnd: unknown): string {
+  const end = new Date(clean(contractEnd));
+  if (Number.isNaN(end.getTime())) return "unknown";
+  const days = Math.ceil((end.getTime() - Date.now()) / 86_400_000);
+  if (days < 0) return "expired";
+  if (days <= 90) return "high";
+  if (days <= 180) return "medium";
+  return "low";
 }
 
 function countByKey<T extends Record<string, unknown>>(items: T[], key: keyof T): Map<string, number> {

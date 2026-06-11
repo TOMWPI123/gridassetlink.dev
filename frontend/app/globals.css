@@ -3610,6 +3610,60 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   line-height: 1.3;
 }
 
+.street-layer-action-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid rgba(105,215,228,.28);
+  border-radius: 6px;
+  background: rgba(105,215,228,.1);
+  color: #d7fffb;
+  font-size: 10px;
+  font-weight: 820;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.street-layer-action-link:hover {
+  background: rgba(105,215,228,.18);
+  border-color: rgba(105,215,228,.42);
+}
+
+.strand-continuity-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.strand-continuity-card {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.strand-continuity-card strong,
+.strand-continuity-card span,
+.strand-continuity-card small {
+  overflow-wrap: anywhere;
+}
+
+.strand-continuity-card a {
+  justify-self: start;
+  color: #075e63;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.strand-continuity-card a:hover {
+  text-decoration: underline;
+}
+
 .street-owner-sublayer-actions {
   display: inline-flex;
   flex: 0 0 auto;

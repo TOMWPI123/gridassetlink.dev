@@ -526,7 +526,7 @@ export type DistributionPoleFiberRoute = {
   fiberCount: 12 | 24 | 48 | 96;
   status: "in_service_synthetic" | "planned" | "proposed" | "reserved" | "needs_field_verification";
   continuityStatus: "complete_synthetic" | "planned" | "proposed" | "needs_splice_review" | "broken_demo";
-  serviceTypesCarried: Array<"SCADA" | "Distribution Automation" | "Telecom Backhaul" | "AMI Backhaul" | "Protection Pilot" | "Spare">;
+  serviceTypesCarried: string[];
   estimatedPoleScaleCount: number;
   notes: string;
 };
@@ -671,7 +671,17 @@ export type DistributionFiberAssignment = {
   feederId: string;
   utilityOwner: string;
   state: "CT" | "ME" | "MA" | "NH" | "RI" | "VT" | "unknown";
-  serviceType: "SCADA" | "Distribution Automation" | "Telecom Backhaul" | "AMI Backhaul" | "Protection Pilot" | "Spare";
+  serviceId?: string;
+  circuitId?: string;
+  serviceName?: string;
+  serviceType: string;
+  bandwidthProfile?: string;
+  endpointAPatchPanelId?: string;
+  endpointZPatchPanelId?: string;
+  endpointAPort?: string;
+  endpointZPort?: string;
+  telecomNodeIds?: string[];
+  hardwarePortIds?: string[];
   status: "active_synthetic" | "planned" | "proposed" | "reserved";
   criticality: "low" | "normal" | "high" | "critical";
   strandNumbers: number[];
@@ -950,17 +960,7 @@ export type FiberSplice = {
   notes?: string;
 };
 
-export type SyntheticServiceType =
-  | "SCADA synthetic demo"
-  | "Relay/protection synthetic demo"
-  | "SEL ICON synthetic demo"
-  | "Microwave backhaul synthetic demo"
-  | "Substation LAN synthetic demo"
-  | "EMS/RTU synthetic demo"
-  | "Dark fiber synthetic demo"
-  | "Leased fiber synthetic demo"
-  | "DERMS communications synthetic demo"
-  | "Voice operations synthetic demo";
+export type SyntheticServiceType = string;
 
 export type SyntheticService = {
   serviceId: string;
@@ -977,6 +977,14 @@ export type SyntheticService = {
   endpointZPort?: string;
   primaryPathAssignmentId?: string;
   backupPathAssignmentId?: string;
+  distributionAssignmentId?: string;
+  circuitId?: string;
+  providerName?: string;
+  bandwidthProfile?: string;
+  vlanOrTimeslot?: string;
+  telecomNodeIds?: string[];
+  hardwareCardIds?: string[];
+  hardwarePortIds?: string[];
   criticality: "low" | "medium" | "high" | "critical";
   protectionLevel: "none" | "single_path" | "diverse_path" | "ring_protected" | "backup_available";
   latencyClass: "best_effort" | "normal" | "low_latency" | "protection_grade";
@@ -987,6 +995,49 @@ export type SyntheticService = {
   continuitySplicePointIds?: string[];
   continuitySpliceClosureIds?: string[];
   continuityStatus?: "complete" | "broken" | "proposed_fix" | "proposed_change";
+  notes: string;
+};
+
+export type StrandContinuitySegment = {
+  sequenceNumber: number;
+  objectType: "patch_panel" | "patch_panel_port" | "fiber_cable" | "strand" | "splice_closure" | "fiber_splice" | "telecom_device" | "device_port" | "service";
+  objectId: string;
+  label: string;
+  cableId?: string;
+  strandNumbers?: number[];
+  lossDb?: number;
+  notes?: string;
+};
+
+export type StrandContinuityRecord = {
+  id: string;
+  strandContinuityId: string;
+  continuityName: string;
+  assignmentId: string;
+  serviceId?: string;
+  circuitId?: string;
+  serviceName?: string;
+  serviceType: string;
+  status: "active_synthetic" | "planned" | "proposed" | "reserved" | "broken_demo";
+  criticality: "low" | "medium" | "normal" | "high" | "critical";
+  aEndPatchPanelId?: string;
+  aEndPatchPanelPortId?: string;
+  zEndPatchPanelId?: string;
+  zEndPatchPanelPortId?: string;
+  terminatedDeviceId?: string;
+  terminatedDeviceName?: string;
+  terminatedDevicePortId?: string;
+  terminatedDevicePortName?: string;
+  cableIds: string[];
+  strandNumbers: number[];
+  spliceClosureIds: string[];
+  fiberSpliceIds: string[];
+  routeMiles: number;
+  estimatedLossDb: number;
+  continuitySegments: StrandContinuitySegment[];
+  mapCoordinates: Coordinate[][];
+  synthetic: true;
+  source: "synthetic-demo";
   notes: string;
 };
 
@@ -1506,6 +1557,7 @@ export type StreetMapLayerKey =
   | "fiberStrandsLayer"
   | "spliceClosures"
   | "fiberAssignments"
+  | "strandContinuity"
   | "patchPanels"
   | "availableStrandCapacity"
   | "criticalRidingCircuits"

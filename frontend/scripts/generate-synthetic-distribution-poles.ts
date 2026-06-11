@@ -71,7 +71,6 @@ async function main() {
       const parentPatchPanel = patchPanels[(substationIndex + feederIndex) % Math.max(1, patchPanels.length)];
       const fiberCount = pickFiberCount(rng);
       const status = pickStatus(rng);
-      const serviceTypes = pickServiceTypes(feederIndex, rng);
       const poleStartIndex = poleFeatures.length;
       const polesOnFeeder = Math.max(5, Math.min(poleCountForPath(feeder.coordinates, rng), Math.ceil(targetPolesForSubstation / feederCount)));
       const spacingMiles = Math.max(0.028, totalMiles(feeder.coordinates) / Math.max(1, polesOnFeeder - 1));
@@ -131,6 +130,7 @@ async function main() {
       }
       if (!feederPoleIds.length) continue;
       const routePoleFeatures = poleFeatures.slice(poleStartIndex);
+      const serviceTypes = pickServiceTypes(feederIndex, fiberCount, rng);
       const splicePointIds = createDistributionSplices({
         routeId,
         feederId,
@@ -165,25 +165,23 @@ async function main() {
         splicePointIds,
         slackLoopIds,
         routeMiles: round(totalMiles(feeder.coordinates), 3),
+        parentPatchPanel,
         assignmentFeatures,
+        rng,
       });
+      const routeSplices = splicePointFeatures.filter((splice) => splice.properties.routeId === routeId);
+      const routeSlacks = slackLoopFeatures.filter((slack) => slack.properties.routeId === routeId);
+      const spliceIdsByPole = groupIdsByPole(routeSplices);
+      const slackIdsByPole = groupIdsByPole(routeSlacks);
       routePoleFeatures.forEach((pole) => {
-        pole.properties.splicePointIds = splicePointFeatures
-          .filter((splice) => splice.properties.routeId === routeId && splice.properties.poleId === pole.properties.id)
-          .map((splice) => splice.properties.id);
-        pole.properties.slackLoopIds = slackLoopFeatures
-          .filter((slack) => slack.properties.routeId === routeId && slack.properties.poleId === pole.properties.id)
-          .map((slack) => slack.properties.id);
+        pole.properties.splicePointIds = spliceIdsByPole.get(pole.properties.id) || [];
+        pole.properties.slackLoopIds = slackIdsByPole.get(pole.properties.id) || [];
         pole.properties.assignmentIds = assignmentIds;
       });
-      splicePointFeatures
-        .filter((splice) => splice.properties.routeId === routeId)
-        .forEach((splice) => {
-          splice.properties.connectedAssignmentIds = assignmentIds;
-        });
-      const totalSlackFeet = slackLoopFeatures
-        .filter((slack) => slack.properties.routeId === routeId)
-        .reduce((sum, slack) => sum + slack.properties.slackFeet, 0);
+      routeSplices.forEach((splice) => {
+        splice.properties.connectedAssignmentIds = assignmentIds;
+      });
+      const totalSlackFeet = routeSlacks.reduce((sum, slack) => sum + slack.properties.slackFeet, 0);
 
       fiberFeatures.push({
         type: "Feature",
@@ -544,7 +542,9 @@ function createDistributionAssignments({
   splicePointIds,
   slackLoopIds,
   routeMiles,
+  parentPatchPanel,
   assignmentFeatures,
+  rng,
 }: {
   routeId: string;
   feederId: string;
@@ -557,44 +557,76 @@ function createDistributionAssignments({
   splicePointIds: string[];
   slackLoopIds: string[];
   routeMiles: number;
+  parentPatchPanel?: PatchPanel;
   assignmentFeatures: DistributionFiberAssignmentCollection["features"];
+  rng: () => number;
 }) {
   const poleIds = routePoleFeatures.map((pole) => pole.properties.id);
-  const coordinates = routePoleFeatures.map((pole) => pole.geometry.coordinates);
-  return serviceTypes.map((serviceType, index) => {
-    const strandStart = ((index * 2) % Math.max(2, fiberCount - 1)) + 1;
+  const allCoordinates = routePoleFeatures.map((pole) => pole.geometry.coordinates);
+  const maxServicePairs = Math.max(1, Math.floor(fiberCount / 2));
+  return serviceTypes.slice(0, maxServicePairs).map((serviceType, index) => {
+    const strandStart = (index * 2) + 1;
     const id = `DIST-ASSIGN-${String(assignmentFeatures.length + 1).padStart(6, "0")}`;
-    const criticality = serviceType === "Protection Pilot" || serviceType === "SCADA"
+    const serviceId = `SYN-DIST-SVC-${String(assignmentFeatures.length + 1).padStart(6, "0")}`;
+    const circuitId = `${servicePrefix(serviceType)}-${idSafe(feederId).slice(0, 40)}-${String(index + 1).padStart(3, "0")}`;
+    const zPoleIndex = Math.min(
+      poleIds.length - 1,
+      Math.max(1, Math.floor((index + 1) * poleIds.length / (serviceTypes.length + 1)) + Math.floor((rng() - 0.5) * Math.max(2, poleIds.length / 5))),
+    );
+    const zPole = routePoleFeatures[zPoleIndex] || routePoleFeatures[routePoleFeatures.length - 1];
+    const coordinates = allCoordinates.slice(0, zPoleIndex + 1);
+    const serviceRouteMiles = round(totalMiles(coordinates), 3);
+    const criticality = serviceType === "Protection Pilot" || serviceType === "SCADA" || serviceType === "DTT Pilot" || serviceType === "Recloser SCADA"
       ? "critical"
-      : serviceType === "Distribution Automation"
+      : serviceType === "Distribution Automation" || serviceType === "Feeder Automation" || serviceType === "PMU Backhaul" || serviceType === "Substation LAN Extension"
         ? "high"
-        : serviceType === "Spare"
+        : serviceType === "Spare" || serviceType === "Dark Fiber Reserve"
           ? "low"
           : "normal";
+    const serviceStatus = serviceType === "Spare" || serviceType === "Dark Fiber Reserve"
+      ? "reserved"
+      : status === "proposed"
+        ? "proposed"
+        : status === "planned"
+          ? "planned"
+          : "active_synthetic";
+    const endpointAPort = parentPatchPanel ? `${parentPatchPanel.id}-PORT-${String(strandStart).padStart(3, "0")}` : undefined;
+    const endpointZPatchPanelId = `${zPole.properties.id}-SYN-DIST-PANEL`;
+    const endpointZPort = `${endpointZPatchPanelId}-PORT-${String(strandStart).padStart(3, "0")}`;
     assignmentFeatures.push({
       type: "Feature",
       properties: {
         id,
+        serviceId,
+        circuitId,
+        serviceName: `${serviceType} ${feederId} to ${zPole.properties.poleNumber}`,
         assignmentName: `${serviceType} on ${feederId}`,
         routeId,
         feederId,
         utilityOwner: owner,
         state,
         serviceType,
-        status: serviceType === "Spare" ? "reserved" : status === "proposed" ? "proposed" : status === "planned" ? "planned" : "active_synthetic",
+        status: serviceStatus,
         criticality,
         strandNumbers: [strandStart, Math.min(fiberCount, strandStart + 1)],
         aEndPoleId: poleIds[0],
-        zEndPoleId: poleIds[poleIds.length - 1],
-        poleIds: sampleIds(poleIds),
+        zEndPoleId: zPole.properties.id,
+        poleIds: sampleIds(poleIds.slice(0, zPoleIndex + 1)),
         splicePointIds,
         slackLoopIds,
-        routeMiles,
-        estimatedLossDb: round(routeMiles * 0.25 + splicePointIds.length * 0.05 + slackLoopIds.length * 0.01 + 1, 2),
+        routeMiles: serviceRouteMiles || routeMiles,
+        estimatedLossDb: round((serviceRouteMiles || routeMiles) * 0.25 + splicePointIds.length * 0.05 + slackLoopIds.length * 0.01 + 1, 2),
         fiberCount,
+        bandwidthProfile: bandwidthProfileFor(serviceType),
+        endpointAPatchPanelId: parentPatchPanel?.id,
+        endpointZPatchPanelId,
+        endpointAPort,
+        endpointZPort,
+        telecomNodeIds: [`TN-${idSafe(feederId).slice(0, 36)}-A`, `TN-${idSafe(zPole.properties.poleNumber).slice(0, 36)}-Z`],
+        hardwarePortIds: [`${idSafe(feederId).slice(0, 34)}-PORT-${String(strandStart).padStart(3, "0")}`, `${idSafe(zPole.properties.poleNumber).slice(0, 34)}-PORT-${String(strandStart + 1).padStart(3, "0")}`],
         synthetic: true,
         source: "synthetic-demo",
-        notes: "Synthetic distribution fiber assignment carried along a generated pole-line feeder route.",
+        notes: "Synthetic distribution fiber service/circuit assignment carried from a patch panel to a generated random distribution pole endpoint. Not real routing.",
       },
       geometry: { type: "LineString", coordinates },
     });
@@ -602,19 +634,81 @@ function createDistributionAssignments({
   });
 }
 
-function pickServiceTypes(index: number, rng: () => number): DistributionPoleContinuityRecord["serviceTypesCarried"] {
-  const services: DistributionPoleContinuityRecord["serviceTypesCarried"] = ["Telecom Backhaul"];
-  if (index % 2 === 0) services.push("Distribution Automation");
-  if (rng() > 0.45) services.push("SCADA");
-  if (rng() > 0.72) services.push("AMI Backhaul");
-  if (rng() > 0.86) services.push("Protection Pilot");
-  if (rng() > 0.8) services.push("Spare");
+function pickServiceTypes(index: number, fiberCount: 12 | 24 | 48 | 96, rng: () => number): DistributionPoleContinuityRecord["serviceTypesCarried"] {
+  const base = [
+    "Telecom Backhaul",
+    "Distribution Automation",
+    "SCADA",
+    "AMI Backhaul",
+    "Recloser SCADA",
+    "Feeder Automation",
+    "Voltage Regulator Backhaul",
+    "Capacitor Bank Control",
+    "Relay Engineering Access",
+    "NMS Management",
+    "PTP Timing Extension",
+    "Substation LAN Extension",
+    "DERMS Field Telemetry",
+    "PMU Backhaul",
+    "Voice Operations",
+    "Security Camera Backhaul",
+    "Wireless Backhaul Handoff",
+    "Protection Pilot",
+    "DTT Pilot",
+    "Leased Ethernet Backup",
+    "Dark Fiber Reserve",
+    "Spare",
+  ];
+  const target = Math.min(
+    base.length,
+    Math.max(4, Math.min(Math.floor(fiberCount / 2), Math.round(fiberCount * (0.58 + rng() * 0.22) / 2))),
+  );
+  const services: string[] = ["Telecom Backhaul", index % 2 === 0 ? "Distribution Automation" : "SCADA"];
+  let cursor = Math.floor(rng() * base.length);
+  while (services.length < target) {
+    const service = base[(cursor + services.length + Math.floor(rng() * 7)) % base.length];
+    if (!services.includes(service)) services.push(service);
+    cursor += 3;
+  }
   return [...new Set(services)];
+}
+
+function servicePrefix(serviceType: string) {
+  if (serviceType.includes("SCADA")) return "SCADA";
+  if (serviceType.includes("Protection")) return "PROT";
+  if (serviceType.includes("DTT")) return "DTT";
+  if (serviceType.includes("Timing") || serviceType.includes("PTP")) return "TIME";
+  if (serviceType.includes("AMI")) return "AMI";
+  if (serviceType.includes("Leased")) return "LEASED";
+  if (serviceType.includes("Dark")) return "DARK";
+  if (serviceType.includes("NMS")) return "NMS";
+  return idSafe(serviceType).slice(0, 8) || "SVC";
+}
+
+function bandwidthProfileFor(serviceType: string) {
+  if (serviceType.includes("Protection") || serviceType.includes("DTT")) return "64 kbps protection channel";
+  if (serviceType.includes("PTP") || serviceType.includes("Timing")) return "timing profile";
+  if (serviceType.includes("SCADA") || serviceType.includes("Automation")) return "10-100 Mbps operations VLAN";
+  if (serviceType.includes("AMI")) return "50 Mbps AMI aggregation";
+  if (serviceType.includes("Security Camera")) return "100 Mbps video VLAN";
+  if (serviceType.includes("Leased")) return "100 Mbps leased backup handoff";
+  if (serviceType.includes("Backhaul") || serviceType.includes("LAN") || serviceType.includes("NMS")) return "1 Gbps Ethernet";
+  return "reserved strand pair";
 }
 
 function sampleIds(ids: string[]) {
   if (ids.length <= 10) return ids;
   return [ids[0], ids[1], ids[2], ids[Math.floor(ids.length / 2)], ids[ids.length - 3], ids[ids.length - 2], ids[ids.length - 1]];
+}
+
+function groupIdsByPole<T extends { properties: { id: string; poleId: string } }>(features: T[]) {
+  const groups = new Map<string, string[]>();
+  for (const feature of features) {
+    const existing = groups.get(feature.properties.poleId) || [];
+    existing.push(feature.properties.id);
+    groups.set(feature.properties.poleId, existing);
+  }
+  return groups;
 }
 
 function normalizeState(value: string) {

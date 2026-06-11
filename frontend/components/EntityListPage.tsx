@@ -73,9 +73,9 @@ function ModuleLayerSummary({ data, backendCount, totalCount }: { data: ModuleLa
         <div className="module-layer-note">{data.notice}</div>
         <div className="module-layer-grid">
           <div className="module-layer-card">
-            <span>Backend demo rows</span>
+            <span>Synced backend rows</span>
             <strong>{backendCount.toLocaleString()}</strong>
-            <small>Original planning database rows remain searchable beside layer records.</small>
+            <small>Planning/API rows remain searchable beside layer-backed synthetic records.</small>
           </div>
           {data.metrics.map((metric) => (
             <div className="module-layer-card" key={metric.label}>

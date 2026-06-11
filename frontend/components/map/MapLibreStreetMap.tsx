@@ -486,12 +486,8 @@ export function MapLibreStreetMap({
           {layers.proposedFiberSplices ? <span><i className="legend-proposed-splice" />Proposed fiber splices</span> : null}
           {layers.availableStrandCapacity ? <span><i className="legend-opgw-capacity" />Available strands</span> : null}
           {layers.criticalRidingCircuits ? <span><i className="legend-critical-route" />Critical riding circuits</span> : null}
-          {layers.distributionPoleDensity ? <span><i className="legend-node" />Distribution pole density</span> : null}
-          {layers.distributionPoles ? <span><i className="legend-node" />Distribution telecom poles</span> : null}
-          {layers.distributionFiberRoutes ? <span><i className="legend-line" />Distribution pole fiber</span> : null}
-          {layers.distributionSplicePoints ? <span><i className="legend-splice-point" />Distribution splice points</span> : null}
-          {layers.distributionSlackLoops ? <span><i className="legend-node" />Distribution slack loops</span> : null}
-          {layers.distributionFiberAssignments ? <span><i className="legend-line" />Distribution assignments</span> : null}
+          {layers.strandContinuity ? <span><i className="legend-critical-route" />Strand Continuity</span> : null}
+          {layers.distributionPoleDensity || layers.distributionPoles || layers.distributionFiberRoutes || layers.distributionSplicePoints || layers.distributionSlackLoops || layers.distributionFiberAssignments ? <span><i className="legend-line" />Distribution Network</span> : null}
           {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
           {layers.designAssets ? <span><i className="legend-node" />Editable planning assets</span> : null}
           {layers.syntheticSubstations ? <span><i className="legend-substation" />Synthetic substations</span> : null}
@@ -1832,8 +1828,9 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    opgwRoutes: layers.assumedOpgwRoutes || layers.opgwRoutes || layers.opgwOutageImpact ? collection(opgwRoutes.flatMap((feature) => {
+    opgwRoutes: layers.assumedOpgwRoutes || layers.opgwRoutes || layers.opgwOutageImpact || layers.strandContinuity ? collection(opgwRoutes.flatMap((feature) => {
       const isContinuityHighlight = continuitySets.routeIds.has(feature.properties.opgwRouteId);
+      if (layers.strandContinuity && !isContinuityHighlight) return [];
       const visible =
         (layers.assumedOpgwRoutes && isAssumedOpgwStatus(feature.properties.routeStatus))
         || (layers.plannedOpgwFiber && isPlannedOpgwStatus(feature.properties.routeStatus))
@@ -1868,8 +1865,9 @@ function buildDatasets(
         geometry: feature.geometry,
       }];
     })) : emptyCollection,
-    opgwCableSections: layers.opgwCableSections || layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.availableStrandCapacity || layers.opgwOutageImpact ? collection(opgwCableSections.flatMap((feature) => {
+    opgwCableSections: layers.opgwCableSections || layers.assumedOpgwRoutes || layers.plannedOpgwFiber || layers.verifiedOpgwFiber || layers.availableStrandCapacity || layers.opgwOutageImpact || layers.strandContinuity ? collection(opgwCableSections.flatMap((feature) => {
       const isContinuityHighlight = continuitySets.sectionIds.has(feature.properties.cableSectionId) || continuitySets.routeIds.has(feature.properties.opgwRouteId);
+      if (layers.strandContinuity && !isContinuityHighlight) return [];
       const statusVisible =
         layers.opgwCableSections
         || (layers.assumedOpgwRoutes && feature.properties.installStatus === "assumed")
@@ -1937,9 +1935,10 @@ function buildDatasets(
         geometry: feature.geometry,
       }];
     })) : emptyCollection,
-    opgwSplicePoints: layers.opgwSplicePoints || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers ? collection(opgwSplicePoints.flatMap((feature) => {
+    opgwSplicePoints: layers.opgwSplicePoints || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers || layers.strandContinuity ? collection(opgwSplicePoints.flatMap((feature) => {
       const metrics = spliceMetricsByPoint.get(feature.properties.splicePointId);
       const isContinuityHighlight = continuitySets.splicePointIds.has(feature.properties.splicePointId);
+      if (layers.strandContinuity && !isContinuityHighlight) return [];
       const hasExisting = (metrics?.activeSyntheticServices || 0) > 0 || feature.properties.status === "synthetic_assumption" || feature.properties.status === "verified";
       const hasProposed = (metrics?.proposedSyntheticServices || 0) > 0 || feature.properties.status === "planned";
       if (layers.existingFiberSplices && !layers.opgwSplicePoints && !layers.compareSpliceLayers && !hasExisting) return [];
@@ -1977,6 +1976,7 @@ function buildDatasets(
       const status = opgwPlanningStatus(feature);
       const featureRouteId = opgwRouteIdForCable(feature);
       const isContinuityHighlight = continuitySets.cableIds.has(feature.properties.id) || continuitySets.routeIds.has(featureRouteId);
+      if (layers.strandContinuity && !isContinuityHighlight) return [];
       const confidenceLevel = opgwConfidenceLevel(feature);
       const strandStats = strandStatsByCable.get(feature.properties.id) || fallbackStrandStats(feature.properties.fiberCount);
       const assignmentStats = assignmentStatsByCable.get(feature.properties.id) || emptyAssignmentStats();
@@ -2033,9 +2033,10 @@ function buildDatasets(
         geometry: feature.geometry,
       }];
     })),
-    spliceClosures: layers.spliceClosures || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers ? collection(spliceClosures.flatMap((feature) => {
+    spliceClosures: layers.spliceClosures || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers || layers.strandContinuity ? collection(spliceClosures.flatMap((feature) => {
       const pointId = closureToSplicePointId.get(feature.properties.id) || "";
       const isContinuityHighlight = continuitySets.splicePointIds.has(pointId);
+      if (layers.strandContinuity && !isContinuityHighlight) return [];
       const metrics = spliceMetricsByPoint.get(pointId);
       const hasExisting = feature.properties.status === "existing" || (metrics?.activeSyntheticServices || 0) > 0;
       const hasProposed = feature.properties.status === "planned" || feature.properties.status === "proposed" || (metrics?.proposedSyntheticServices || 0) > 0;
@@ -2070,8 +2071,9 @@ function buildDatasets(
       geometry: feature.geometry,
       }];
     })) : emptyCollection,
-    fiberAssignments: layers.fiberAssignments || layers.criticalRidingCircuits ? collection(fiberAssignments.flatMap((assignment) => {
+    fiberAssignments: layers.fiberAssignments || layers.criticalRidingCircuits || layers.strandContinuity ? collection(fiberAssignments.flatMap((assignment) => {
       const isContinuityHighlight = continuitySets.assignmentIds.has(assignment.id);
+      if (layers.strandContinuity && !isContinuityHighlight) return [];
       if (layers.criticalRidingCircuits && !layers.fiberAssignments && !isCriticalFiberAssignment(assignment) && !isContinuityHighlight) return [];
       const coordinates = assignment.cableIds
         .map((cableId) => cableById.get(cableId))
@@ -2244,6 +2246,8 @@ function buildDatasets(
       geometry: feature.geometry,
     }))) : emptyCollection,
     patchPanels: layers.patchPanels ? collection(patchPanels.flatMap((panel) => {
+      const isContinuityHighlight = panel.fiberCableIds.some((cableId) => continuitySets.cableIds.has(cableId));
+      if (layers.strandContinuity && !isContinuityHighlight) return [];
       if (panel.locationType !== "structure") return [];
       const structure = structureById.get(panel.locationId);
       if (!structure) return [];
@@ -2257,6 +2261,8 @@ function buildDatasets(
           portCount: panel.portCount,
           connectorType: panel.connectorType,
           synthetic: true,
+          isContinuityHighlight,
+          continuityLabel: continuityHighlight?.label || null,
         },
         geometry: { type: "Point" as const, coordinates: structure.geometry.coordinates },
       }];

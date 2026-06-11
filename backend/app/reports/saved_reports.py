@@ -186,3 +186,58 @@ SAVED_REPORTS.extend(
         {"report_name": "RegionalGrid - Transmission line records with unknown owner or voltage", "description": "Public line records missing owner or voltage class.", "sql_text": "select line_name, state, owner_id, voltage_kv, voltage_class from regional_transmission_lines where owner_id is null or voltage_class is null or voltage_class = 'unknown'"},
     ]
 )
+
+SAVED_REPORTS.extend(
+    [
+        {
+            "report_name": "Synthetic Services - Circuits by service type and criticality",
+            "description": "Backend circuit inventory grouped the same way the frontend synthetic service layer is displayed.",
+            "sql_text": "select service_type, criticality, status, count(*) as circuit_count from circuits group by service_type, criticality, status order by service_type, criticality",
+        },
+        {
+            "report_name": "Synthetic Services - Fiber assignments by circuit and device port",
+            "description": "Fiber assignment rows joined to circuits, device ports, and fiber strands for service synchronization checks.",
+            "sql_text": "select c.circuit_id, c.service_type, d.device_name, dp.port_name, fc.cable_id, fs.strand_number, fa.assignment_type, fa.assignment_status from fiber_assignments fa left join circuits c on c.id = fa.circuit_id left join device_ports dp on dp.id = fa.device_port_id left join devices d on d.id = dp.device_id left join fiber_strands fs on fs.id = fa.fiber_strand_id left join fiber_cables fc on fc.id = fs.fiber_cable_id order by c.circuit_id, d.device_name, dp.port_name",
+        },
+        {
+            "report_name": "Synthetic Services - Patch panel handoffs by device port",
+            "description": "Patch panel ports connected to device ports, showing the panel-to-hardware handoff model used by the frontend synthetic data.",
+            "sql_text": "select pp.panel_id, ppp.port_number, ppp.port_label, d.device_name, dp.port_name, dp.port_type, dp.status from patch_panel_ports ppp join patch_panels pp on pp.id = ppp.patch_panel_id left join device_ports dp on dp.id = ppp.connected_device_port_id left join devices d on d.id = dp.device_id order by pp.panel_id, ppp.port_number",
+        },
+        {
+            "report_name": "Synthetic Services - Device hardware port utilization",
+            "description": "Device ports grouped by device, port type, and status for hardware/card utilization review.",
+            "sql_text": "select d.device_name, d.device_type, dp.port_type, dp.status, count(*) as port_count from device_ports dp join devices d on d.id = dp.device_id group by d.device_name, d.device_type, dp.port_type, dp.status order by d.device_name, dp.port_type",
+        },
+        {
+            "report_name": "Synthetic Services - SEL ICON module and card utilization",
+            "description": "ICON module/card rows by node, slot, module type, and service role.",
+            "sql_text": "select n.node_name, im.slot_number, im.module_type, im.port_count, im.service_role, im.status from icon_modules im join icon_nodes n on n.id = im.icon_node_id order by n.node_name, im.slot_number",
+        },
+        {
+            "report_name": "Synthetic Services - Verizon leased service inventory",
+            "description": "Verizon provider leased services tracked by bandwidth, cost, contract end, and status.",
+            "sql_text": "select p.provider_name, ls.provider_circuit_id, ls.service_type, ls.bandwidth, ls.monthly_cost, ls.contract_end, ls.status from leased_services ls join providers p on p.id = ls.provider_id where lower(p.provider_name) like '%verizon%' order by ls.contract_end, ls.provider_circuit_id",
+        },
+        {
+            "report_name": "Synthetic Services - Verizon leased services nearing renewal",
+            "description": "Verizon leased services whose contract end is inside the next 180 days.",
+            "sql_text": "select p.provider_name, ls.provider_circuit_id, ls.service_type, ls.bandwidth, ls.monthly_cost, ls.contract_end, ls.status from leased_services ls join providers p on p.id = ls.provider_id where lower(p.provider_name) like '%verizon%' and ls.contract_end <= date('now', '+180 days') order by ls.contract_end",
+        },
+        {
+            "report_name": "Synthetic Services - Leased backup circuits by provider",
+            "description": "Circuits with leased ownership or leased backup markers grouped by provider.",
+            "sql_text": "select coalesce(p.provider_name, 'internal or synthetic') as provider_name, c.service_type, c.criticality, c.status, count(*) as circuit_count from circuits c left join providers p on p.id = c.provider_id where lower(c.ownership_type) like '%leased%' or lower(c.service_type) like '%leased%' group by coalesce(p.provider_name, 'internal or synthetic'), c.service_type, c.criticality, c.status",
+        },
+        {
+            "report_name": "Synthetic Services - Fiber cables carrying the most assignments",
+            "description": "Fiber cables ranked by the number of assignment rows riding their strands.",
+            "sql_text": "select fc.cable_id, fc.cable_type, count(fa.id) as assignment_count from fiber_cables fc left join fiber_strands fs on fs.fiber_cable_id = fc.id left join fiber_assignments fa on fa.fiber_strand_id = fs.id group by fc.cable_id, fc.cable_type order by assignment_count desc",
+        },
+        {
+            "report_name": "Synthetic Services - Device ports missing service or fiber assignment",
+            "description": "Device ports that are marked assigned but do not have linked circuit or fiber assignment references.",
+            "sql_text": "select d.device_name, dp.port_name, dp.port_type, dp.status, dp.connected_circuit_id, dp.connected_fiber_strand_id from device_ports dp join devices d on d.id = dp.device_id where dp.status = 'assigned' and (dp.connected_circuit_id is null or not exists (select 1 from fiber_assignments fa where fa.device_port_id = dp.id))",
+        },
+    ]
+)
