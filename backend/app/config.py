@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,https://gridassetlink.dev,https://www.gridassetlink.dev"
     auto_seed: bool = True
     allow_admin_write_sql: bool = False
+    auth_required: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

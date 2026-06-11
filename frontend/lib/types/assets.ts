@@ -1392,6 +1392,20 @@ export type DesignMaterializationBatchResult = {
   synthetic_data_notice: string;
 };
 
+export type DesignIssuedWorkOrderResult = {
+  record: DesignAssetRecord;
+  work_order: {
+    id?: number;
+    work_order_number?: string;
+    title?: string;
+    status?: string;
+    priority?: string;
+    work_type?: string;
+  } & Record<string, unknown>;
+  tasks: Array<Record<string, unknown>>;
+  synthetic_data_notice: string;
+};
+
 export type DesignAgentTool = {
   tool_key: string;
   label: string;

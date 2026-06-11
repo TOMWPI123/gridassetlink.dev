@@ -12,7 +12,19 @@ from sqlalchemy import String, cast, func, or_
 from sqlmodel import select
 
 from app.auth.dependencies import SessionDep, require_roles
-from app.models import Circuit, DesignAssetEvent, DesignAssetRecord, DesignAssetType, FiberCable, FiberStrand, RegionalSyntheticCircuit, User
+from app.models import (
+    Circuit,
+    DesignAssetEvent,
+    DesignAssetRecord,
+    DesignAssetType,
+    FiberCable,
+    FiberStrand,
+    RegionalSyntheticCircuit,
+    User,
+    WorkOrder,
+    WorkOrderTask,
+    WorkOrderUpdate,
+)
 from app.routers.crud import MODEL_REGISTRY
 from app.services.audit import model_to_dict
 
@@ -799,6 +811,111 @@ def materialize_record(record_id: int, session: SessionDep, user: User = Depends
     result = _materialize_design_record(session, user, record, asset_type, mode=mode)
     session.commit()
     return result
+
+
+@router.post("/records/{record_id}/issue-work-order", status_code=status.HTTP_201_CREATED)
+def issue_work_order_from_record(record_id: int, session: SessionDep, user: User = Depends(require_roles("admin", "engineer", "editor")), payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    record = session.get(DesignAssetRecord, record_id)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Design asset record not found")
+    asset_type = session.get(DesignAssetType, record.asset_type_id)
+    if asset_type is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Design asset record has no valid asset type")
+
+    body = payload or {}
+    before = _record_dump(record, asset_type)
+    properties = dict(record.properties_json or {})
+    work_order_number = str(body.get("work_order_number") or body.get("workOrderNumber") or _next_design_work_order_number(session)).strip()
+    if session.exec(select(WorkOrder).where(WorkOrder.work_order_number == work_order_number)).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Work order number already exists")
+
+    order = WorkOrder(
+        work_order_number=work_order_number[:80],
+        title=_truncate(body.get("title") or f"Design work: {record.display_label}", 255),
+        description=_design_record_work_order_description(record, asset_type, body),
+        work_type=_truncate(body.get("work_type") or body.get("workType") or "design_database_work", 80),
+        priority=_truncate(body.get("priority") or properties.get("priority") or "normal", 80),
+        status=_truncate(body.get("status") or "issued", 80),
+        requested_by_user_id=user.id,
+        assigned_engineer_id=_optional_int(body.get("assigned_engineer_id") or body.get("assignedEngineerId")) or user.id,
+        assigned_field_tech_id=_optional_int(body.get("assigned_field_tech_id") or body.get("assignedFieldTechId")),
+        substation_id=_optional_int(body.get("substation_id") or body.get("substationId") or properties.get("substation_id")),
+        circuit_id=_optional_int(body.get("circuit_id") or body.get("circuitId") or properties.get("circuit_id")),
+        device_id=_optional_int(body.get("device_id") or body.get("deviceId") or properties.get("device_id")),
+        fiber_cable_id=_optional_int(body.get("fiber_cable_id") or body.get("fiberCableId") or properties.get("fiber_cable_id")),
+        provider_id=_optional_int(body.get("provider_id") or body.get("providerId") or properties.get("provider_id")),
+        outage_required=_payload_bool(body.get("outage_required") or body.get("outageRequired")),
+        switching_required=_payload_bool(body.get("switching_required") or body.get("switchingRequired")),
+        protection_impact=_optional_text(body.get("protection_impact") or body.get("protectionImpact")),
+        customer_impact=_optional_text(body.get("customer_impact") or body.get("customerImpact")),
+        closeout_summary="Issued from a schema-backed Design Mode database record. Synthetic/demo planning data only until field closeout and engineering verification.",
+    )
+    session.add(order)
+    session.flush()
+
+    task_rows: list[WorkOrderTask] = []
+    for index, task_title in enumerate(_design_work_order_tasks(record, asset_type, body), start=1):
+        task = WorkOrderTask(
+            work_order_id=order.id,
+            task_number=index,
+            task_title=task_title,
+            task_description=f"Linked living database record: {record.record_key}",
+            assigned_to_user_id=order.assigned_field_tech_id,
+            photo_required=index in {4, 5},
+            status="open",
+        )
+        session.add(task)
+        task_rows.append(task)
+
+    linked_ids = _linked_work_order_ids(properties)
+    if order.id is not None and order.id not in linked_ids:
+        linked_ids.append(order.id)
+    properties.update(
+        {
+            "linked_work_order_ids": linked_ids,
+            "latest_work_order_id": order.id,
+            "latest_work_order_number": order.work_order_number,
+            "work_order_status": order.status,
+            "living_database_status": "work_order_issued",
+        }
+    )
+    record.properties_json = properties
+    if record.status == "proposed":
+        record.status = "in_review"
+    record.version += 1
+    record.updated_at = _utc_now()
+    record.updated_by = user.id
+    session.add(record)
+    session.add(
+        WorkOrderUpdate(
+            work_order_id=order.id,
+            user_id=user.id,
+            update_type="issued_from_design_record",
+            update_text=f"Issued from Design Mode record {record.record_key} ({record.display_label}).",
+        )
+    )
+    session.flush()
+    dumped_record = _record_dump(record, asset_type)
+    _add_event(
+        session,
+        "record_work_order_issued",
+        user,
+        asset_type=asset_type,
+        record=record,
+        before=before,
+        after={"record": dumped_record, "work_order": model_to_dict(order), "tasks": [model_to_dict(task) for task in task_rows]},
+    )
+    session.commit()
+    session.refresh(order)
+    session.refresh(record)
+    for task in task_rows:
+        session.refresh(task)
+    return {
+        "record": _record_dump(record, asset_type),
+        "work_order": model_to_dict(order),
+        "tasks": [model_to_dict(task) for task in task_rows],
+        "synthetic_data_notice": BLUEPRINT_NOTICE,
+    }
 
 
 @router.post("/materialize")
@@ -2486,6 +2603,116 @@ def _asset_type_map(session: SessionDep, records: list[DesignAssetRecord], known
     if not ids:
         return {}
     return {row.id: row for row in session.exec(select(DesignAssetType).where(DesignAssetType.id.in_(ids))).all() if row.id is not None}
+
+
+def _next_design_work_order_number(session: SessionDep) -> str:
+    prefix = f"WO-DESIGN-{_utc_now().strftime('%Y%m%d')}"
+    existing_count = len(session.exec(select(WorkOrder).where(WorkOrder.work_order_number.like(f"{prefix}-%"))).all())
+    for offset in range(existing_count + 1, existing_count + 5000):
+        candidate = f"{prefix}-{offset:04d}"
+        if session.exec(select(WorkOrder).where(WorkOrder.work_order_number == candidate)).first() is None:
+            return candidate
+    return f"{prefix}-{uuid4().hex[:8].upper()}"
+
+
+def _design_record_work_order_description(record: DesignAssetRecord, asset_type: DesignAssetType, payload: dict[str, Any]) -> str:
+    properties = record.properties_json or {}
+    notes = [
+        str(payload.get("description") or "").strip(),
+        f"Design record: {record.record_key}",
+        f"Design object type: {asset_type.display_name} ({asset_type.slug})",
+        f"Record status at issue: {record.status}",
+        "Synthetic/demo planning data only until field closeout and engineering verification.",
+    ]
+    key_fields = [
+        "object_name",
+        "name",
+        "category",
+        "status",
+        "service_type",
+        "cable_id",
+        "circuit_id",
+        "fiber_count",
+        "splice_point_id",
+        "pole_id",
+        "substation_code",
+        "device_name",
+    ]
+    summary = [f"{key}: {properties[key]}" for key in key_fields if not _is_blank(properties.get(key))]
+    if summary:
+        notes.append("Design properties: " + "; ".join(summary[:10]))
+    if record.notes:
+        notes.append(f"Record notes: {record.notes}")
+    return "\n".join(item for item in notes if item)
+
+
+def _design_work_order_tasks(record: DesignAssetRecord, asset_type: DesignAssetType, payload: dict[str, Any]) -> list[str]:
+    raw_tasks = payload.get("tasks") or payload.get("task_titles") or payload.get("taskTitles")
+    parsed_tasks: list[str] = []
+    if isinstance(raw_tasks, list):
+        for item in raw_tasks:
+            if isinstance(item, dict):
+                title = item.get("task_title") or item.get("title") or item.get("task")
+            else:
+                title = item
+            if title is not None and str(title).strip():
+                parsed_tasks.append(_truncate(title, 255))
+    if parsed_tasks:
+        return parsed_tasks
+
+    geometry_task = "Verify map geometry and affected assets in the dashboard" if asset_type.geometry_type != "table_only" else "Verify table-only design object attributes"
+    return [
+        f"Review living database record {record.record_key}",
+        geometry_task,
+        "Confirm required design fields and synthetic/demo data boundary",
+        "Complete assigned field or engineering work and upload evidence",
+        "Submit closeout notes, photos, tests, or redlines",
+        "Engineer reviews closeout and updates record to as-built when verified",
+    ]
+
+
+def _linked_work_order_ids(properties: dict[str, Any]) -> list[int]:
+    raw_ids = properties.get("linked_work_order_ids") or properties.get("linkedWorkOrderIds") or []
+    if not isinstance(raw_ids, list):
+        raw_ids = [raw_ids]
+    linked: list[int] = []
+    for value in raw_ids:
+        parsed = _optional_int(value)
+        if parsed is not None and parsed not in linked:
+            linked.append(parsed)
+    return linked
+
+
+def _optional_int(value: Any) -> int | None:
+    if _is_blank(value):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _payload_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
+def _optional_text(value: Any) -> str | None:
+    if _is_blank(value):
+        return None
+    return str(value)
+
+
+def _truncate(value: Any, max_length: int) -> str:
+    text = str(value or "").strip()
+    return text[:max_length]
+
+
+def _is_blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and value.strip() == "")
 
 
 def _asset_type_dump(obj: DesignAssetType) -> dict[str, Any]:

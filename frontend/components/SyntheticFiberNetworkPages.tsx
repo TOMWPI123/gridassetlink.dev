@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { DataTable } from "@/components/DataTable";
+import { findStrandContinuityRecord, strandContinuityDashboardHref } from "@/lib/opgw/strandContinuity";
 import type { FiberAssignment, FiberSplice, FiberStrand, OpgwCableCollection, PatchPanel, SpliceClosureCollection, StrandContinuityRecord, TransmissionStructureCollection } from "@/lib/types/assets";
 import type { JsonRecord } from "@/types";
 
@@ -45,8 +46,15 @@ export function OpgwCablesPage() {
 
 export function FiberStrandTablePage() {
   const data = useSyntheticFiberData();
-  const rows = data.strands as unknown as JsonRecord[];
-  return <SyntheticPage title="Fiber Strand Table" subtitle="One synthetic strand record per generated OPGW fiber." error={data.error}><DataTable rows={rows} columns={["cableId", "strandNumber", "tubeNumber", "colorCode", "status", "assignmentId", "circuitId"]} filterField="status" /></SyntheticPage>;
+  const rows = data.strands.map((strand) => {
+    const continuityRecord = findStrandContinuityRecord(strand, data.strandContinuity);
+    return {
+      ...strand,
+      continuity_id: continuityRecord?.strandContinuityId || "-",
+      continuity_view: continuityRecord ? strandContinuityDashboardHref(continuityRecord) : "No continuity record",
+    } as unknown as JsonRecord;
+  });
+  return <SyntheticPage title="Fiber Strand Table" subtitle="One synthetic strand record per generated OPGW fiber. Use View to isolate its splice, cable, patch-panel, and assignment continuity on the dashboard without device layers." error={data.error}><DataTable rows={rows} columns={["cableId", "strandNumber", "tubeNumber", "colorCode", "status", "assignmentId", "circuitId", "continuity_id", "continuity_view"]} filterField="status" /></SyntheticPage>;
 }
 
 export function SplicePointsPage() {
@@ -76,16 +84,15 @@ export function StrandContinuityPage() {
     strand_set: record.strandNumbers.join(", "),
     splice_closure_count: record.spliceClosureIds.length,
     segment_count: record.continuitySegments.length,
-    map_view: `/dashboard?drawer=layers&strandContinuity=${encodeURIComponent(record.id)}`,
+    map_view: strandContinuityDashboardHref(record),
   }) as unknown as JsonRecord);
   const panelIds = new Set(data.strandContinuity.flatMap((record) => [record.aEndPatchPanelId, record.zEndPatchPanelId].filter(Boolean)));
-  const deviceIds = new Set(data.strandContinuity.map((record) => record.terminatedDeviceId).filter(Boolean));
   return (
-    <SyntheticPage title="Strand Continuity" subtitle="Synthetic end-to-end strand paths from substation patch panels through splices to terminated telecom devices." error={data.error}>
+    <SyntheticPage title="Strand Continuity" subtitle="Synthetic end-to-end strand paths from substation patch panels through splices and fiber assets. Dashboard strand views hide device layers by default." error={data.error}>
       <section className="metric-grid" aria-label="Strand continuity metrics">
         <Metric label="Continuity paths" value={data.strandContinuity.length.toLocaleString()} detail="Generated strand-level demos" />
         <Metric label="Patch panels" value={panelIds.size.toLocaleString()} detail="A/Z panel terminations" />
-        <Metric label="Terminated devices" value={deviceIds.size.toLocaleString()} detail="Synthetic end hardware" />
+        <Metric label="Splice records" value={data.strandContinuity.reduce((sum, record) => sum + record.fiberSpliceIds.length, 0).toLocaleString()} detail="Synthetic strand continuity records" />
         <Metric label="Splice references" value={data.strandContinuity.reduce((sum, record) => sum + record.spliceClosureIds.length, 0).toLocaleString()} detail="Diverse splice path hops" />
       </section>
       <section className="panel" style={{ marginBottom: 16 }}>
@@ -94,20 +101,20 @@ export function StrandContinuityPage() {
           <span className="badge active">isolated layer mode</span>
         </div>
         <div className="panel-body">
-          <p className="subtle">Open any row on the map to turn off unrelated layers, highlight the strand assignment, show patch panels/splices, and follow the path to its terminated synthetic device port.</p>
+          <p className="subtle">Open any row on the map to turn off unrelated layers, highlight the strand assignment, and show the cable, splice, patch-panel, and fiber asset path without device overlays.</p>
           <div className="strand-continuity-card-grid">
             {data.strandContinuity.slice(0, 12).map((record) => (
               <article className="strand-continuity-card" key={record.id}>
                 <strong>{record.continuityName}</strong>
                 <span>{record.serviceType} / {record.strandNumbers.join(", ")} strands / {record.estimatedLossDb.toFixed(2)} dB</span>
-                <small>{record.aEndPatchPanelId || "A-end panel"} to {record.terminatedDeviceName || record.zEndPatchPanelId || "Z-end device"}</small>
-                <Link href={`/dashboard?drawer=layers&strandContinuity=${encodeURIComponent(record.id)}`}>Open Strand View</Link>
+                <small>{record.aEndPatchPanelId || "A-end panel"} to {record.zEndPatchPanelId || "Z-end panel"}</small>
+                <Link href={strandContinuityDashboardHref(record)}>Open Strand View</Link>
               </article>
             ))}
           </div>
         </div>
       </section>
-      <DataTable rows={rows} columns={["strandContinuityId", "continuityName", "serviceType", "status", "strand_set", "aEndPatchPanelId", "zEndPatchPanelId", "terminatedDeviceName", "terminatedDevicePortName", "cable_count", "splice_closure_count", "routeMiles", "estimatedLossDb", "map_view"]} filterField="serviceType" />
+      <DataTable rows={rows} columns={["strandContinuityId", "continuityName", "serviceType", "status", "strand_set", "aEndPatchPanelId", "zEndPatchPanelId", "cable_count", "splice_closure_count", "segment_count", "routeMiles", "estimatedLossDb", "map_view"]} filterField="serviceType" />
     </SyntheticPage>
   );
 }

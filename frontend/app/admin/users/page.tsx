@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { EntityListPage } from "@/components/EntityListPage";
+import { entityConfigs } from "@/lib/entities";
 
 export default function Page() {
-  redirect("/dashboard");
+  return <EntityListPage config={entityConfigs.users} />;
 }

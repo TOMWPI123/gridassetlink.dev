@@ -87,9 +87,19 @@ Editable street-map seed data lives in:
 
 The street-level dashboard uses `maplibre-gl` installed through npm. It keeps the typed planning data and editor callbacks while rendering a MapLibre basemap with selectable GeoJSON overlays for substations, SEL ICON nodes, transmission/fiber paths, planning regions, and work-order locations.
 
-## No-Auth Synthetic Planning Demo
+## Account-Gated Synthetic Planning Demo
 
-The app now opens directly to `/dashboard`; `/` redirects there. Sign-in, sign-out, account badges, user management, and admin/audit navigation are bypassed for this planning demo.
+The app now uses seeded demo accounts by default. `/` opens the dashboard flow, and unauthenticated visitors are redirected to `/login` before reaching protected module and administration pages. The Administration section includes account management, audit logs, settings, and Database Admin for creating schema-backed synthetic planning objects.
+
+Seeded demo credentials:
+
+- `admin@example.com` / `admin123`
+- `engineer@example.com` / `engineer123`
+- `fieldtech@example.com` / `fieldtech123`
+- `viewer@example.com` / `viewer123`
+- `sqlanalyst@example.com` / `sql123`
+
+For local bypass-only development, set `AUTH_REQUIRED=false` on the backend and `NEXT_PUBLIC_ENABLE_AUTH=false` on the frontend.
 
 Use this statement as the operating boundary:
 
@@ -352,17 +362,20 @@ Public transmission-line data is used for map reference only. Synthetic substati
 
 To replace or refresh the public source, provide a different public FeatureServer URL through `TRANSMISSION_LINES_FEATURESERVER_URL`, rerun `npm run data:map`, inspect the metadata file, and verify that only public, non-sensitive display fields are retained.
 
-## Design/Edit Mode
+## Design/Edit and Database Administration
 
-Schema-driven map editing is available behind a feature flag:
+Schema-driven map editing is available from the dashboard **Design Mode** button and from `/dashboard?drawer=design`. The `/admin/database` page provides an account-gated workflow for creating any synthetic/demo database object type and record.
+
+Design mode can still be pre-enabled with:
 
 ```bash
 NEXT_PUBLIC_ENABLE_MAP_EDITING=true
 ```
 
-The dashboard now uses a bottom **Command Terminal** for schema-backed planning edits instead of a visible Design Mode drawer. Demo users can:
+Admins and engineers can:
 
 - click **Command Terminal** at the bottom of the dashboard and type natural commands such as `Build new pole between Meadow-Road-Str-0060 and Meadow-Road-Str-0049 and add a splice to the pole`;
+- open **Administration > Database Admin** to install core schemas, create custom object types, add map-visible records, and open the dashboard Design Mode layer;
 - create synthetic poles/support structures, splice cans, OPGW/fiber spans, fiber assignments, services, or generic database objects from text commands;
 - rename schema-backed planning objects and ask cable/service questions such as strand count, route endpoints, or service status;
 - receive follow-up parameter prompts when a command is missing endpoint, target, fiber-count, splice, or database-object details;
@@ -374,17 +387,18 @@ The dashboard now uses a bottom **Command Terminal** for schema-backed planning 
 - use **Capture module data into Design Mode** to snapshot existing backend module/layer rows, including their full row attributes, into `design-module-snapshot-record` records. Those snapshot records can be exported in a blueprint and replayed into a blank instance while preserving row IDs for related fibers, splices, ports, circuits, and work orders;
 - export the current Design Mode schema/record database as a portable blueprint JSON, or export a full rebuild package that includes the blueprint, module entity catalog, agent tool manifest, and snapshot summary. A rebuild package can be imported into a blank instance and replayed into backend module tables;
 - materialize a selected Design Mode object, or every record in the selected object type, into backend module tables when that schema declares a backend mapping. This lets an AI agent create poles, circuits, spans, splices, OPGW/fiber, patch panels, work orders, and other rebuild objects in Design Mode, then push the supported records into canonical backend data;
+- issue a work order directly from a selected Design Mode record or from **Administration > Database Admin > Living database work queue**. The design record stores the linked work-order IDs/status in properties JSON, and the work order receives default review, field-work, evidence, closeout, and engineering-review tasks;
 - use the Design Mode AI-agent tool manifest to call stable create endpoints for `create-circuit`, `create-device`, `create-device-port`, `create-pole`, `create-fiber-span`, `create-fiber-strand`, `create-splice`, `create-fiber-splice`, `create-patch-panel`, `create-patch-panel-port`, `create-fiber-assignment`, and `create-database-object`. Each tool creates a Design Mode record; tools with a backend entity can also materialize into the matching backend module when `materialize` is true;
 - click the map with Design/Edit tools to place points, add line vertices, or add polygon vertices, then finish/cancel unsaved geometry before saving;
 - select existing editable records, redraw geometry, edit attributes in a schema-generated form, save changes, or archive records with confirmation;
 - search, select, and zoom to schema-backed records on the MapLibre map;
 - review event history through `/api/design-assets/records/{id}/events`.
 
-Backend routes live under `/api/design-assets`. The command terminal posts to `POST /api/design-assets/terminal-command`. Blueprint routes are `GET /api/design-assets/blueprint`, `POST /api/design-assets/blueprint/import`, `GET /api/design-assets/rebuild-package`, `POST /api/design-assets/rebuild-package/import`, `GET /api/design-assets/module-blueprints`, and `POST /api/design-assets/module-blueprints/{key}/install`. Materialization routes are `POST /api/design-assets/records/{id}/materialize` and `POST /api/design-assets/materialize`. Module snapshot routes are `GET /api/design-assets/module-entities`, `POST /api/design-assets/module-snapshot`, and `POST /api/design-assets/module-snapshot/materialize`. Agent tool routes are `GET /api/design-assets/agent-tools` and `POST /api/design-assets/agent-tools/{tool_key}/run`. The seeded demo types are `planning-marker`, `fiber-design-span`, and `planning-work-zone`; the rebuild bundle adds `design-substation`, `design-circuit`, `design-device`, `design-device-port`, `design-distribution-pole`, `design-opgw-cable`, `design-fiber-strand`, `design-splice-point`, `design-fiber-splice`, `design-patch-panel`, `design-patch-panel-port`, `design-fiber-assignment`, `design-database-object`, `design-module-snapshot-record`, and `design-work-order`. All seeded, blueprint, terminal-created, and user-created records are synthetic/demo planning data only. Do not enter real CEII, SCADA, relay/protection, operational telecom, credentials, private fiber-route data, or engineering-critical settings.
+Backend routes live under `/api/design-assets`. The command terminal posts to `POST /api/design-assets/terminal-command`. Blueprint routes are `GET /api/design-assets/blueprint`, `POST /api/design-assets/blueprint/import`, `GET /api/design-assets/rebuild-package`, `POST /api/design-assets/rebuild-package/import`, `GET /api/design-assets/module-blueprints`, and `POST /api/design-assets/module-blueprints/{key}/install`. Materialization routes are `POST /api/design-assets/records/{id}/materialize` and `POST /api/design-assets/materialize`. Module snapshot routes are `GET /api/design-assets/module-entities`, `POST /api/design-assets/module-snapshot`, and `POST /api/design-assets/module-snapshot/materialize`. Agent tool routes are `GET /api/design-assets/agent-tools` and `POST /api/design-assets/agent-tools/{tool_key}/run`. The seeded demo types are `planning-marker`, `fiber-design-span`, and `planning-work-zone`; the rebuild bundle adds `design-substation`, `design-circuit`, `design-device`, `design-device-port`, `design-distribution-pole`, `design-opgw-cable`, `design-fiber-strand`, `design-splice-point`, `design-fiber-splice`, `design-patch-panel`, `design-patch-panel-port`, `design-fiber-assignment`, `design-database-object`, `design-module-snapshot-record`, and `design-work-order`. See `docs/database_administration.md` for the account, admin, database-object, dashboard map, and materialization workflow. All seeded, blueprint, terminal-created, admin-created, and user-created records are synthetic/demo planning data only. Do not enter real CEII, SCADA, relay/protection, operational telecom, credentials, private fiber-route data, or engineering-critical settings.
 
 ## MVP Status
 
-Fully working: no-auth dashboard entry, public transmission-line reference rendering, deterministic synthetic structures/OPGW/strands/splices/patch panels/fiber assignments, dashboard metrics, SQL saved reports, SELECT-only query endpoint, circuit trace, fiber assignment validation, strand assignment grids, splice maps, patch panel port maps, device fiber connectivity, circuit fiber paths, work-order fiber tasks, outage impact, QR generation stub, CSV export, import validation stub, work-order closeout, backend tests.
+Fully working: account-gated dashboard entry, public transmission-line reference rendering, deterministic synthetic structures/OPGW/strands/splices/patch panels/fiber assignments, dashboard metrics, SQL saved reports, SELECT-only query endpoint, circuit trace, fiber assignment validation, strand assignment grids, splice maps, patch panel port maps, device fiber connectivity, circuit fiber paths, work-order fiber tasks, outage impact, QR generation stub, CSV export, import validation stub, work-order closeout, backend tests.
 
 Stubbed: file blob upload, Excel export, advanced GIS map rendering, advanced risk simulation, desktop packaging beyond the CLI scaffold.
 

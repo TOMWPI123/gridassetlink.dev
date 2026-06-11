@@ -1,7 +1,7 @@
 "use client";
 
 import { Cable, ClipboardList, Cpu, Database, GitBranch, LogIn, Map, Network, Shield } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { login } from "@/lib/api";
 
@@ -20,13 +20,15 @@ const modules = [
 
 export function AuthPanel() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") || "/dashboard";
   const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
-    try { await login(email, password); router.push("/dashboard"); } catch (err) { setError(err instanceof Error ? err.message : "Login failed"); }
+    try { await login(email, password); router.push(nextPath); } catch (err) { setError(err instanceof Error ? err.message : "Login failed"); }
   }
   async function openModule(href: string) {
     setError("");
@@ -44,6 +46,7 @@ export function AuthPanel() {
         <div className="module-grid auth-module-grid">{modules.map(({ label, detail, href, icon: Icon }) => <button className="module-card" type="button" key={href} onClick={() => openModule(href)}><span className="module-icon"><Icon size={18} /></span><span><span className="field-label">Demo Module</span><strong>{label}</strong><span className="subtle">{detail}</span></span></button>)}</div>
         <form onSubmit={submit}>
           <strong>Sign in</strong>
+          <p className="subtle" style={{ marginTop: 8 }}>Accounts gate administration, database edits, materialization, SQL, and field workflows. Demo credentials are seeded for local planning use.</p>
           <div style={{ marginTop: 14 }}><label className="field-label">Email</label><input className="input" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           <div style={{ marginTop: 10 }}><label className="field-label">Password</label><input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
           {error ? <p className="badge red" style={{ marginTop: 12 }}>{error}</p> : null}

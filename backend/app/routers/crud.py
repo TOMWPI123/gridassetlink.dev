@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import String, cast, or_
 from sqlmodel import SQLModel, select
 
-from app.auth.dependencies import CurrentUser, SessionDep, require_roles
+from app.auth.dependencies import CurrentUser, SessionDep, normalize_role, require_roles
 from app.auth.security import hash_password
 from app.models import (
     Attachment,
@@ -181,17 +181,37 @@ def _search_statement(model: type[ModelT], search: str | None):
     return statement
 
 
+def _write_roles_for_slug(slug: str) -> tuple[str, ...]:
+    if slug in {"users", "audit-logs"}:
+        return ("admin",)
+    return ("admin", "engineer")
+
+
+def _read_roles_for_slug(slug: str) -> tuple[str, ...]:
+    if slug in {"users", "audit-logs"}:
+        return ("admin",)
+    return ()
+
+
+def _ensure_read_allowed(slug: str, user: CurrentUser) -> None:
+    roles = _read_roles_for_slug(slug)
+    if roles and normalize_role(user.role) not in {normalize_role(role) for role in roles}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
+
+
 def build_crud_router(slug: str, model: type[ModelT], tag: str) -> APIRouter:
     router = APIRouter(prefix=f"/api/{slug}", tags=[tag])
+    write_roles = _write_roles_for_slug(slug)
 
     @router.get("")
     @router.get("/")
-    def list_items(session: SessionDep, _: CurrentUser, search: str | None = None, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    def list_items(session: SessionDep, user: CurrentUser, search: str | None = None, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+        _ensure_read_allowed(slug, user)
         limit = min(max(limit, 1), 500)
         return [_public_dump(item) for item in session.exec(_search_statement(model, search).offset(offset).limit(limit)).all()]
 
-    @router.post("", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_roles("admin", "engineer"))])
-    @router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_roles("admin", "engineer"))])
+    @router.post("", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_roles(*write_roles))])
+    @router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_roles(*write_roles))])
     def create_item(payload: dict[str, Any], session: SessionDep, user: CurrentUser) -> dict[str, Any]:
         obj = _validate_payload(model, payload)
         if hasattr(obj, "created_by"):
@@ -206,13 +226,14 @@ def build_crud_router(slug: str, model: type[ModelT], tag: str) -> APIRouter:
         return _public_dump(obj)
 
     @router.get("/{item_id}")
-    def get_item(item_id: int, session: SessionDep, _: CurrentUser) -> dict[str, Any]:
+    def get_item(item_id: int, session: SessionDep, user: CurrentUser) -> dict[str, Any]:
+        _ensure_read_allowed(slug, user)
         obj = session.get(model, item_id)
         if obj is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{tag} not found")
         return _public_dump(obj)
 
-    @router.put("/{item_id}", dependencies=[Depends(require_roles("admin", "engineer"))])
+    @router.put("/{item_id}", dependencies=[Depends(require_roles(*write_roles))])
     def update_item(item_id: int, payload: dict[str, Any], session: SessionDep, user: CurrentUser) -> dict[str, Any]:
         obj = session.get(model, item_id)
         if obj is None:

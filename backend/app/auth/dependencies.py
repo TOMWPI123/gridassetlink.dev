@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session, select
 
 from app.auth.security import decode_access_token
+from app.config import settings
 from app.database import get_session
 from app.models import User
 
@@ -24,6 +25,8 @@ def normalize_role(role: str | None) -> str:
 
 def get_current_user(session: SessionDep, credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)]) -> User:
     if credentials is None:
+        if settings.auth_required:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
         user = session.exec(select(User).where(User.is_active == True).where(User.role.in_(["admin", "engineer"]))).first()  # noqa: E712
         if user is not None:
             return user

@@ -384,6 +384,75 @@ def test_design_asset_record_validation_geometry_crud_and_events() -> None:
     assert archived.json()["status"] == "archived"
 
 
+def test_design_record_issues_living_database_work_order() -> None:
+    headers = auth_headers("engineer@example.com", "engineer123")
+    type_response = client.post(
+        "/api/design-assets/asset-types",
+        json={
+            "slug": "unit-test-living-work-object",
+            "display_name": "Unit Test Living Work Object",
+            "geometry_type": "point",
+            "fields": [
+                {"name": "object_name", "label": "Object name", "type": "string", "required": True},
+                {"name": "category", "label": "Category", "type": "string"},
+            ],
+            "searchable_fields": ["object_name", "category"],
+            "map_style": {"color": "#55d6ff", "radius": 7},
+        },
+        headers=headers,
+    )
+    assert type_response.status_code == 201
+
+    record_response = client.post(
+        "/api/design-assets/records",
+        json={
+            "asset_type_slug": "unit-test-living-work-object",
+            "record_key": "UNIT-TEST-LIVING-WORK-001",
+            "display_label": "Unit Test Living Work Record",
+            "geometry": {"type": "Point", "coordinates": [-71.72, 42.21]},
+            "properties": {"object_name": "Unit Test Living Work Record", "category": "work-order-demo"},
+            "status": "proposed",
+            "source": "synthetic_demo",
+            "visibility": "synthetic-demo",
+        },
+        headers=headers,
+    )
+    assert record_response.status_code == 201
+    record = record_response.json()
+
+    viewer_forbidden = client.post(
+        f"/api/design-assets/records/{record['id']}/issue-work-order",
+        json={},
+        headers=auth_headers("viewer@example.com", "viewer123"),
+    )
+    assert viewer_forbidden.status_code == 403
+
+    issued = client.post(
+        f"/api/design-assets/records/{record['id']}/issue-work-order",
+        json={"title": "Install demo living database object", "tasks": ["Review design package", "Complete field verification"]},
+        headers=headers,
+    )
+    assert issued.status_code == 201
+    payload = issued.json()
+    assert payload["work_order"]["work_order_number"].startswith("WO-DESIGN-")
+    assert payload["work_order"]["work_type"] == "design_database_work"
+    assert len(payload["tasks"]) == 2
+    assert payload["record"]["status"] == "in_review"
+    assert payload["record"]["properties"]["latest_work_order_id"] == payload["work_order"]["id"]
+    assert payload["record"]["properties"]["living_database_status"] == "work_order_issued"
+
+    order_detail = client.get(f"/api/work-orders/{payload['work_order']['id']}", headers=headers)
+    assert order_detail.status_code == 200
+    assert "UNIT-TEST-LIVING-WORK-001" in order_detail.json()["description"]
+
+    task_rows = client.get("/api/work-order-tasks?search=Review%20design%20package&limit=500", headers=headers)
+    assert task_rows.status_code == 200
+    assert any(row["work_order_id"] == payload["work_order"]["id"] and row["task_title"] == "Review design package" for row in task_rows.json())
+
+    events = client.get(f"/api/design-assets/records/{record['id']}/events", headers=headers)
+    assert any(event["event_type"] == "record_work_order_issued" for event in events.json())
+
+
 def test_design_blueprint_export_import_and_core_module_bundle() -> None:
     headers = auth_headers("engineer@example.com", "engineer123")
     blueprints = client.get("/api/design-assets/module-blueprints", headers=headers)

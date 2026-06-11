@@ -38,8 +38,15 @@ export function DataTable({ rows, columns, detailBase, filterField, onExport }: 
 }
 
 function renderCell(column: string, value: unknown) {
+  if (isViewLinkColumn(column) && typeof value === "string" && value.startsWith("/")) {
+    return <Link className="table-view-link" href={value}>View</Link>;
+  }
   if (column === "priority") return <PriorityBadge value={value} />;
   if (statusLike.has(column) || column.endsWith("_status")) return <Badge value={value} />;
   if (column.includes("cost") && typeof value === "number") return `$${value.toLocaleString()}`;
   return displayValue(value);
+}
+
+function isViewLinkColumn(column: string) {
+  return column === "view" || column === "map_view" || column.endsWith("_view");
 }

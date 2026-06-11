@@ -5,7 +5,9 @@ import type { UserSession } from "@/types";
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "/backend" : "http://localhost:8000");
 export const LOCAL_GIS_API_BASE = "http://127.0.0.1:8000";
 export const GIS_API_BASE_STORAGE_KEY = "gridassetlink-gis-api-base";
-const AUTH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AUTH === "true";
+export const AUTH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AUTH !== "false";
+const WRITE_ROLES = new Set(["admin", "engineer", "editor"]);
+const ADMIN_ROLES = new Set(["admin"]);
 
 export function getSession(): UserSession | null {
   if (typeof window === "undefined") return null;
@@ -16,8 +18,9 @@ export function getSession(): UserSession | null {
 
 export function saveSession(session: UserSession) { window.localStorage.setItem("telecomne-session", JSON.stringify(session)); }
 export function clearSession() { window.localStorage.removeItem("telecomne-session"); }
-export function currentRole(): string { return getSession()?.user.role || "demo_engineer"; }
-export function canWrite(): boolean { return true; }
+export function currentRole(): string { return getSession()?.user.role || (AUTH_ENABLED ? "viewer" : "demo_engineer"); }
+export function canWrite(): boolean { return !AUTH_ENABLED || WRITE_ROLES.has(currentRole()); }
+export function canAdmin(): boolean { return !AUTH_ENABLED || ADMIN_ROLES.has(currentRole()); }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);

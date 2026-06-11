@@ -11,6 +11,7 @@ import { seedEditableSubstations } from "@/data/substations";
 import { seedPlanningRegions, seedTransmissionLines } from "@/data/transmissionLines";
 import { seedTransmissionMaps } from "@/data/transmissionMaps";
 import { traceSyntheticService } from "@/lib/opgw/continuityEngine";
+import { findStrandContinuityRecord } from "@/lib/opgw/strandContinuity";
 import { API_BASE, LOCAL_GIS_API_BASE, clearStoredGisApiBase, fetchFromApiBase, getStoredGisApiBase, normalizeApiBase, saveGisApiBase } from "@/lib/api";
 import { buildSyntheticOpgwEngineeringModel } from "@/lib/opgw/spanModel";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
@@ -21,7 +22,7 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type ContinuityHighlight, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, DesignAgentTool, DesignAgentToolRunResult, DesignAssetBlueprint, DesignAssetField, DesignAssetFieldType, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignBlueprintInstallResult, DesignMaterializationBatchResult, DesignMaterializationResult, DesignModuleBlueprint, DesignModuleEntity, DesignModuleSnapshotMaterializeResult, DesignModuleSnapshotResult, DesignRebuildAudit, DesignRebuildPackage, DesignRebuildPackageImportResult, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StrandContinuityRecord, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, DesignAgentTool, DesignAgentToolRunResult, DesignAssetBlueprint, DesignAssetField, DesignAssetFieldType, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignBlueprintInstallResult, DesignIssuedWorkOrderResult, DesignMaterializationBatchResult, DesignMaterializationResult, DesignModuleBlueprint, DesignModuleEntity, DesignModuleSnapshotMaterializeResult, DesignModuleSnapshotResult, DesignRebuildAudit, DesignRebuildPackage, DesignRebuildPackageImportResult, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StrandContinuityRecord, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const MAP_EDITING_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MAP_EDITING === "true";
 const designFieldTypeOptions: DesignAssetFieldType[] = ["string", "textarea", "number", "integer", "boolean", "date", "enum", "json"];
@@ -151,6 +152,9 @@ type DashboardContinuitySummary = {
   warningSummary: string[];
   traceHref: string;
 };
+type StrandContinuityFocusOptions = {
+  includeDevices?: boolean;
+};
 type DashboardMapDataGroup =
   | "publicReference"
   | "fccReference"
@@ -270,7 +274,7 @@ export function DashboardPage() {
   const [transmissionLines] = useState(seedTransmissionLines);
   const [planningRegions] = useState(seedPlanningRegions);
   const [activeTool, setActiveTool] = useState<MapDrawingTool>("select");
-  const [designModeEnabled, setDesignModeEnabled] = useState(true);
+  const [designModeEnabled, setDesignModeEnabled] = useState(MAP_EDITING_ENABLED);
   const [selectedAsset, setSelectedAsset] = useState<StreetMapSelection | null>(null);
   const [mapWindowClosed, setMapWindowClosed] = useState(false);
   const [draftSubstation, setDraftSubstation] = useState<Substation | null>(null);
@@ -295,13 +299,7 @@ export function DashboardPage() {
   const deepLinkFocusApplied = useRef(false);
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
-  const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.has("strandContinuity") || params.has("strandContinuityId")) return strandContinuityLayerState(dashboardStreetLayers);
-    }
-    return dashboardStreetLayers;
-  });
+  const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(dashboardStreetLayers);
   const [isolatedOpgwRouteId, setIsolatedOpgwRouteId] = useState<string | null>(null);
   const [isolatedOpgwSectionId, setIsolatedOpgwSectionId] = useState<string | null>(null);
   const [isolatedOpgwSplicePointId, setIsolatedOpgwSplicePointId] = useState<string | null>(null);
@@ -619,8 +617,8 @@ export function DashboardPage() {
     if (groups.length) void loadMapDataGroups(groups);
   }, [continuityHighlight, loadMapDataGroups, rightMode, searchLayerFilter, streetLayers]);
 
-  const loadDesignAssets = useCallback(async () => {
-    if (!designFeaturesEnabled) return;
+  const loadDesignAssets = useCallback(async (force = false) => {
+    if (!force && !designFeaturesEnabled) return;
     try {
       const payload = await fetchFromApiBase<DesignAssetMapPayload>(API_BASE, "/api/design-assets/map-records");
       setDesignAssetTypes(payload.asset_types || []);
@@ -669,11 +667,17 @@ export function DashboardPage() {
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
-    if (drawer && ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments"].includes(drawer)) {
+    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design"];
+    if (drawer && allowedDrawers.includes(drawer as RightDrawerMode)) {
       setRightMode(drawer as RightDrawerMode);
       setRightCollapsed(false);
+      if (drawer === "design") {
+        setDesignModeEnabled(true);
+        setStreetLayers((current) => ({ ...current, designAssets: true }));
+        void loadDesignAssets(true);
+      }
     }
-  }, []);
+  }, [loadDesignAssets]);
 
   const publicOnly = true;
   const visibleTransmissionMaps = useMemo(
@@ -798,6 +802,7 @@ export function DashboardPage() {
     };
     return [draftRecord, ...visibleDesignAssetRecords];
   }, [activeDesignAssetType, designFeaturesEnabled, pendingDesignGeometry, visibleDesignAssetRecords]);
+  const selectedDesignAssetRecord = selectedAsset?.kind === "design_asset_record" ? selectedAsset.record : null;
   const visibleFiberAssignments = useMemo(
     () => fiberAssignments.filter((assignment) => assignment.synthetic),
     [fiberAssignments],
@@ -1153,6 +1158,17 @@ export function DashboardPage() {
     showToast("Started a new editable planning asset.");
   }
 
+  function selectDesignAssetRecord(record: DesignAssetRecord) {
+    const selection: StreetMapSelection = { kind: "design_asset_record", id: String(record.id), label: record.display_label || record.record_key, record };
+    setSelectedAsset(selection);
+    setStreetLayers((current) => ({ ...current, designAssets: true }));
+    if (record.geometry || record.geometry_json) {
+      setFocusRequest({ selection, sequence: Date.now() });
+    }
+    setRightMode("design");
+    setRightCollapsed(false);
+  }
+
   function stageDesignVertex(coordinate: Coordinate, geometryType: "line" | "polygon") {
     const activeType = designAssetTypes.find((item) => item.slug === selectedDesignAssetTypeSlug) || designAssetTypes.find((item) => item.geometry_type === geometryType);
     if (!activeType || activeType.geometry_type !== geometryType) {
@@ -1363,7 +1379,7 @@ export function DashboardPage() {
     if (nextHighlight) {
       setContinuityHighlight(nextHighlight);
       setStreetLayers((current) => selection.kind === "fiber_assignment" && current.strandContinuity
-        ? strandContinuityLayerState(current)
+        ? strandContinuityLayerState(current, { includeDevices: current.telecomNodes || current.selIconNodes || current.c3794Nodes })
         : ({
           ...current,
           syntheticOpgwCables: true,
@@ -1764,8 +1780,9 @@ export function DashboardPage() {
     };
   }
 
-  function focusStrandContinuityRecord(record: StrandContinuityRecord) {
+  function focusStrandContinuityRecord(record: StrandContinuityRecord, options: StrandContinuityFocusOptions = {}) {
     if (!visibleOpgwCables.length && !visibleFiberAssignments.length) return false;
+    const includeDevices = options.includeDevices ?? true;
     const highlight = buildContinuityHighlightForStrandRecord(record);
     const assignment = visibleFiberAssignments.find((item) => item.id === record.assignmentId);
     const cable = visibleOpgwCables.find((feature) => record.cableIds.includes(feature.properties.id));
@@ -1784,12 +1801,12 @@ export function DashboardPage() {
     setIsolatedOpgwRouteId(highlight.routeIds?.[0] || null);
     setIsolatedOpgwSectionId(highlight.sectionIds?.[0] || null);
     setIsolatedOpgwSplicePointId(highlight.splicePointIds[0] || null);
-    setStreetLayers((current) => strandContinuityLayerState(current));
+    setStreetLayers((current) => strandContinuityLayerState(current, { includeDevices }));
     setSearchLayerFilter("strandContinuity");
     setVisibilityFilter("synthetic-demo");
     setRightMode("layers");
     setRightCollapsed(false);
-    showToast(`Strand View isolated for ${record.strandContinuityId || record.id}.`);
+    showToast(`Strand View isolated for ${record.strandContinuityId || record.id}${includeDevices ? "" : " without device layers"}.`);
     return true;
   }
 
@@ -1810,6 +1827,7 @@ export function DashboardPage() {
     const cableId = params.get("cable");
     const serviceId = params.get("service");
     const strandContinuityId = params.get("strandContinuity") || params.get("strandContinuityId");
+    const includeContinuityDevices = !shouldHideContinuityDevices(params);
     const distributionPoleId = params.get("distributionPole") || params.get("distributionPoleId");
     const distributionRouteId = params.get("distributionRoute") || params.get("distributionRouteId");
 
@@ -1822,7 +1840,7 @@ export function DashboardPage() {
         || item.serviceId === strandContinuityId
       );
       if (!record) return;
-      if (!focusStrandContinuityRecord(record)) return;
+      if (!focusStrandContinuityRecord(record, { includeDevices: includeContinuityDevices })) return;
       deepLinkFocusApplied.current = true;
       return;
     }
@@ -1927,7 +1945,7 @@ export function DashboardPage() {
     setRightMode("design");
     setRightCollapsed(false);
     setActiveTool("select");
-    void loadDesignAssets();
+    void loadDesignAssets(true);
     showToast("Design Mode enabled: editable planning assets, schema forms, and map drawing tools are available.");
     issueMapCommand("resize");
   }
@@ -2179,6 +2197,14 @@ export function DashboardPage() {
               {label}
             </button>
           ))}
+          <button
+            type="button"
+            className={designModeEnabled && rightMode === "design" ? "active" : ""}
+            onClick={handleDesignModeClick}
+          >
+            <PencilRuler size={14} />
+            Design Mode
+          </button>
         </div>
         <div className="dashboard-map-global-search-wrap">
           <div className="dashboard-map-global-search-shell">
@@ -2247,6 +2273,7 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "sources" ? "active" : ""} onClick={() => setRightMode("sources")}><TableProperties size={14} />Sources</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
               <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
+              <button type="button" className={rightMode === "design" ? "active" : ""} onClick={handleDesignModeClick}><PencilRuler size={14} />Design</button>
             </div>
             <div className="dashboard-drawer-body">
               {rightMode === "modules" ? <ModulesDrawer pathname={pathname} layerSummaries={dashboardLayerSummaries} /> : null}
@@ -2368,9 +2395,40 @@ export function DashboardPage() {
               ) : null}
               {rightMode === "sources" ? <DashboardDataSourcesPanel /> : null}
               {rightMode === "details" ? <LinkedAssetDetailPanel selection={selectedAsset} onClose={handleCloseAssetDetail} /> : null}
-              {rightMode === "strands" ? <FiberStrandTable strands={fiberStrands} assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} onUpdateStrands={updateFiberStrands} /> : null}
+              {rightMode === "strands" ? (
+                <FiberStrandTable
+                  strands={fiberStrands}
+                  assignments={visibleFiberAssignments}
+                  opgwCables={visibleOpgwCables}
+                  strandContinuityRecords={strandContinuityRecords}
+                  onUpdateStrands={updateFiberStrands}
+                  onViewContinuity={(record) => focusStrandContinuityRecord(record, { includeDevices: false })}
+                />
+              ) : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
               {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
+              {rightMode === "design" ? (
+                <DesignEditDrawer
+                  enabled={designFeaturesEnabled}
+                  assetTypes={designAssetTypes}
+                  records={visibleDesignAssetRecords}
+                  selectedRecord={selectedDesignAssetRecord}
+                  selectedTypeSlug={selectedDesignAssetTypeSlug}
+                  pendingGeometry={pendingDesignGeometry}
+                  activeTool={activeTool}
+                  drawingVertexCount={designDrawingCoordinates.length}
+                  message={designAssetMessage}
+                  onSelectedTypeSlugChange={setSelectedDesignAssetTypeSlug}
+                  onPendingGeometryChange={setPendingDesignGeometry}
+                  onBeginDrawing={beginDesignDrawing}
+                  onFinishDrawing={finishDesignDrawing}
+                  onCancelDraft={cancelDesignDraft}
+                  onNewRecord={startNewDesignRecord}
+                  onRefresh={() => loadDesignAssets(true)}
+                  onSelectRecord={selectDesignAssetRecord}
+                  onNotify={showToast}
+                />
+              ) : null}
               {rightMode === "editor" ? (
                 <div className="dashboard-drawer-stack">
                   {showMapEditor ? <TransmissionMapEditor open={showMapEditor} onCancel={() => setShowMapEditor(false)} onSave={handleCreateMap} /> : null}
@@ -3326,7 +3384,7 @@ function ModulesDrawer({ pathname, layerSummaries }: { pathname: string; layerSu
         <Network size={16} />
         <div>
           <strong>TelecomNE modules</strong>
-          <span>No-account synthetic planning modules</span>
+          <span>Account-gated synthetic planning modules</span>
         </div>
       </div>
       <LayerSummaryDigest layerSummaries={layerSummaries} />
@@ -3487,7 +3545,7 @@ function SummaryDrawer({ cards, publicOnly, mapStatusMessage, opgwMetrics, layer
         <Gauge size={16} />
         <div>
           <strong>Dashboard summary</strong>
-          <span>{publicOnly ? "Public ISO-NE reference mode" : "No-account synthetic planning workspace"}</span>
+          <span>{publicOnly ? "Public ISO-NE reference mode" : "Account-gated synthetic planning workspace"}</span>
         </div>
       </div>
       <LayerSummaryDigest layerSummaries={layerSummaries} compact />
@@ -3606,12 +3664,16 @@ function FiberStrandTable({
   strands,
   assignments,
   opgwCables,
+  strandContinuityRecords,
   onUpdateStrands,
+  onViewContinuity,
 }: {
   strands: FiberStrand[];
   assignments: FiberAssignment[];
   opgwCables: OpgwCableFeature[];
+  strandContinuityRecords: StrandContinuityRecord[];
   onUpdateStrands: (cableId: string, strandNumbers: number[], status: FiberStrand["status"], assignmentId?: string) => void;
+  onViewContinuity: (record: StrandContinuityRecord) => void;
 }) {
   const [cableId, setCableId] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -3620,6 +3682,10 @@ function FiberStrandTable({
   const effectiveCableId = cableId || opgwCables[0]?.properties.id || "";
   const cable = opgwCables.find((item) => item.properties.id === effectiveCableId);
   const assignmentById = useMemo(() => new Map(assignments.map((assignment) => [assignment.id, assignment])), [assignments]);
+  const continuityRecordsForCable = useMemo(
+    () => strandContinuityRecords.filter((record) => record.cableIds.includes(effectiveCableId)),
+    [effectiveCableId, strandContinuityRecords],
+  );
   const rows = useMemo(() => strands
     .filter((strand) => strand.cableId === effectiveCableId)
     .filter((strand) => statusFilter === "all" || strand.status === statusFilter)
@@ -3630,6 +3696,7 @@ function FiberStrandTable({
     })
     .slice(0, 144), [effectiveCableId, query, statusFilter, strands]);
   const selectedRows = rows.filter((strand) => selected.includes(strand.strandNumber));
+  const viewableRows = rows.filter((strand) => Boolean(findStrandContinuityRecord(strand, continuityRecordsForCable))).length;
 
   function toggleStrand(strandNumber: number) {
     setSelected((current) => current.includes(strandNumber) ? current.filter((item) => item !== strandNumber) : [...current, strandNumber]);
@@ -3682,6 +3749,7 @@ function FiberStrandTable({
       <div className="fiber-stat-row">
         <span>{cable?.properties.fiberCount || 0}F</span>
         <span>{rows.length} shown</span>
+        <span>{viewableRows} continuity views</span>
         <span>{selectedRows.length} selected</span>
       </div>
       <div className="fiber-action-row">
@@ -3699,11 +3767,13 @@ function FiberStrandTable({
               <th>Color</th>
               <th>Status</th>
               <th>Assignment</th>
+              <th>View</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((strand) => {
               const assignment = strand.assignmentId ? assignmentById.get(strand.assignmentId) : undefined;
+              const continuityRecord = findStrandContinuityRecord(strand, continuityRecordsForCable);
               return (
                 <tr className={selected.includes(strand.strandNumber) ? "selected" : ""} key={strand.id} onClick={() => toggleStrand(strand.strandNumber)}>
                   <td>{strand.strandNumber}</td>
@@ -3711,6 +3781,19 @@ function FiberStrandTable({
                   <td>{strand.colorCode || "-"}</td>
                   <td><span className={`fiber-status ${strand.status}`}>{strand.status}</span></td>
                   <td>{assignment?.assignmentName || strand.assignmentId || "-"}</td>
+                  <td>
+                    <button
+                      type="button"
+                      disabled={!continuityRecord}
+                      title={continuityRecord ? "View full strand continuity on the dashboard without device layers" : "No continuity record for this strand"}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (continuityRecord) onViewContinuity(continuityRecord);
+                      }}
+                    >
+                      View
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -4013,6 +4096,8 @@ function DesignEditDrawer({
   const activeAgentDesignTool = orderedAgentTools.find((tool) => tool.tool_key === selectedAgentToolKey) || orderedAgentTools[0];
   const agentToolSupportsMaterialize = Boolean(activeAgentDesignTool?.supports_materialize);
   const pendingGeometryMatchesAgentTool = Boolean(activeAgentDesignTool && pendingGeometry && geometryTypeMatchesDesignGeometry(activeAgentDesignTool.geometry_type, pendingGeometry));
+  const selectedWorkOrderNumber = selectedRecord ? designRecordWorkOrderNumber(selectedRecord) : "";
+  const selectedWorkOrderId = selectedRecord ? designRecordWorkOrderId(selectedRecord) : null;
 
   useEffect(() => {
     if (!activeType && assetTypes[0]) onSelectedTypeSlugChange(assetTypes[0].slug);
@@ -4418,6 +4503,33 @@ function DesignEditDrawer({
     }
   }
 
+  async function issueWorkOrderFromSelectedRecord() {
+    if (!selectedRecord) {
+      setLocalMessage("Select a Design Mode object first.");
+      return;
+    }
+    setBusy("Issuing work order");
+    try {
+      const result = await fetchFromApiBase<DesignIssuedWorkOrderResult>(API_BASE, `/api/design-assets/records/${selectedRecord.id}/issue-work-order`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: `Design work: ${selectedRecord.display_label}`,
+          work_type: "design_database_work",
+          priority: "normal",
+          status: "issued",
+        }),
+      });
+      await onRefresh();
+      onSelectRecord(result.record);
+      setLocalMessage(`Issued ${result.work_order.work_order_number || "work order"} with ${result.tasks.length} task${result.tasks.length === 1 ? "" : "s"} for ${selectedRecord.display_label}.`);
+      onNotify(`Issued work order ${result.work_order.work_order_number || ""} from Design Mode.`);
+    } catch (error) {
+      setLocalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function materializeActiveType(modeValue: "upsert" | "skip_existing" = "upsert") {
     if (!activeType) {
       setLocalMessage("Select an object type first.");
@@ -4776,10 +4888,18 @@ function DesignEditDrawer({
             {records.slice(0, 8).map((record) => (
               <button type="button" key={record.id} className={selectedRecord?.id === record.id ? "active" : ""} onClick={() => onSelectRecord(record)}>
                 <strong>{record.display_label}</strong>
-                <span>{record.asset_type_display_name || record.asset_type_slug} / {record.status}</span>
+                <span>{record.asset_type_display_name || record.asset_type_slug} / {record.status}{designRecordWorkOrderNumber(record) ? ` / ${designRecordWorkOrderNumber(record)}` : ""}</span>
               </button>
             ))}
           </div>
+          {selectedRecord ? (
+            <div className="dashboard-source-boundary">
+              <p>
+                Living database record: {selectedRecord.record_key}
+                {selectedWorkOrderNumber ? <> / latest work order {selectedWorkOrderId ? <Link href={`/work-orders/${selectedWorkOrderId}`}>{selectedWorkOrderNumber}</Link> : selectedWorkOrderNumber}</> : " / no work order issued yet"}
+              </p>
+            </div>
+          ) : null}
           <label><span>Record key</span><input value={recordKey} onChange={(event) => setRecordKey(event.currentTarget.value)} /></label>
           <label><span>Display label</span><input value={displayLabel} onChange={(event) => setDisplayLabel(event.currentTarget.value)} /></label>
           <label><span>Status</span><select value={recordStatus} onChange={(event) => setRecordStatus(event.currentTarget.value as DesignAssetRecord["status"])}>
@@ -4792,6 +4912,7 @@ function DesignEditDrawer({
           <label><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.currentTarget.value)} /></label>
           <div className="dashboard-gis-actions">
             <button className="telecom-map-button" type="button" onClick={() => void saveRecord()} disabled={Boolean(busy) || !activeType}>Save object</button>
+            {selectedRecord ? <button className="telecom-map-button" type="button" onClick={() => void issueWorkOrderFromSelectedRecord()} disabled={Boolean(busy)}>Issue work order</button> : null}
             {selectedRecord ? <button type="button" onClick={() => void materializeSelectedRecord("upsert")} disabled={Boolean(busy)}>Materialize selected to backend</button> : null}
             {activeType ? <button type="button" onClick={() => void materializeActiveType("upsert")} disabled={Boolean(busy)}>Materialize object type</button> : null}
             {selectedRecord ? <button type="button" onClick={() => void archiveRecord()} disabled={Boolean(busy)}>Archive</button> : null}
@@ -4801,6 +4922,21 @@ function DesignEditDrawer({
       {message || localMessage ? <p className="dashboard-gis-message">{busy ? `${busy}... ` : ""}{localMessage || message}</p> : null}
     </section>
   );
+}
+
+function designRecordWorkOrderNumber(record: DesignAssetRecord): string {
+  const value = (record.properties || record.properties_json || {}).latest_work_order_number;
+  return typeof value === "string" ? value : "";
+}
+
+function designRecordWorkOrderId(record: DesignAssetRecord): number | null {
+  const value = (record.properties || record.properties_json || {}).latest_work_order_id;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 function DesignFieldInput({ field, value, onChange }: { field: DesignAssetField; value: string; onChange: (value: string) => void }) {
@@ -5529,7 +5665,19 @@ function withDistributionNetworkLayerState(current: Record<StreetMapLayerKey, bo
   return next;
 }
 
-function strandContinuityLayerState(current: Record<StreetMapLayerKey, boolean>) {
+function shouldHideContinuityDevices(params: URLSearchParams) {
+  return isTruthyUrlParam(params.get("hideDevices"))
+    || isTruthyUrlParam(params.get("withoutDevices"))
+    || params.get("devices") === "0";
+}
+
+function isTruthyUrlParam(value: string | null) {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+}
+
+function strandContinuityLayerState(current: Record<StreetMapLayerKey, boolean>, options: StrandContinuityFocusOptions = {}) {
+  const includeDevices = options.includeDevices ?? true;
   const next = Object.fromEntries(
     (Object.keys(current) as StreetMapLayerKey[]).map((key) => [key, false]),
   ) as Record<StreetMapLayerKey, boolean>;
@@ -5541,8 +5689,9 @@ function strandContinuityLayerState(current: Record<StreetMapLayerKey, boolean>)
   next.spliceClosures = true;
   next.patchPanels = true;
   next.fiberAssignments = true;
-  next.telecomNodes = true;
-  next.selIconNodes = true;
+  next.telecomNodes = includeDevices;
+  next.selIconNodes = includeDevices;
+  next.c3794Nodes = includeDevices;
   return next;
 }
 
