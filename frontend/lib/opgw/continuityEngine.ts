@@ -301,6 +301,105 @@ export function resolveSelectedSplicePointIdForTrace(input: ContinuityTraceInput
   return undefined;
 }
 
+export function traceSpliceConnection(spliceConnectionId: string, data: FiberContinuityData): FiberContinuityPath | null {
+  const normalizedId = decodeURIComponent(spliceConnectionId);
+  const spliceConnection = data.fiberSplices.find((splice) => splice.id === normalizedId);
+  if (!spliceConnection) return null;
+
+  const selectedSplicePointId = resolveSelectedSplicePointIdForTrace({ spliceConnectionId: normalizedId }, data);
+  const spliceView = selectedSplicePointId ? buildSpliceManagerView(selectedSplicePointId, data) : null;
+  const connectedSectionIds = new Set(spliceView?.connectedCableSections.map((section) => section.cableSectionId) || []);
+  const connectedCableIds = new Set([spliceConnection.fromCableId, spliceConnection.toCableId]);
+  const localSections = data.opgwCableSections.filter((section) => {
+    if (!connectedSectionIds.has(section.properties.cableSectionId)) return false;
+    return routeCableIdsForSection(section, data.opgwCables).some((cableId) => connectedCableIds.has(cableId));
+  });
+  const fallbackSections = [...connectedCableIds].flatMap((cableId) => sectionsForCableId(cableId, data));
+  const sections = uniqueBy(localSections.length ? localSections : fallbackSections, (section) => section.properties.cableSectionId).slice(0, 6);
+  const spanSegmentsBySection = buildSpanSegmentsBySection(data.opgwSpanSegments);
+  const pathSpanSegments = sections.flatMap((section) => spanSegmentsBySection.get(section.properties.cableSectionId) || []);
+  const transmissionLines = new Set(sections.map((section) => section.properties.transmissionLineId).filter(Boolean));
+  const pathId = `TRACE-${normalizedId}`;
+  const segments: FiberContinuityPathSegment[] = [];
+
+  if (spliceView?.header.splicePointId) {
+    segments.push(makeSegment(pathId, segments.length + 1, "splice_point", spliceView.header.splicePointId, {
+      transmissionLineId: spliceView.header.transmissionLineId,
+      opgwRouteId: spliceView.header.opgwRouteId,
+      splicePointId: spliceView.header.splicePointId,
+      segmentStatus: "warning",
+      notes: `Closure ${spliceConnection.spliceClosureId}`,
+    }));
+  }
+
+  sections.forEach((section) => {
+    segments.push(makeSegment(pathId, segments.length + 1, "cable_section", section.properties.cableSectionId, {
+      transmissionLineId: section.properties.transmissionLineId,
+      opgwRouteId: section.properties.opgwRouteId,
+      cableSectionId: section.properties.cableSectionId,
+      segmentStatus: section.properties.installStatus === "proposed" ? "proposed" : section.properties.installStatus === "planned" ? "planned" : "existing",
+      estimatedLossDb: section.properties.routeMiles * 0.25,
+      notes: `${section.properties.fromStructureNumber} to ${section.properties.toStructureNumber}`,
+    }));
+  });
+
+  segments.push(makeSegment(pathId, segments.length + 1, "splice_connection", spliceConnection.id, {
+    spliceConnectionId: spliceConnection.id,
+    strandNumber: spliceConnection.fromStrandNumber,
+    segmentStatus: spliceConnection.status === "faulted"
+      ? "broken"
+      : spliceConnection.status === "proposed"
+        ? "proposed"
+        : spliceConnection.status === "planned"
+          ? "planned"
+          : spliceConnection.spliceType === "open" || spliceConnection.spliceType === "reserved"
+            ? "warning"
+            : "existing",
+    estimatedLossDb: spliceConnection.lossDb || 0,
+    notes: `${spliceConnection.fromCableId}/${spliceConnection.fromStrandNumber} to ${spliceConnection.toCableId}/${spliceConnection.toStrandNumber}`,
+  }));
+
+  const totalRouteMiles = sections.reduce((sum, section) => sum + section.properties.routeMiles, 0);
+  const totalEstimatedLossDb = Number((totalRouteMiles * 0.25 + (spliceConnection.lossDb || 0)).toFixed(3));
+  const pathStatus: FiberContinuityPath["pathStatus"] = spliceConnection.status === "faulted"
+    ? "broken"
+    : spliceConnection.status === "proposed" || spliceConnection.status === "planned"
+      ? "proposed"
+      : spliceConnection.spliceType === "open" || spliceConnection.spliceType === "reserved"
+        ? "warning"
+        : "complete";
+  const warningSummary = [
+    "This splice connection has no matched carried service; showing synthetic cable, strand, and closure continuity context instead.",
+    "Synthetic demo continuity only and not authoritative for operations.",
+  ];
+  if (spliceConnection.spliceType === "open") warningSummary.push("Connection type is open; end-to-end strand continuity may be incomplete until a planned splice is added.");
+  if (spliceConnection.status === "faulted") warningSummary.push("Connection status is faulted in the synthetic planning data.");
+
+  return {
+    continuityPathId: pathId,
+    serviceId: `SPLICE-CONNECTION-${spliceConnection.id}`,
+    assignmentId: spliceConnection.assignmentId,
+    layerType: spliceConnection.status === "proposed" || spliceConnection.status === "planned" ? "proposed" : "existing",
+    endpointASiteId: sections[0]?.properties.fromStructureNumber || spliceConnection.fromCableId,
+    endpointZSiteId: sections[sections.length - 1]?.properties.toStructureNumber || spliceConnection.toCableId,
+    pathStatus,
+    totalRouteMiles: Number(totalRouteMiles.toFixed(3)),
+    totalCableSections: sections.length,
+    totalTransmissionLines: transmissionLines.size,
+    totalSpanSegments: pathSpanSegments.length,
+    totalSplicePoints: spliceView?.header.splicePointId ? 1 : 0,
+    totalPatchPanels: 0,
+    totalEstimatedLossDb,
+    hasBrokenContinuity: pathStatus === "broken" || spliceConnection.spliceType === "open",
+    hasFaultedSection: spliceConnection.status === "faulted" || sections.some((section) => section.properties.installStatus === "faulted"),
+    hasProposedChanges: spliceConnection.status === "planned" || spliceConnection.status === "proposed",
+    syntheticFlag: true,
+    warningSummary,
+    segments,
+    notes: "Synthetic splice-connection trace generated without a carried service match.",
+  };
+}
+
 export function filterContinuityTraceServicesByLayer(services: SyntheticService[], layerType: ContinuityTraceLayerType | undefined) {
   if (!layerType || layerType === "compare") return services;
   if (layerType === "existing") return services.filter((service) => service.layerType === "existing");
@@ -320,6 +419,13 @@ function addServicesForTraceCableIds(cableIds: Set<string>, services: SyntheticS
   services
     .filter((service) => service.continuityCableIds?.some((cableId) => cableIds.has(cableId)))
     .forEach((service) => matched.set(service.serviceId, service));
+}
+
+function sectionsForCableId(cableId: string, data: FiberContinuityData) {
+  const cable = data.opgwCables.find((feature) => feature.properties.id === cableId);
+  if (!cable) return [];
+  const routeId = opgwRouteIdForCable(cable);
+  return data.opgwCableSections.filter((section) => section.properties.opgwRouteId === routeId);
 }
 
 export function traceSyntheticService(service: SyntheticService, data: FiberContinuityData, selectedSplicePointId?: string): FiberContinuityPath {
@@ -548,4 +654,14 @@ function makeSegment(
     segmentStatus: "existing",
     ...values,
   };
+}
+
+function uniqueBy<T>(values: T[], keyForValue: (value: T) => string) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = keyForValue(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

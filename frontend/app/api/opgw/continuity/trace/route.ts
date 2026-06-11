@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveContinuityTraceServices, resolveSelectedSplicePointIdForTrace, traceSyntheticService, type ContinuityTraceInput } from "@/lib/opgw/continuityEngine";
+import { resolveContinuityTraceServices, resolveSelectedSplicePointIdForTrace, traceSpliceConnection, traceSyntheticService, type ContinuityTraceInput } from "@/lib/opgw/continuityEngine";
 import { loadSyntheticFiberContinuityData } from "@/lib/opgw/staticSyntheticData";
 
 export async function POST(request: Request) {
@@ -17,6 +17,20 @@ export async function POST(request: Request) {
 
   const services = resolveContinuityTraceServices(body, data);
   if (!services.length) {
+    const fallbackPath = body.spliceConnectionId ? traceSpliceConnection(body.spliceConnectionId, data) : null;
+    if (fallbackPath) {
+      return NextResponse.json({
+        input: body,
+        layerType: fallbackPath.layerType,
+        syntheticFlag: true,
+        warning: "No carried service matched this splice connection. Returning synthetic cable, strand, and closure continuity context instead.",
+        serviceCount: 0,
+        pathCount: 1,
+        services: [],
+        paths: [fallbackPath],
+        summary: buildTraceSummary([fallbackPath]),
+      });
+    }
     return NextResponse.json({
       error: "No synthetic services matched the requested continuity trace input",
       acceptedInputs: ["serviceId", "assignmentId", "strandId", "cableSectionId", "spliceConnectionId", "splicePointId", "spliceClosureId", "layerType"],
@@ -42,15 +56,19 @@ export async function POST(request: Request) {
       operationalStatus: service.operationalStatus,
     })),
     paths,
-    summary: {
-      transmissionLines: unique(paths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId).filter(Boolean))).length,
-      cableSections: unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId))).length,
-      spanSegments: unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "span_segment").map((segment) => segment.objectId))).length,
-      splicePoints: unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "splice_point").map((segment) => segment.objectId))).length,
-      patchPanels: unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "patch_panel").map((segment) => segment.objectId))).length,
-      warnings: unique(paths.flatMap((path) => path.warningSummary)),
-    },
+    summary: buildTraceSummary(paths),
   });
+}
+
+function buildTraceSummary(paths: ReturnType<typeof traceSyntheticService>[]) {
+  return {
+    transmissionLines: unique(paths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId).filter(Boolean))).length,
+    cableSections: unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId))).length,
+    spanSegments: unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "span_segment").map((segment) => segment.objectId))).length,
+    splicePoints: unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "splice_point").map((segment) => segment.objectId))).length,
+    patchPanels: unique(paths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "patch_panel").map((segment) => segment.objectId))).length,
+    warnings: unique(paths.flatMap((path) => path.warningSummary)),
+  };
 }
 
 function unique<T>(values: T[]) {

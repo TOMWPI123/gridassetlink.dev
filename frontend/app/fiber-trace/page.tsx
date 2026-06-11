@@ -7,6 +7,7 @@ import {
   buildSpliceManagerView,
   resolveContinuityTraceServices,
   resolveSelectedSplicePointIdForTrace,
+  traceSpliceConnection,
   traceSyntheticService,
   type ContinuityTraceInput,
   type ContinuityTraceLayerType,
@@ -100,7 +101,35 @@ export default async function Page({ searchParams }: PageProps) {
 
   if (assignmentId || strandId || cableSectionId || spliceConnectionId) {
     const services = resolveContinuityTraceServices(genericTraceInput, data);
-    if (!services.length) notFound();
+    const spliceConnectionFallbackPath = spliceConnectionId ? traceSpliceConnection(spliceConnectionId, data) : null;
+    if (!services.length && !spliceConnectionFallbackPath) notFound();
+    if (!services.length && spliceConnectionFallbackPath && spliceConnectionId) {
+      const connection = data.fiberSplices.find((splice) => splice.id === decodeURIComponent(spliceConnectionId));
+      const selectedSplicePointId = resolveSelectedSplicePointIdForTrace(genericTraceInput, data);
+      return (
+        <OpgwFiberTraceView
+          title={`Fiber Continuity for splice connection ${spliceConnectionId}`}
+          subtitle="No carried service matched this splice row; showing cable and strand continuity context"
+          services={[]}
+          paths={[spliceConnectionFallbackPath]}
+          warnings={spliceConnectionFallbackPath.warningSummary}
+          contextRows={[
+            ["Trace input", "Splice connection"],
+            ["Connection", spliceConnectionId],
+            ["Closure", connection?.spliceClosureId || "-"],
+            ["From cable", connection ? `${connection.fromCableId} / strand ${connection.fromStrandNumber}` : "-"],
+            ["To cable", connection ? `${connection.toCableId} / strand ${connection.toStrandNumber}` : "-"],
+            ["Splice type", connection?.spliceType.replaceAll("_", " ") || "-"],
+            ["Status", connection?.status || "-"],
+            ["Matched services", "0"],
+          ]}
+          mapHref={selectedSplicePointId
+            ? `/dashboard?drawer=layers&splicePoint=${encodeURIComponent(selectedSplicePointId)}&spliceConnection=${encodeURIComponent(spliceConnectionId)}`
+            : `/dashboard?drawer=layers&spliceConnection=${encodeURIComponent(spliceConnectionId)}`}
+          managerHref={selectedSplicePointId ? `/opgw/splices/${encodeURIComponent(selectedSplicePointId)}` : undefined}
+        />
+      );
+    }
     const selectedSplicePointId = resolveSelectedSplicePointIdForTrace(genericTraceInput, data);
     const paths = services.map((service) => traceSyntheticService(service, data, selectedSplicePointId));
     const targetLabel = assignmentId
@@ -372,7 +401,7 @@ function OpgwFiberTraceView({
           <section className="splice-manager-panel">
             <div className="splice-manager-panel-title"><strong>Services Carried</strong></div>
             <div className="service-carried-list">
-              {services.map((service) => (
+              {services.length ? services.map((service) => (
                 <article key={service.serviceId}>
                   <strong>{service.serviceId}</strong>
                   <span>{service.serviceName}</span>
@@ -383,7 +412,7 @@ function OpgwFiberTraceView({
                     <Badge value={service.layerType} />
                   </div>
                 </article>
-              ))}
+              )) : <p className="subtle">No synthetic services are attached to this trace input. Cable, splice, and strand context is still shown for planning review.</p>}
             </div>
           </section>
         </div>
