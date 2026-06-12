@@ -116,8 +116,9 @@ a { color: inherit; text-decoration: none; }
 .module-layer-panel { margin-bottom: 16px; }
 .module-layer-body { display: grid; gap: 12px; }
 .module-layer-note { padding: 10px 12px; border: 1px solid rgba(183,121,31,.22); border-radius: 8px; background: #fff8e6; color: #6f4a10; font-size: 12px; line-height: 1.45; }
-.module-layer-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 10px; }
-.module-layer-card { display: grid; align-content: start; gap: 6px; min-height: 126px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fbfd; }
+.module-loading-strip { margin-bottom: 12px; border: 1px solid #b7d7ff; border-radius: 8px; background: #eff6ff; color: #1d4f91; padding: 9px 11px; font-size: 12px; font-weight: 820; }
+.module-layer-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 10px; content-visibility: auto; contain-intrinsic-size: 320px; }
+.module-layer-card { display: grid; align-content: start; gap: 6px; min-height: 126px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fbfd; contain: content; }
 .module-layer-card span { color: var(--muted); font-size: 10px; font-weight: 820; text-transform: uppercase; }
 .module-layer-card strong { color: #0b4f52; font-size: 24px; line-height: 1; }
 .module-layer-card small { color: #34495c; font-size: 12px; line-height: 1.35; }
@@ -1222,7 +1223,7 @@ a { color: inherit; text-decoration: none; }
 
 .input, .select, .textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--foreground); padding: 9px 10px; font-size: 13px; }
 .textarea { min-height: 96px; resize: vertical; }
-.table-wrap { overflow: auto; }
+.table-wrap { overflow: auto; content-visibility: auto; contain-intrinsic-size: 540px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
 th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercase; background: #f7fafc; cursor: pointer; }

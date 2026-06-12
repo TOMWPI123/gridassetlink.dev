@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { apiDownload, apiFetch, canWrite, formatLabel } from "@/lib/api";
 import { loadModuleLayerData, type ModuleLayerData } from "@/lib/moduleLayerData";
 import type { EntityConfig, JsonRecord } from "@/types";
@@ -9,70 +9,151 @@ import { DataTable } from "@/components/DataTable";
 import { OpgwCableMenu } from "@/components/OpgwCableMenu";
 import { SubstationFiberSection } from "@/components/SubstationFiberSection";
 
+type LayerCacheResult = ModuleLayerData | null;
+
+const moduleLayerDataCache = new Map<string, LayerCacheResult>();
+const moduleLayerDataPromiseCache = new Map<string, Promise<LayerCacheResult>>();
+
 export function EntityListPage({ config }: { config?: EntityConfig }) {
   if (!config) return <div className="panel panel-body">Unsupported entity view.</div>;
   return <ConfiguredEntityListPage config={config} />;
 }
 
 function ConfiguredEntityListPage({ config }: { config: EntityConfig }) {
-  const [rows, setRows] = useState<JsonRecord[]>([]);
+  const [backendRows, setBackendRows] = useState<JsonRecord[]>([]);
+  const [layerRows, setLayerRows] = useState<JsonRecord[]>([]);
   const [moduleLayerData, setModuleLayerData] = useState<ModuleLayerData | null>(null);
-  const [busy, setBusy] = useState(true);
+  const [isBackendLoading, setIsBackendLoading] = useState(true);
+  const [isLayerLoading, setIsLayerLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
+  const [initialWaitExpired, setInitialWaitExpired] = useState(false);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [showOpgwTable, setShowOpgwTable] = useState(config.key !== "opgw");
   const loadIdRef = useRef(0);
+  const idleCancelRef = useRef<() => void>(() => undefined);
   const writable = canWrite() && !["users", "audit-logs"].includes(config.key);
+  const rows = useMemo(() => (backendRows.length ? [...backendRows, ...layerRows] : layerRows), [backendRows, layerRows]);
   const visibleRows = useMemo(() => rows.filter((row) => matchesStaticFilter(config.key, row)), [config.key, rows]);
   const load = useCallback(async () => {
     const loadId = loadIdRef.current + 1;
     loadIdRef.current = loadId;
-    setBusy(true);
+    idleCancelRef.current();
+    idleCancelRef.current = () => undefined;
     setError("");
-    setModuleLayerData(null);
-    setRows([]);
-    const backendPromise = apiFetch<JsonRecord[]>(config.endpoint)
-      .then((value) => ({ rows: normalizeBackendRows(value) }))
-      .catch((reason) => ({ error: reason }));
-    const layerResult = await loadModuleLayerData(config.key)
-      .then((value) => ({ data: value }))
-      .catch((reason) => ({ error: reason }));
-    if (loadId !== loadIdRef.current) return;
-    const layerData = "data" in layerResult ? layerResult.data : null;
-    const layerRows = layerData?.rows || [];
-    if (layerData) {
-      setModuleLayerData(layerData);
-      setRows(layerRows);
-      setBusy(false);
+    setInitialWaitExpired(false);
+    setIsBackendLoading(true);
+    setIsLayerLoading(true);
+
+    const cachedLayerData = moduleLayerDataCache.has(config.key) ? moduleLayerDataCache.get(config.key) ?? null : undefined;
+    if (cachedLayerData !== undefined) {
+      startTransition(() => {
+        setModuleLayerData(cachedLayerData);
+        setLayerRows(cachedLayerData?.rows || []);
+      });
+      setIsLayerLoading(false);
+    } else {
+      startTransition(() => {
+        setModuleLayerData(null);
+        setLayerRows([]);
+      });
+      idleCancelRef.current = scheduleModuleIdleWork(() => {
+        void loadCachedModuleLayerData(config.key)
+          .then((layerData) => {
+            if (loadId !== loadIdRef.current) return;
+            startTransition(() => {
+              setModuleLayerData(layerData);
+              setLayerRows(layerData?.rows || []);
+            });
+          })
+          .catch((reason) => {
+            if (loadId !== loadIdRef.current) return;
+            setError(reason instanceof Error ? reason.message : "Could not load layer data");
+          })
+          .finally(() => {
+            if (loadId === loadIdRef.current) setIsLayerLoading(false);
+          });
+      });
     }
-    const backendResult = await backendPromise;
-    if (loadId !== loadIdRef.current) return;
-    if ("rows" in backendResult) {
-      setRows([...backendResult.rows, ...layerRows]);
-    } else if (!layerRows.length) {
-      setError(backendResult.error instanceof Error ? backendResult.error.message : "Could not load data");
+
+    try {
+      const backendResult = await apiFetch<JsonRecord[]>(config.endpoint);
+      if (loadId !== loadIdRef.current) return;
+      const normalizedRows = normalizeBackendRows(backendResult);
+      startTransition(() => setBackendRows(normalizedRows));
+    } catch (reason) {
+      if (loadId !== loadIdRef.current) return;
+      if (!moduleLayerDataCache.get(config.key)?.rows.length) {
+        setError(reason instanceof Error ? reason.message : "Could not load data");
+      }
+    } finally {
+      if (loadId === loadIdRef.current) setIsBackendLoading(false);
     }
-    if (!layerData && "error" in layerResult) {
-      setError(layerResult.error instanceof Error ? layerResult.error.message : "Could not load layer data");
-    }
-    setBusy(false);
   }, [config.endpoint, config.key]);
   useEffect(() => {
     setShowOpgwTable(config.key !== "opgw");
   }, [config.key]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => {
+      loadIdRef.current += 1;
+      idleCancelRef.current();
+    };
+  }, [load]);
+  useEffect(() => {
+    if (rows.length || (!isBackendLoading && !isLayerLoading)) return;
+    const handle = window.setTimeout(() => setInitialWaitExpired(true), 850);
+    return () => window.clearTimeout(handle);
+  }, [isBackendLoading, isLayerLoading, rows.length]);
   const exportRows = () => moduleLayerData ? downloadRowsAsCsv(visibleRows, `${config.key}.csv`) : apiDownload(`/api/export/${config.endpoint.replace("/api/", "")}`, `${config.key}.csv`);
+  const loadingInBackground = isBackendLoading || isLayerLoading || isPending;
+  const busy = !rows.length && !initialWaitExpired && loadingInBackground;
+  const refreshing = rows.length > 0 && (isBackendLoading || isLayerLoading || isPending);
   return (
     <>
       <div className="page-header"><div><h1 className="eyebrowless-title">{config.title}</h1><div className="subtle">{config.description}</div></div><div className="toolbar"><button className="icon-button" onClick={load} title="Refresh"><RefreshCw size={16} /></button>{writable ? <button className="button primary" onClick={() => setShowCreate(!showCreate)}><Plus size={16} />Create</button> : null}</div></div>
       {showCreate && writable ? <QuickCreate config={config} onCreated={load} /> : null}
       {error ? <div className="badge red">{error}</div> : null}
-      {moduleLayerData ? <ModuleLayerSummary data={moduleLayerData} backendCount={rows.length - moduleLayerData.rows.length} totalCount={visibleRows.length} /> : null}
+      {refreshing ? <div className="module-loading-strip">Refreshing module data without clearing the current view...</div> : null}
+      {!rows.length && initialWaitExpired && loadingInBackground ? <div className="module-loading-strip">Loading layer-backed records in the background. Module controls remain available.</div> : null}
+      {moduleLayerData ? <ModuleLayerSummary data={moduleLayerData} backendCount={backendRows.length} totalCount={visibleRows.length} /> : null}
       {config.key === "substations" && !busy ? <SubstationFiberSection rows={visibleRows} /> : null}
       {config.key === "opgw" && !busy ? <OpgwCableMenu rows={visibleRows} /> : null}
       {busy ? <div className="panel panel-body">Loading {config.title.toLowerCase()}...</div> : config.key === "opgw" && !showOpgwTable ? <DeferredOpgwTablePrompt rows={visibleRows} onShow={() => setShowOpgwTable(true)} /> : <DataTable rows={visibleRows} columns={config.columns} detailBase={moduleLayerData?.disableDetailLinks ? undefined : detailBaseFor(config.key, config.detailBase)} filterField={config.filterField} onExport={exportRows} />}
     </>
   );
+}
+
+function loadCachedModuleLayerData(key: string): Promise<LayerCacheResult> {
+  if (moduleLayerDataCache.has(key)) return Promise.resolve(moduleLayerDataCache.get(key) ?? null);
+  const pending = moduleLayerDataPromiseCache.get(key);
+  if (pending) return pending;
+  const promise = loadModuleLayerData(key)
+    .then((data) => {
+      moduleLayerDataCache.set(key, data);
+      moduleLayerDataPromiseCache.delete(key);
+      return data;
+    })
+    .catch((reason) => {
+      moduleLayerDataPromiseCache.delete(key);
+      throw reason;
+    });
+  moduleLayerDataPromiseCache.set(key, promise);
+  return promise;
+}
+
+function scheduleModuleIdleWork(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  const win = window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
+  if (win.requestIdleCallback && win.cancelIdleCallback) {
+    const handle = win.requestIdleCallback(callback, { timeout: 500 });
+    return () => win.cancelIdleCallback?.(handle);
+  }
+  const handle = window.setTimeout(callback, 80);
+  return () => window.clearTimeout(handle);
 }
 
 function DeferredOpgwTablePrompt({ rows, onShow }: { rows: JsonRecord[]; onShow: () => void }) {
