@@ -1,2 +1,2 @@
-import { SQLReportsPage } from "@/components/UtilityPages";
-export default function Page() { return <SQLReportsPage />; }
+import { SavedReportsPage } from "@/components/UtilityPages";
+export default function Page() { return <SavedReportsPage />; }

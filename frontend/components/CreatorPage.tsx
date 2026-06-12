@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Copy, Database, FileSpreadsheet, Hammer, Layers, PackageCheck, RefreshCw, Save, Search, ShieldCheck, Sparkles, WandSparkles } from "lucide-react";
+import { AlertTriangle, Cable, CheckCircle2, ClipboardCheck, Copy, Database, FileSpreadsheet, Hammer, Layers, MapPin, Network, PackageCheck, PlusCircle, RefreshCw, Route, Save, Search, ShieldCheck, Sparkles, Workflow, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/Badges";
 import { apiFetch, canWrite, displayValue, formatLabel } from "@/lib/api";
@@ -18,25 +18,33 @@ import type {
   DesignModuleBlueprint,
 } from "@/lib/types/assets";
 
-type CreatorTab = "templates" | "wizard" | "import" | "bulk" | "duplicate" | "validate" | "materialize";
+type CreatorTab = "start" | "templates" | "splice" | "wizard" | "import" | "records" | "validate" | "materialize";
 type ImportFormat = "csv" | "json" | "geojson";
+type SpliceRecipeKey = "new_closure" | "straight_through" | "branch_tap" | "resplice";
 type CreatorMessage = { tone: "success" | "warning" | "error" | "info"; text: string };
 type ImportRow = { properties: Record<string, unknown>; geometry?: DesignAssetGeoJsonGeometry | null; sourceIndex: number };
 type ImportPreview = { format: ImportFormat; headers: string[]; rows: ImportRow[] };
 type ValidationFinding = { severity: "pass" | "warning" | "error"; message: string };
 
 const CREATOR_NOTICE = "Creator records are synthetic/demo planning records only. Do not enter CEII, SCADA secrets, relay/protection settings, credentials, operational telecom routes, or private fiber-route data.";
-const tabs: Array<{ key: CreatorTab; label: string; Icon: typeof Sparkles }> = [
-  { key: "templates", label: "Templates", Icon: Sparkles },
-  { key: "wizard", label: "Service Wizard", Icon: WandSparkles },
-  { key: "import", label: "Import", Icon: FileSpreadsheet },
-  { key: "bulk", label: "Bulk Edit", Icon: Layers },
-  { key: "duplicate", label: "Duplicate", Icon: Copy },
-  { key: "validate", label: "Validate", Icon: ShieldCheck },
-  { key: "materialize", label: "Materialize", Icon: PackageCheck },
+const tabs: Array<{ key: CreatorTab; label: string; description: string; Icon: LucideIcon }> = [
+  { key: "start", label: "Start Here", description: "Choose a button-driven workflow", Icon: Sparkles },
+  { key: "templates", label: "Add Object", description: "Create one database item", Icon: PlusCircle },
+  { key: "splice", label: "Splicing", description: "Add or redo splice records", Icon: Cable },
+  { key: "wizard", label: "Service Path", description: "Circuit plus fiber assignment", Icon: Route },
+  { key: "import", label: "Import Objects", description: "Map file fields in the UI", Icon: FileSpreadsheet },
+  { key: "records", label: "Edit Records", description: "Search, duplicate, or edit selected records", Icon: Layers },
+  { key: "validate", label: "Review", description: "Check drafts before publish", Icon: ShieldCheck },
+  { key: "materialize", label: "Publish", description: "Send reviewed records to modules", Icon: PackageCheck },
 ];
 
 const recordStatuses: DesignAssetRecord["status"][] = ["proposed", "planned", "in_review", "active", "as_built", "archived"];
+const spliceRecipes: Array<{ key: SpliceRecipeKey; title: string; description: string; spliceType: string; closureType: string; Icon: LucideIcon }> = [
+  { key: "new_closure", title: "Add splice closure", description: "Create the splice point/closure first, then add splice rows later.", spliceType: "open", closureType: "aerial_opgw_splice", Icon: PlusCircle },
+  { key: "straight_through", title: "Straight-through splice", description: "Connect an incoming strand to the matching outgoing strand.", spliceType: "straight_through", closureType: "aerial_opgw_splice", Icon: Workflow },
+  { key: "branch_tap", title: "Branch or tap splice", description: "Create a proposed branch row for a tap, lateral, or service feed.", spliceType: "branch", closureType: "tap_splice", Icon: Network },
+  { key: "resplice", title: "Redo splicing", description: "Stage a proposed resplice without overwriting existing continuity.", spliceType: "straight_through", closureType: "transition_splice", Icon: Cable },
+];
 const wizardDefaults = {
   serviceId: "DESIGN-SVC-001",
   circuitId: "DESIGN-CKT-001",
@@ -49,10 +57,24 @@ const wizardDefaults = {
   spliceIds: "DESIGN-SPLICE-001-F001",
   status: "planned",
 };
+const spliceDefaults = {
+  splicePointId: "DESIGN-SPLICE-001",
+  closureType: "aerial_opgw_splice",
+  structureRef: "DESIGN-POLE-001",
+  connectedCableIds: "DESIGN-OPGW-001, DESIGN-OPGW-002",
+  incomingCableRef: "DESIGN-OPGW-001",
+  incomingStrandNumber: "1",
+  outgoingCableRef: "DESIGN-OPGW-002",
+  outgoingStrandNumber: "1",
+  spliceType: "straight_through",
+  lossDb: "0.04",
+  status: "planned",
+  notes: "Synthetic planned splice created from Creator.",
+};
 
 export function CreatorPage() {
   const writable = canWrite();
-  const [activeTab, setActiveTab] = useState<CreatorTab>("templates");
+  const [activeTab, setActiveTab] = useState<CreatorTab>("start");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<CreatorMessage | null>(null);
   const [mapPayload, setMapPayload] = useState<DesignAssetMapPayload | null>(null);
@@ -63,6 +85,8 @@ export function CreatorPage() {
   const [toolProperties, setToolProperties] = useState<Record<string, unknown>>({});
   const [toolMaterialize, setToolMaterialize] = useState(false);
   const [wizard, setWizard] = useState(wizardDefaults);
+  const [spliceRecipe, setSpliceRecipe] = useState<SpliceRecipeKey>("straight_through");
+  const [spliceDraft, setSpliceDraft] = useState(spliceDefaults);
   const [importText, setImportText] = useState("");
   const [importFormat, setImportFormat] = useState<ImportFormat>("csv");
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
@@ -100,7 +124,8 @@ export function CreatorPage() {
   useEffect(() => {
     const workflow = typeof window !== "undefined" ? window.location.search : "";
     const tab = new URLSearchParams(workflow).get("workflow");
-    if (isCreatorTab(tab)) setActiveTab(tab);
+    const nextTab = normalizeCreatorTab(tab);
+    if (nextTab) setActiveTab(nextTab);
   }, []);
 
   useEffect(() => {
@@ -200,6 +225,90 @@ export function CreatorPage() {
     }
   }
 
+  function openTab(tab: CreatorTab) {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `/creator?workflow=${tab}`);
+    }
+  }
+
+  function chooseTool(toolKey: string, overrides: Record<string, unknown> = {}) {
+    const tool = tools.find((item) => item.tool_key === toolKey);
+    if (!tool) {
+      setMessage({ tone: "warning", text: "That creation tool is still loading. Try Refresh if it does not appear." });
+      return;
+    }
+    setSelectedToolKey(tool.tool_key);
+    setToolProperties({ ...(tool.example_properties || {}), ...overrides });
+    setToolMaterialize(false);
+    openTab("templates");
+  }
+
+  function chooseSpliceRecipe(recipeKey: SpliceRecipeKey) {
+    const recipe = spliceRecipes.find((item) => item.key === recipeKey) || spliceRecipes[1];
+    setSpliceRecipe(recipe.key);
+    setSpliceDraft((current) => ({
+      ...current,
+      closureType: recipe.closureType,
+      spliceType: recipe.spliceType,
+      status: recipe.key === "resplice" ? "proposed" : current.status,
+      notes: recipe.key === "resplice"
+        ? "Synthetic proposed resplice. Existing rows stay unchanged until reviewed."
+        : current.notes,
+    }));
+    openTab("splice");
+  }
+
+  async function runSpliceWorkflow() {
+    try {
+      const spliceTool = tools.find((tool) => tool.tool_key === "create-splice");
+      const fiberSpliceTool = tools.find((tool) => tool.tool_key === "create-fiber-splice");
+      if (!spliceTool) throw new Error("The splice creation tool is not installed yet.");
+      const connectedCableIds = splitList(spliceDraft.connectedCableIds);
+      const spliceResult = await apiFetch<DesignAgentToolRunResult>(spliceTool.endpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          properties: {
+            splice_point_id: spliceDraft.splicePointId,
+            closure_type: spliceDraft.closureType,
+            structure_ref: spliceDraft.structureRef,
+            connected_cable_ids: connectedCableIds,
+            status: spliceDraft.status,
+            notes: spliceDraft.notes,
+          },
+          materialize: false,
+        }),
+      });
+      let fiberSpliceResult: DesignAgentToolRunResult | null = null;
+      if (spliceRecipe !== "new_closure") {
+        if (!fiberSpliceTool) throw new Error("The fiber splice row tool is not installed yet.");
+        fiberSpliceResult = await apiFetch<DesignAgentToolRunResult>(fiberSpliceTool.endpoint, {
+          method: "POST",
+          body: JSON.stringify({
+            properties: {
+              splice_key: `${spliceDraft.splicePointId}-F${spliceDraft.incomingStrandNumber}`,
+              splice_closure_ref: spliceDraft.splicePointId,
+              incoming_cable_ref: spliceDraft.incomingCableRef,
+              incoming_strand_number: Number(spliceDraft.incomingStrandNumber),
+              outgoing_cable_ref: spliceDraft.outgoingCableRef,
+              outgoing_strand_number: Number(spliceDraft.outgoingStrandNumber),
+              splice_type: spliceDraft.spliceType,
+              loss_db: Number(spliceDraft.lossDb),
+              status: spliceDraft.status,
+              notes: spliceDraft.notes,
+            },
+            materialize: false,
+          }),
+        });
+      }
+      setLastResult({ splicePoint: spliceResult, spliceRow: fiberSpliceResult });
+      setMessage({ tone: "success", text: fiberSpliceResult ? `Created ${spliceDraft.splicePointId} and a proposed splice row.` : `Created ${spliceDraft.splicePointId}. Add splice rows when ready.` });
+      await refresh();
+    } catch (error) {
+      setMessage({ tone: "error", text: readableError(error) });
+    }
+  }
+
   function parseImport() {
     try {
       const preview = parseImportText(importText, importFormat);
@@ -233,7 +342,7 @@ export function CreatorPage() {
           body: JSON.stringify({
             status: bulkStatus,
             visibility: bulkVisibility,
-            notes: bulkNotes || record.notes || "Updated through Creator bulk edit.",
+            notes: bulkNotes || record.notes || "Updated through Creator selected edit.",
           }),
         })
       ));
@@ -282,7 +391,7 @@ export function CreatorPage() {
         body: JSON.stringify({ record_ids: selectedRecordIds, mode: materializeMode }),
       });
       setLastResult(result);
-      setMessage({ tone: result.error_count ? "warning" : "success", text: `Materialized ${result.materialized_count}; ${result.error_count} errors.` });
+      setMessage({ tone: result.error_count ? "warning" : "success", text: `Published ${result.materialized_count} selected records; ${result.error_count} errors.` });
       await refresh();
     } catch (error) {
       setMessage({ tone: "error", text: readableError(error) });
@@ -293,7 +402,7 @@ export function CreatorPage() {
     try {
       const result = await apiFetch<DesignBlueprintInstallResult>(`/api/design-assets/module-blueprints/${key}/install`, { method: "POST", body: JSON.stringify({}) });
       setLastResult(result);
-      setMessage({ tone: "success", text: `Installed ${result.installed_asset_type_slugs.length} Creator schemas.` });
+      setMessage({ tone: "success", text: `Installed ${result.installed_asset_type_slugs.length} Creator object packages.` });
       await refresh();
     } catch (error) {
       setMessage({ tone: "error", text: readableError(error) });
@@ -308,13 +417,13 @@ export function CreatorPage() {
     <div className="creator-page">
       <section className="creator-header panel">
         <div>
-          <span className="eyebrow"><WandSparkles size={14} />Creator</span>
-          <h1>Build database records without writing SQL</h1>
-          <p>Create assets, circuits, fiber assignments, imports, and editable design records through guided synthetic/demo workflows.</p>
+          <h1>Creator</h1>
+          <p>Build database objects, fiber records, splicing changes, services, imports, and work-ready design records with guided buttons and forms.</p>
         </div>
         <div className="creator-header-actions">
           <button className="button" type="button" onClick={refresh}><RefreshCw size={14} />Refresh</button>
-          <Link className="button secondary" href="/admin/database"><Database size={14} />Advanced Admin</Link>
+          <Link className="button secondary" href="/dashboard?drawer=design"><MapPin size={14} />Map Design</Link>
+          <Link className="button secondary" href="/admin/database"><Database size={14} />Backend Modules</Link>
         </div>
       </section>
 
@@ -336,22 +445,51 @@ export function CreatorPage() {
             <span>{loading ? "Loading..." : `${records.length.toLocaleString()} records`}</span>
           </div>
           {tabs.map(({ key, label, Icon }) => (
-            <a
+            <button
+              type="button"
               key={key}
               data-testid={`creator-tab-${key}`}
               aria-pressed={activeTab === key}
-              href={`/creator?workflow=${key}`}
+              onClick={() => openTab(key)}
               className={activeTab === key ? "active" : ""}
             >
               <Icon size={15} />
               <span>{label}</span>
-            </a>
+            </button>
           ))}
         </aside>
 
         <main className="creator-main">
+          {activeTab === "start" ? (
+            <CreatorSection title="What do you want to add or change?" icon={<Sparkles size={18} />} description="Choose a task. Creator will open the right form, prefill safe synthetic/demo fields, and keep public reference data read-only.">
+              <div className="creator-launch-grid">
+                <CreatorActionCard Icon={MapPin} title="Add pole or support" description="Insert a synthetic support structure into a pole line or planned fiber route." action="Add Pole" onClick={() => chooseTool("create-pole")} />
+                <CreatorActionCard Icon={Cable} title="Insert fiber span" description="Add OPGW, ADSS, or distribution fiber between splice points or supports." action="Add Fiber Span" onClick={() => chooseTool("create-fiber-span")} />
+                <CreatorActionCard Icon={Workflow} title="Redo splicing" description="Stage a closure, straight-through splice, branch/tap, or resplice workflow." action="Open Splicing" onClick={() => chooseSpliceRecipe("resplice")} strong />
+                <CreatorActionCard Icon={Database} title="Add any database object" description="Create a custom object type for inventory, planning, notes, or records that do not belong on the map." action="Add Object" onClick={() => chooseTool("create-database-object")} />
+                <CreatorActionCard Icon={Network} title="Add device or port" description="Create telecom devices, SEL ICON placeholders, ports, and physical labels." action="Add Device" onClick={() => chooseTool("create-device")} />
+                <CreatorActionCard Icon={Route} title="Assign a service" description="Create a circuit draft plus linked fiber assignment, strands, and splice references." action="Build Service" onClick={() => openTab("wizard")} />
+                <CreatorActionCard Icon={FileSpreadsheet} title="Import objects" description="Paste a CSV, JSON, or GeoJSON file and map fields in the browser." action="Open Import" onClick={() => openTab("import")} />
+                <CreatorActionCard Icon={ClipboardCheck} title="Review and publish" description="Check required fields, duplicate keys, safety labels, and publish reviewed records to modules." action="Review Drafts" onClick={() => openTab("validate")} />
+              </div>
+              <div className="creator-status-grid">
+                <MetricTile label="Design records" value={records.length} detail="Living synthetic/demo records currently loaded." />
+                <MetricTile label="Object types" value={assetTypes.length} detail="Database object definitions available to Creator." />
+                <MetricTile label="Creation tools" value={tools.length} detail="Button actions connected to the backend demo API." />
+                <MetricTile label="Module packages" value={blueprints.length} detail="Reusable object sets that can be installed from the UI." />
+              </div>
+            </CreatorSection>
+          ) : null}
+
           {activeTab === "templates" ? (
-            <CreatorSection title="Create From Template" icon={<Sparkles size={18} />} description="Pick an object template, edit the minimum fields, then save a living design record. Materialize only after review.">
+            <CreatorSection title="Add One Database Object" icon={<PlusCircle size={18} />} description="Pick what you want to create, edit the fields, then save a living design record. Use the publish checkbox only when the record is reviewed.">
+              <div className="creator-helper-strip">
+                <button type="button" onClick={() => chooseTool("create-pole")}><MapPin size={14} />Pole</button>
+                <button type="button" onClick={() => chooseTool("create-fiber-span")}><Cable size={14} />Fiber span</button>
+                <button type="button" onClick={() => chooseTool("create-patch-panel")}><Network size={14} />Patch panel</button>
+                <button type="button" onClick={() => chooseTool("create-device")}><Database size={14} />Device</button>
+                <button type="button" onClick={() => chooseTool("create-database-object")}><PlusCircle size={14} />Any object</button>
+              </div>
               <div className="creator-template-layout">
                 <div className="creator-template-list">
                   {tools.map((tool) => (
@@ -361,7 +499,7 @@ export function CreatorPage() {
                       setToolMaterialize(false);
                     }}>
                       <strong>{tool.label}</strong>
-                      <span>{tool.backend_entity || "design record only"} / {tool.geometry_type}</span>
+                      <span>{moduleLabelForTool(tool)} / {formatGeometryLabel(tool.geometry_type)}</span>
                     </button>
                   ))}
                 </div>
@@ -373,18 +511,65 @@ export function CreatorPage() {
                       <DynamicPropertyForm properties={toolProperties} required={selectedTool.required_properties} onChange={setToolProperties} />
                       <label className="creator-check">
                         <input type="checkbox" checked={toolMaterialize} disabled={!selectedTool.supports_materialize} onChange={(event) => setToolMaterialize(event.currentTarget.checked)} />
-                        <span>Materialize into {selectedTool.backend_entity || "module table"} after save</span>
+                        <span>Also publish into {selectedTool.backend_entity || "the matching module"} after save</span>
                       </label>
-                      <button className="button" type="button" disabled={!writable} onClick={runSelectedTool}><Save size={14} />Create Record</button>
+                      <button className="button" type="button" disabled={!writable} onClick={runSelectedTool}><Save size={14} />Save Record</button>
                     </>
-                  ) : <p>No templates loaded.</p>}
+                  ) : <p>No creation tools loaded yet. Use Refresh to reconnect Creator actions.</p>}
                 </div>
               </div>
             </CreatorSection>
           ) : null}
 
+          {activeTab === "splice" ? (
+            <CreatorSection title="Splicing Builder" icon={<Cable size={18} />} description="Create a splice point and optional splice row from one UI. Use this to stage new closures, straight-through splices, branch/tap work, or resplice designs.">
+              <div className="creator-splice-recipes">
+                {spliceRecipes.map(({ key, title, description, Icon }) => (
+                  <button key={key} type="button" className={spliceRecipe === key ? "active" : ""} onClick={() => chooseSpliceRecipe(key)}>
+                    <Icon size={17} />
+                    <strong>{title}</strong>
+                    <span>{description}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="creator-splice-layout">
+                <div className="creator-card">
+                  <h3>Splice point / closure</h3>
+                  <div className="creator-form-grid">
+                    <CreatorInput label="Splice point ID" value={spliceDraft.splicePointId} onChange={(value) => setSpliceDraft((current) => ({ ...current, splicePointId: value }))} />
+                    <CreatorInput label="Closure type" value={spliceDraft.closureType} onChange={(value) => setSpliceDraft((current) => ({ ...current, closureType: value }))} />
+                    <CreatorInput label="Structure or pole reference" value={spliceDraft.structureRef} onChange={(value) => setSpliceDraft((current) => ({ ...current, structureRef: value }))} />
+                    <CreatorInput label="Connected cable IDs" value={spliceDraft.connectedCableIds} onChange={(value) => setSpliceDraft((current) => ({ ...current, connectedCableIds: value }))} />
+                  </div>
+                </div>
+                <div className="creator-card">
+                  <h3>{spliceRecipe === "new_closure" ? "Optional splice row" : "Splice row"}</h3>
+                  <div className="creator-form-grid">
+                    <CreatorInput label="Incoming cable" value={spliceDraft.incomingCableRef} onChange={(value) => setSpliceDraft((current) => ({ ...current, incomingCableRef: value }))} />
+                    <CreatorInput label="Incoming strand" value={spliceDraft.incomingStrandNumber} onChange={(value) => setSpliceDraft((current) => ({ ...current, incomingStrandNumber: value }))} />
+                    <CreatorInput label="Outgoing cable" value={spliceDraft.outgoingCableRef} onChange={(value) => setSpliceDraft((current) => ({ ...current, outgoingCableRef: value }))} />
+                    <CreatorInput label="Outgoing strand" value={spliceDraft.outgoingStrandNumber} onChange={(value) => setSpliceDraft((current) => ({ ...current, outgoingStrandNumber: value }))} />
+                    <CreatorInput label="Splice type" value={spliceDraft.spliceType} onChange={(value) => setSpliceDraft((current) => ({ ...current, spliceType: value }))} />
+                    <CreatorInput label="Loss dB" value={spliceDraft.lossDb} onChange={(value) => setSpliceDraft((current) => ({ ...current, lossDb: value }))} />
+                    <CreatorInput label="Status" value={spliceDraft.status} onChange={(value) => setSpliceDraft((current) => ({ ...current, status: value }))} />
+                    <CreatorInput label="Notes" value={spliceDraft.notes} onChange={(value) => setSpliceDraft((current) => ({ ...current, notes: value }))} />
+                  </div>
+                </div>
+              </div>
+              <div className="creator-splice-checklist">
+                <strong>What this captures</strong>
+                <span>Closure ID, structure/pole, cable IDs, incoming/outgoing strands, splice type, loss estimate, status, and notes.</span>
+                <span>Existing/generated splice rows remain unchanged. Resplice work is staged as proposed demo planning data.</span>
+              </div>
+              <div className="creator-action-row">
+                <button className="button" type="button" disabled={!writable} onClick={runSpliceWorkflow}><Save size={14} />Save Splicing Change</button>
+                <Link className="button secondary" href="/splice-matrix"><Cable size={14} />Open Splice Matrix</Link>
+              </div>
+            </CreatorSection>
+          ) : null}
+
           {activeTab === "wizard" ? (
-            <CreatorSection title="Service / Circuit / Fiber Assignment Wizard" icon={<WandSparkles size={18} />} description="Create a circuit draft plus a linked fiber-assignment draft with devices, cable, strands, and splices captured as fields.">
+            <CreatorSection title="Build Service Path" icon={<Route size={18} />} description="Create a circuit draft plus a linked fiber-assignment draft with devices, cable, strands, and splices captured as fields.">
               <div className="creator-form-grid">
                 {Object.entries(wizard).map(([key, value]) => (
                   <label key={key}>
@@ -394,14 +579,14 @@ export function CreatorPage() {
                 ))}
               </div>
               <div className="creator-action-row">
-                <button className="button" type="button" disabled={!writable} onClick={runServiceWizard}><Hammer size={14} />Create Circuit + Assignment</button>
+                <button className="button" type="button" disabled={!writable} onClick={runServiceWizard}><Hammer size={14} />Save Service + Assignment</button>
                 <span>Captures service ID, circuit ID, endpoints, cable ID, strand numbers, splice IDs, and status.</span>
               </div>
             </CreatorSection>
           ) : null}
 
           {activeTab === "import" ? (
-            <CreatorSection title="Import With Mapping Preview" icon={<FileSpreadsheet size={18} />} description="Paste CSV, JSON, or GeoJSON; map fields; preview rows; then import as a design blueprint.">
+            <CreatorSection title="Import Objects With Field Mapping" icon={<FileSpreadsheet size={18} />} description="Paste CSV, JSON, or GeoJSON, choose field names with inputs, preview rows, then import as editable design records.">
               <div className="creator-import-controls">
                 <label><span>Format</span><select value={importFormat} onChange={(event) => setImportFormat(event.currentTarget.value as ImportFormat)}><option value="csv">CSV</option><option value="json">JSON</option><option value="geojson">GeoJSON</option></select></label>
                 <label><span>Asset type slug</span><input value={importSlug} onChange={(event) => setImportSlug(slugifyField(event.currentTarget.value))} /></label>
@@ -417,14 +602,8 @@ export function CreatorPage() {
             </CreatorSection>
           ) : null}
 
-          {activeTab === "bulk" ? (
-            <CreatorSection title="Bulk Edit Selected Records" icon={<Layers size={18} />} description="Safely update status, visibility, or notes on selected design records without touching public reference data.">
-              <BulkControls bulkStatus={bulkStatus} setBulkStatus={setBulkStatus} bulkVisibility={bulkVisibility} setBulkVisibility={setBulkVisibility} bulkNotes={bulkNotes} setBulkNotes={setBulkNotes} onApply={applyBulkEdit} disabled={!writable || !selectedRecordIds.length} />
-              <RecordPicker records={records.slice(0, 120)} selectedIds={selectedRecordIds} onToggle={toggleRecord} />
-            </CreatorSection>
-          ) : null}
-
-          {activeTab === "duplicate" ? (
+          {activeTab === "records" ? (
+            <>
             <CreatorSection title="Search And Duplicate" icon={<Copy size={18} />} description="Find an existing design record and duplicate it as a proposed starting point.">
               <div className="creator-search-row">
                 <Search size={15} />
@@ -441,10 +620,15 @@ export function CreatorPage() {
                 ))}
               </div>
             </CreatorSection>
+            <CreatorSection title="Edit Selected Records" icon={<Layers size={18} />} description="Update status, visibility, or notes on selected design records without touching public reference data.">
+              <BulkControls bulkStatus={bulkStatus} setBulkStatus={setBulkStatus} bulkVisibility={bulkVisibility} setBulkVisibility={setBulkVisibility} bulkNotes={bulkNotes} setBulkNotes={setBulkNotes} onApply={applyBulkEdit} disabled={!writable || !selectedRecordIds.length} />
+              <RecordPicker records={records.slice(0, 120)} selectedIds={selectedRecordIds} onToggle={toggleRecord} />
+            </CreatorSection>
+            </>
           ) : null}
 
           {activeTab === "validate" ? (
-            <CreatorSection title="Validate Drafts Before Saving" icon={<ShieldCheck size={18} />} description="Check required fields, synthetic-data boundary, import shape, duplicate keys, and selected record readiness.">
+            <CreatorSection title="Review Drafts Before Saving" icon={<ShieldCheck size={18} />} description="Check required fields, synthetic-data boundary, import shape, duplicate keys, and selected record readiness.">
               <div className="creator-validation-list">
                 {validationFindings.map((finding, index) => (
                   <div key={`${finding.severity}-${index}`} className={finding.severity}>
@@ -457,32 +641,27 @@ export function CreatorPage() {
           ) : null}
 
           {activeTab === "materialize" ? (
-            <CreatorSection title="Materialize Reviewed Records" icon={<PackageCheck size={18} />} description="Convert supported design records into module tables only after review. This does not make synthetic assumptions real.">
+            <CreatorSection title="Publish Reviewed Records To Modules" icon={<PackageCheck size={18} />} description="Send supported design records into module tables only after review. This does not make synthetic assumptions real.">
               <div className="creator-blueprint-grid">
                 {blueprints.map((blueprint) => (
                   <article key={blueprint.key}>
                     <strong>{blueprint.display_name}</strong>
                     <span>{blueprint.description}</span>
-                    <small>{blueprint.asset_type_count} schemas / {blueprint.record_count} seed records</small>
-                    <button className="button secondary" type="button" disabled={!writable} onClick={() => installBlueprint(blueprint.key)}>Install Schema</button>
+                    <small>{blueprint.asset_type_count} object types / {blueprint.record_count} seed records</small>
+                    <button className="button secondary" type="button" disabled={!writable} onClick={() => installBlueprint(blueprint.key)}>Install Package</button>
                   </article>
                 ))}
               </div>
               <div className="creator-action-row">
-                <select value={materializeMode} onChange={(event) => setMaterializeMode(event.currentTarget.value as "upsert" | "skip_existing")}><option value="upsert">Upsert</option><option value="skip_existing">Skip existing</option></select>
-                <button className="button" type="button" disabled={!writable || !selectedRecordIds.length} onClick={materializeSelectedRecords}>Materialize Selected</button>
+                <select value={materializeMode} onChange={(event) => setMaterializeMode(event.currentTarget.value as "upsert" | "skip_existing")}><option value="upsert">Update existing records</option><option value="skip_existing">Only add new records</option></select>
+                <button className="button" type="button" disabled={!writable || !selectedRecordIds.length} onClick={materializeSelectedRecords}>Publish Selected</button>
                 <span>{selectedRecordIds.length} selected</span>
               </div>
               <RecordPicker records={records.slice(0, 120)} selectedIds={selectedRecordIds} onToggle={toggleRecord} />
             </CreatorSection>
           ) : null}
 
-          {lastResult ? (
-            <section className="panel creator-result">
-              <div className="panel-header"><strong>Last Result</strong></div>
-              <pre>{JSON.stringify(lastResult, null, 2)}</pre>
-            </section>
-          ) : null}
+          {lastResult ? <LastResultPanel result={lastResult} /> : null}
         </main>
       </div>
     </div>
@@ -497,6 +676,52 @@ function CreatorSection({ title, icon, description, children }: { title: string;
         <span>{description}</span>
       </div>
       {children}
+    </section>
+  );
+}
+
+function CreatorActionCard({ Icon, title, description, action, onClick, strong = false }: { Icon: LucideIcon; title: string; description: string; action: string; onClick: () => void; strong?: boolean }) {
+  return (
+    <article className={`creator-action-card ${strong ? "strong" : ""}`}>
+      <div className="creator-action-card-icon"><Icon size={18} /></div>
+      <strong>{title}</strong>
+      <span>{description}</span>
+      <button type="button" onClick={onClick}>{action}</button>
+    </article>
+  );
+}
+
+function MetricTile({ label, value, detail }: { label: string; value: number; detail: string }) {
+  return (
+    <div className="creator-metric-tile">
+      <span>{label}</span>
+      <strong>{value.toLocaleString()}</strong>
+      <small>{detail}</small>
+    </div>
+  );
+}
+
+function CreatorInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label>
+      <span>{label}</span>
+      <input value={value} onChange={(event) => onChange(event.currentTarget.value)} />
+    </label>
+  );
+}
+
+function LastResultPanel({ result }: { result: unknown }) {
+  return (
+    <section className="panel creator-result">
+      <div className="panel-header"><strong>Action complete</strong><span className="subtle">The record was saved through the Creator UI.</span></div>
+      <div className="creator-result-summary">
+        <CheckCircle2 size={18} />
+        <span>{summarizeResult(result)}</span>
+      </div>
+      <details>
+        <summary>View response details</summary>
+        <pre>{JSON.stringify(result, null, 2)}</pre>
+      </details>
     </section>
   );
 }
@@ -558,7 +783,7 @@ function BulkControls(props: {
       </select>
       <input value={props.bulkVisibility} onChange={(event) => props.setBulkVisibility(event.currentTarget.value)} />
       <input value={props.bulkNotes} onChange={(event) => props.setBulkNotes(event.currentTarget.value)} placeholder="Optional notes" />
-      <button className="button" type="button" disabled={props.disabled} onClick={props.onApply}>Apply Bulk Edit</button>
+      <button className="button" type="button" disabled={props.disabled} onClick={props.onApply}>Apply Selected Updates</button>
     </div>
   );
 }
@@ -687,7 +912,7 @@ function buildValidationFindings(input: {
   const findings: ValidationFinding[] = [];
   if (input.tool) {
     const missing = input.tool.required_properties.filter((field) => input.toolProperties[field] === undefined || input.toolProperties[field] === "");
-    findings.push(missing.length ? { severity: "error", message: `Template is missing required fields: ${missing.join(", ")}.` } : { severity: "pass", message: "Selected template has all required fields filled." });
+    findings.push(missing.length ? { severity: "error", message: `Creation form is missing required fields: ${missing.join(", ")}.` } : { severity: "pass", message: "Selected creation form has all required fields filled." });
   }
   const combinedText = JSON.stringify({ properties: input.toolProperties, importRows: input.importPreview?.rows.slice(0, 20), selected: input.selectedRecords.map((record) => record.properties) }).toLowerCase();
   const forbidden = ["password", "credential", "ceii", "relay setting", "protection setting", "scada secret", "private route"];
@@ -705,7 +930,7 @@ function buildValidationFindings(input: {
     return false;
   });
   findings.push(duplicates.length ? { severity: "warning", message: `Selected records include duplicate keys: ${duplicates.map((record) => record.record_key).join(", ")}.` } : { severity: "pass", message: "Selected records have unique keys." });
-  findings.push(input.records.length ? { severity: "pass", message: `${input.records.length} living design records are available for duplicate, bulk, and materialize workflows.` } : { severity: "warning", message: "No design records are loaded yet. Start with Templates or Import." });
+  findings.push(input.records.length ? { severity: "pass", message: `${input.records.length} living design records are available for duplicate, selected-edit, and publish workflows.` } : { severity: "warning", message: "No design records are loaded yet. Start with Add Object or Import Objects." });
   return findings;
 }
 
@@ -727,6 +952,37 @@ function parseInput(value: string, previous: unknown) {
   return value;
 }
 
+function splitList(value: string): string[] {
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function moduleLabelForTool(tool: DesignAgentTool) {
+  if (tool.backend_entity) return `${formatLabel(tool.backend_entity)} module`;
+  return "Design record";
+}
+
+function formatGeometryLabel(value: DesignAssetType["geometry_type"]) {
+  if (value === "table_only") return "no map geometry";
+  return `${formatLabel(value)} geometry`;
+}
+
+function summarizeResult(result: unknown): string {
+  if (!isRecord(result)) return "Action completed.";
+  const record = isRecord(result.record) ? result.record : undefined;
+  if (record) return `${displayValue(record.display_label || record.record_key || "Record")} is ready for review.`;
+  const splicePoint = isRecord(result.splicePoint) && isRecord(result.splicePoint.record) ? result.splicePoint.record : undefined;
+  const spliceRow = isRecord(result.spliceRow) && isRecord(result.spliceRow.record) ? result.spliceRow.record : undefined;
+  if (splicePoint && spliceRow) return `${displayValue(splicePoint.display_label || "Splice point")} and ${displayValue(spliceRow.display_label || "splice row")} are ready for review.`;
+  if (splicePoint) return `${displayValue(splicePoint.display_label || "Splice point")} is ready for review.`;
+  if (typeof result.materialized_count === "number") return `${result.materialized_count.toLocaleString()} records were published to modules.`;
+  if (typeof result.created_records === "number" || typeof result.updated_records === "number") {
+    const created = typeof result.created_records === "number" ? result.created_records : 0;
+    const updated = typeof result.updated_records === "number" ? result.updated_records : 0;
+    return `${(created + updated).toLocaleString()} records were saved.`;
+  }
+  return "Action completed and the latest response is available below.";
+}
+
 function slugifyField(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "field";
 }
@@ -743,6 +999,8 @@ function readableError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function isCreatorTab(value: string | null): value is CreatorTab {
-  return tabs.some((tab) => tab.key === value);
+function normalizeCreatorTab(value: string | null): CreatorTab | null {
+  if (value === "bulk" || value === "duplicate") return "records";
+  if (tabs.some((tab) => tab.key === value)) return value as CreatorTab;
+  return null;
 }

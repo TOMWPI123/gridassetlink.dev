@@ -8,12 +8,26 @@ import { Badge } from "@/components/Badges";
 import { DataTable } from "@/components/DataTable";
 import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
 
-export function SQLReportsPage() {
+export function SavedReportsPage() {
   const [reports, setReports] = useState<JsonRecord[]>([]);
-  const [sql, setSql] = useState("select circuit_id, circuit_name, status from circuits");
+  const [reportQuery, setReportQuery] = useState("select circuit_id, circuit_name, status from circuits");
+  const [selectedReportName, setSelectedReportName] = useState("Circuit status");
   const [result, setResult] = useState<{ columns: string[]; rows: JsonRecord[] } | null>(null);
-  useEffect(() => { apiFetch<JsonRecord[]>("/api/reports/saved").then((data) => { setReports(data); if (data[0]) setSql(String(data[0].sql_text)); }); }, []);
-  return <><div className="page-header"><div><h1 className="eyebrowless-title">SQL Reports</h1><div className="subtle">Saved reports and SELECT-only explorer</div></div><button className="button primary" onClick={() => apiFetch<{ columns: string[]; rows: JsonRecord[] }>("/api/sql/select", { method: "POST", body: JSON.stringify({ sql, limit: 100 }) }).then(setResult)}><Play size={16} />Run</button></div><div style={{ display: "grid", gridTemplateColumns: "minmax(260px,.75fr) minmax(0,1.25fr)", gap: 16 }}><div className="panel"><div className="panel-header"><strong>Saved Reports</strong></div><div className="panel-body timeline">{reports.map((report) => <button className="trace-step" key={String(report.id)} onClick={() => setSql(String(report.sql_text))}><div className="trace-index">SQL</div><div style={{ textAlign: "left" }}><strong>{String(report.report_name)}</strong><div className="subtle">{String(report.description || "")}</div></div><Badge value="saved" /></button>)}</div></div><div className="panel"><div className="panel-header"><strong>Explorer</strong></div><div className="panel-body"><textarea className="textarea" style={{ minHeight: 180, fontFamily: "var(--font-geist-mono)" }} value={sql} onChange={(e) => setSql(e.target.value)} />{result ? <DataTable rows={result.rows} columns={result.columns} /> : null}</div></div></div></>;
+  useEffect(() => {
+    apiFetch<JsonRecord[]>("/api/reports/saved").then((data) => {
+      setReports(data);
+      if (data[0]) {
+        setReportQuery(String(data[0].sql_text));
+        setSelectedReportName(String(data[0].report_name || "Saved report"));
+      }
+    });
+  }, []);
+  function chooseReport(report: JsonRecord) {
+    setReportQuery(String(report.sql_text || ""));
+    setSelectedReportName(String(report.report_name || "Saved report"));
+    setResult(null);
+  }
+  return <><div className="page-header"><div><h1 className="eyebrowless-title">Saved Reports</h1><div className="subtle">Button-driven report explorer for planning and field review</div></div><button className="button primary" onClick={() => apiFetch<{ columns: string[]; rows: JsonRecord[] }>("/api/sql/select", { method: "POST", body: JSON.stringify({ sql: reportQuery, limit: 100 }) }).then(setResult)}><Play size={16} />Run Report</button></div><div style={{ display: "grid", gridTemplateColumns: "minmax(260px,.75fr) minmax(0,1.25fr)", gap: 16 }}><div className="panel"><div className="panel-header"><strong>Report Buttons</strong></div><div className="panel-body timeline">{reports.map((report) => <button className="trace-step" key={String(report.id)} onClick={() => chooseReport(report)}><div className="trace-index">Report</div><div style={{ textAlign: "left" }}><strong>{String(report.report_name)}</strong><div className="subtle">{String(report.description || "")}</div></div><Badge value={selectedReportName === String(report.report_name) ? "selected" : "saved"} /></button>)}</div></div><div className="panel"><div className="panel-header"><strong>{selectedReportName}</strong><Badge value={result ? `${result.rows.length} rows` : "ready"} /></div><div className="panel-body">{result ? <DataTable rows={result.rows} columns={result.columns} /> : <p className="subtle">Choose a saved report and run it from the button above. Report logic stays behind the UI.</p>}</div></div></div></>;
 }
 
 export function OutageImpactPage() {
@@ -108,5 +122,5 @@ function openDemoSafetyModal(view: "disclaimer" | "sources") {
 }
 
 export function AdminSettingsPage() {
-  return <><div className="page-header"><div><h1 className="eyebrowless-title">Settings</h1><div className="subtle">Security, imports, QR links, and deployment configuration</div></div></div><div className="metric-grid">{["JWT authentication", "Role-based API permissions", "SELECT-only SQL analyst access", "CSV validation preview", "QR permanent links", "PostGIS-ready schema"].map((item) => <div className="metric-card" key={item}><div className="subtle">Enabled</div><div className="metric-value" style={{ fontSize: 20 }}>{item}</div></div>)}</div></>;
+  return <><div className="page-header"><div><h1 className="eyebrowless-title">Settings</h1><div className="subtle">Security, imports, QR links, and deployment configuration</div></div></div><div className="metric-grid">{["JWT authentication", "Role-based API permissions", "Read-only report runner", "CSV validation preview", "QR permanent links", "PostGIS-ready schema"].map((item) => <div className="metric-card" key={item}><div className="subtle">Enabled</div><div className="metric-value" style={{ fontSize: 20 }}>{item}</div></div>)}</div></>;
 }

@@ -292,7 +292,7 @@ export function DeviceOpsComparePage() {
   useEffect(() => { apiFetch<JsonRecord[]>(`/api/compare/${mode}`).then(setRows); }, [mode]);
   return (
     <>
-      <PageHeader title="DeviceOps Compare" subtitle="Difference reports between actual, planned, proposed, and as-built workflow states" actions={<Link className="button" href="/sql-reports"><GitCompare size={16} />Saved SQL Reports</Link>} />
+      <PageHeader title="DeviceOps Compare" subtitle="Difference reports between actual, planned, proposed, and as-built workflow states" actions={<Link className="button" href="/sql-reports"><GitCompare size={16} />Saved Reports</Link>} />
       <Tabs tabs={modes.map(formatLabel)} active={formatLabel(mode)} onChange={(value) => setMode(value.toLowerCase().replaceAll(" ", "-"))} />
       <DataTable rows={rows} columns={diffColumns} filterField="severity" />
     </>
