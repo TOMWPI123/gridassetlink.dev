@@ -379,6 +379,76 @@ a { color: inherit; text-decoration: none; }
   font-size: 12px;
 }
 
+.guide-implementation {
+  display: grid;
+  gap: 18px;
+}
+
+.guide-implementation-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 14px;
+}
+
+.guide-implementation-hero > div,
+.guide-implementation-phase-list article,
+.guide-implementation-grid article {
+  border: 1px solid #cfdce5;
+  background: #fff;
+  border-radius: 8px;
+  padding: 14px;
+  display: grid;
+  gap: 9px;
+}
+
+.guide-implementation-hero strong {
+  color: #102236;
+  font-size: 1.1rem;
+}
+
+.guide-implementation-hero p,
+.guide-implementation-grid span,
+.guide-implementation-phase-list span {
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.guide-implementation-section {
+  display: grid;
+  gap: 12px;
+}
+
+.guide-implementation-section h2 {
+  margin: 0;
+  color: #102236;
+  font-size: 1rem;
+}
+
+.guide-implementation-phase-list,
+.guide-implementation-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.guide-implementation-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.guide-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.guide-checklist-grid span {
+  border: 1px solid #d8e2ea;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #26384a;
+  background: #f7fafc;
+}
+
 .guide-chip-list {
   display: flex;
   flex-wrap: wrap;
@@ -5212,50 +5282,6 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   min-height: 48px;
 }
 
-.dashboard-account-chip {
-  position: fixed;
-  top: 14px;
-  right: 14px;
-  z-index: 42;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: min(360px, calc(100vw - 28px));
-  border: 1px solid rgba(238,252,251,.14);
-  border-radius: 8px;
-  background: rgba(6,16,18,.82);
-  color: #eefcfb;
-  padding: 7px 8px;
-  box-shadow: 0 14px 38px rgba(0,0,0,.25);
-  backdrop-filter: blur(12px);
-}
-
-.dashboard-account-chip span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.dashboard-account-chip small {
-  color: #9ad6dc;
-  font-size: 11px;
-  text-transform: uppercase;
-}
-
-.dashboard-account-chip button {
-  min-height: 28px;
-  border: 1px solid rgba(238,252,251,.16);
-  border-radius: 7px;
-  background: rgba(238,252,251,.08);
-  color: #eefcfb;
-  padding: 0 8px;
-  font-size: 11px;
-  font-weight: 820;
-  cursor: pointer;
-}
-
 .dashboard-compact-brand,
 .dashboard-mode-toggle,
 .dashboard-map-global-search,
@@ -7835,6 +7861,11 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
     width: 100%;
   }
   .dashboard-summary-compact-grid {
+    grid-template-columns: 1fr;
+  }
+  .guide-implementation-hero,
+  .guide-implementation-grid,
+  .guide-checklist-grid {
     grid-template-columns: 1fr;
   }
 }

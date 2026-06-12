@@ -4,17 +4,15 @@ OpenAPI docs are available at `http://localhost:8000/docs`.
 
 Core patterns:
 
-- `POST /api/auth/login`
-- `GET /api/auth/me`
 - `GET /api/{entity}`
 - `POST /api/{entity}`
 - `GET /api/{entity}/{id}`
 - `PUT /api/{entity}/{id}`
 - `DELETE /api/{entity}/{id}`
 
-Authentication is enabled by default. Use a bearer token returned by `/api/auth/login` for CRUD and administration calls. Writes require `admin` or `engineer` except `users` and `audit-logs`, which are admin-only.
+Authentication is disabled by default for the no-account synthetic planning demo. Set `AUTH_REQUIRED=false` and `NEXT_PUBLIC_ENABLE_AUTH=false` for the intended MVP path. The backend uses an internal demo engineer identity for endpoints that need an actor. Auth routes still exist for future production hardening, but they are not part of the normal product flow.
 
-Special endpoints include `/api/dashboard/summary`, `/api/circuits/{id}/trace`, `/api/circuits/{id}/fiber-path`, `/api/fiber-assignments`, `/api/fiber-cables/{id}/strand-assignments`, `/api/fiber-cables/{id}/splice-map`, `/api/splice-closures/{id}/trays`, `/api/splice-closures/{id}/splices`, `/api/patch-panels/{id}/port-map`, `/api/devices/{id}/fiber-connectivity`, `/api/work-orders/{id}/fiber-tasks`, `/api/fiber-cables/{id}/impact`, `/api/splice-closures/{id}/impact`, `/api/work-orders/my`, `/api/work-orders/{id}/closeout`, `/api/sql/select`, `/api/reports/saved`, `/api/import/csv`, `/api/export/{entity}`, and `/api/qr/generate`.
+Special endpoints include `/api/implementation-guide`, `/api/implementation-guide/markdown`, `/api/dashboard/summary`, `/api/circuits/{id}/trace`, `/api/circuits/{id}/fiber-path`, `/api/fiber-assignments`, `/api/fiber-cables/{id}/strand-assignments`, `/api/fiber-cables/{id}/splice-map`, `/api/splice-closures/{id}/trays`, `/api/splice-closures/{id}/splices`, `/api/patch-panels/{id}/port-map`, `/api/devices/{id}/fiber-connectivity`, `/api/work-orders/{id}/fiber-tasks`, `/api/fiber-cables/{id}/impact`, `/api/splice-closures/{id}/impact`, `/api/work-orders/my`, `/api/work-orders/{id}/closeout`, `/api/sql/select`, `/api/reports/saved`, `/api/import/csv`, `/api/export/{entity}`, and `/api/qr/generate`.
 
 Design/database administration endpoints live under `/api/design-assets`. The primary routes are:
 

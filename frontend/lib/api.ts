@@ -5,7 +5,7 @@ import type { UserSession } from "@/types";
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "/backend" : "http://localhost:8000");
 export const LOCAL_GIS_API_BASE = "http://127.0.0.1:8000";
 export const GIS_API_BASE_STORAGE_KEY = "gridassetlink-gis-api-base";
-export const AUTH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AUTH !== "false";
+export const AUTH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AUTH === "true";
 const WRITE_ROLES = new Set(["admin", "engineer", "editor"]);
 const ADMIN_ROLES = new Set(["admin"]);
 

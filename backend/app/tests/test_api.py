@@ -31,6 +31,19 @@ def test_login_and_dashboard() -> None:
     assert response.json()["recent_work_orders"]
 
 
+def test_no_account_implementation_guide() -> None:
+    dashboard = client.get("/api/dashboard/summary")
+    assert dashboard.status_code == 200
+    response = client.get("/api/implementation-guide")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["no_account_mode"]["enabled"] is True
+    assert any("design database" in phase["title"].lower() for phase in payload["fresh_start_phases"])
+    markdown = client.get("/api/implementation-guide/markdown")
+    assert markdown.status_code == 200
+    assert "GridAssetLink Product Implementation Guide" in markdown.text
+
+
 def test_live_status_topline(monkeypatch) -> None:
     monkeypatch.setattr(
         live_status,

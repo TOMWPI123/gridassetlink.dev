@@ -5,7 +5,7 @@ from starlette.responses import Response
 
 from app.config import settings
 from app.database import create_db_and_tables
-from app.routers import auth, dashboard, design_assets, deviceops, gis, live_status, regional_grid, sql, workflows
+from app.routers import auth, dashboard, design_assets, deviceops, gis, implementation_guide, live_status, regional_grid, sql, workflows
 from app.routers.crud import all_crud_routers
 
 app = FastAPI(title=settings.app_name, description="Fictional utility telecom planning and asset management API.", version="0.1.0")
@@ -28,6 +28,7 @@ app.include_router(workflows.router)
 app.include_router(deviceops.router)
 app.include_router(regional_grid.router)
 app.include_router(gis.router)
+app.include_router(implementation_guide.router)
 app.include_router(live_status.router)
 app.include_router(sql.router)
 for router in all_crud_routers():

@@ -24,13 +24,23 @@ def normalize_role(role: str | None) -> str:
 
 
 def get_current_user(session: SessionDep, credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)]) -> User:
-    if credentials is None:
-        if settings.auth_required:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    if not settings.auth_required:
+        if credentials is not None:
+            try:
+                payload = decode_access_token(credentials.credentials)
+                email = payload.get("sub")
+                if isinstance(email, str):
+                    token_user = session.exec(select(User).where(User.email == email)).first()
+                    if token_user is not None and token_user.is_active:
+                        return token_user
+            except ValueError:
+                pass
         user = session.exec(select(User).where(User.is_active == True).where(User.role.in_(["admin", "engineer"]))).first()  # noqa: E712
         if user is not None:
             return user
         return User(email="demo@gridassetlink.local", full_name="No-Account Demo Engineer", password_hash="", role="engineer", is_active=True)
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     try:
         payload = decode_access_token(credentials.credentials)
     except ValueError as exc:

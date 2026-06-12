@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { BookOpen, Cable, ClipboardList, Database, GitBranch, Map, PanelTop, Plus, Route, Save, Split, TableProperties, Upload, Waypoints } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch, canWrite } from "@/lib/api";
 import type { DesignAssetField, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetRecord } from "@/lib/types/assets";
 
@@ -37,6 +37,47 @@ type GuideWorkflow = {
   steps: string[];
   requiredFields: string[];
   validation: string[];
+};
+
+type ImplementationGuidePhase = {
+  title: string;
+  summary: string;
+  steps: string[];
+  deliverables: string[];
+};
+
+type ImplementationGuideDomain = {
+  name: string;
+  objects: string[];
+  rule: string;
+};
+
+type ImplementationGuideWorkflow = {
+  name: string;
+  records: string[];
+  review: string[];
+};
+
+type ImplementationGuideApiSurface = {
+  area: string;
+  routes: string[];
+};
+
+type ImplementationGuidePayload = {
+  title: string;
+  version: string;
+  purpose: string;
+  disclaimer: string;
+  no_account_mode: {
+    enabled: boolean;
+    summary: string;
+    rules: string[];
+  };
+  fresh_start_phases: ImplementationGuidePhase[];
+  database_domains: ImplementationGuideDomain[];
+  core_workflows: ImplementationGuideWorkflow[];
+  api_surfaces: ImplementationGuideApiSurface[];
+  handoff_checklist: string[];
 };
 
 const guideObjectTypes = [
@@ -580,7 +621,23 @@ export function GuideModulePage() {
   const [poleInsertDraft, setPoleInsertDraft] = useState(defaultPoleInsertDraft);
   const [spliceInsertDraft, setSpliceInsertDraft] = useState(defaultSpliceInsertDraft);
   const [liveEditDraft, setLiveEditDraft] = useState(defaultLiveEditDraft);
+  const [implementationGuide, setImplementationGuide] = useState<ImplementationGuidePayload | null>(null);
+  const [implementationGuideError, setImplementationGuideError] = useState("");
   const starterRecordCount = useMemo(() => guideModuleRecords().length, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<ImplementationGuidePayload>("/api/implementation-guide")
+      .then((payload) => {
+        if (!cancelled) setImplementationGuide(payload);
+      })
+      .catch((error) => {
+        if (!cancelled) setImplementationGuideError(error instanceof Error ? error.message : "Could not load backend implementation guide.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function createGuideRecords() {
     setBusy(true);
@@ -660,7 +717,113 @@ export function GuideModulePage() {
           <strong>Synthetic/demo data boundary</strong>
           <span>Use this module for synthetic planning data and UI-driven edits only. Make edits to living data by staging proposed Design Mode records, issuing work orders, and reviewing closeout before materialization. Do not enter CEII, SCADA, relay/protection settings, operational telecom access, credentials, or private fiber-route details.</span>
           {message ? <span className="badge active">{message}</span> : null}
-          {!writable ? <span className="badge red">Current account cannot create or update guide records.</span> : null}
+          {!writable ? <span className="badge red">This no-account demo is currently read-only. Check backend write settings before creating guide records.</span> : null}
+        </div>
+      </section>
+
+      <section className="panel guide-module-section">
+        <div className="panel-header">
+          <div>
+            <strong>{implementationGuide?.title || "Backend Product Implementation Guide"}</strong>
+            <div className="subtle">Loaded from <code>/api/implementation-guide</code> so the product handoff can be served and versioned by the backend.</div>
+          </div>
+          <BookOpen size={18} />
+        </div>
+        <div className="panel-body">
+          {implementationGuide ? (
+            <div className="guide-implementation">
+              <div className="guide-implementation-hero">
+                <div>
+                  <span className="field-label">Version</span>
+                  <strong>{implementationGuide.version}</strong>
+                  <p>{implementationGuide.purpose}</p>
+                </div>
+                <div>
+                  <span className="field-label">No-account mode</span>
+                  <strong>{implementationGuide.no_account_mode.enabled ? "Enabled" : "Disabled"}</strong>
+                  <p>{implementationGuide.no_account_mode.summary}</p>
+                </div>
+              </div>
+              <div className="guide-action-review">
+                <strong>Data boundary</strong>
+                <span>{implementationGuide.disclaimer}</span>
+              </div>
+              <div className="guide-chip-list">
+                {implementationGuide.no_account_mode.rules.map((rule) => <span key={rule}>{rule}</span>)}
+              </div>
+              <div className="guide-implementation-section">
+                <h2>Fresh-start build phases</h2>
+                <div className="guide-implementation-phase-list">
+                  {implementationGuide.fresh_start_phases.map((phase) => (
+                    <article key={phase.title}>
+                      <strong>{phase.title}</strong>
+                      <span>{phase.summary}</span>
+                      <div className="guide-workflow-columns">
+                        <div>
+                          <strong>Steps</strong>
+                          <ol>{phase.steps.map((step) => <li key={step}>{step}</li>)}</ol>
+                        </div>
+                        <div>
+                          <strong>Deliverables</strong>
+                          <ul>{phase.deliverables.map((deliverable) => <li key={deliverable}>{deliverable}</li>)}</ul>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+              <div className="guide-implementation-section">
+                <h2>Database domains</h2>
+                <div className="guide-implementation-grid">
+                  {implementationGuide.database_domains.map((domain) => (
+                    <article key={domain.name}>
+                      <strong>{domain.name}</strong>
+                      <span>{domain.rule}</span>
+                      <div className="guide-chip-list">{domain.objects.map((object) => <span key={object}>{object}</span>)}</div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+              <div className="guide-implementation-section">
+                <h2>Core workflows and backend APIs</h2>
+                <div className="guide-implementation-grid">
+                  {implementationGuide.core_workflows.map((workflow) => (
+                    <article key={workflow.name}>
+                      <strong>{workflow.name}</strong>
+                      <span>Records to create</span>
+                      <div className="guide-chip-list">{workflow.records.map((record) => <span key={record}>{record}</span>)}</div>
+                      <span>Review checks</span>
+                      <ul>{workflow.review.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </article>
+                  ))}
+                  {implementationGuide.api_surfaces.map((surface) => (
+                    <article key={surface.area}>
+                      <strong>{surface.area} API</strong>
+                      <ul>{surface.routes.map((route) => <li key={route}><code>{route}</code></li>)}</ul>
+                    </article>
+                  ))}
+                </div>
+              </div>
+              <div className="guide-implementation-section">
+                <h2>Product handoff checklist</h2>
+                <div className="guide-checklist-grid">
+                  {implementationGuide.handoff_checklist.map((item) => <span key={item}>{item}</span>)}
+                </div>
+              </div>
+              <div className="guide-module-flow">
+                <article>
+                  <strong>Backend markdown</strong>
+                  <span>Open <code>/api/implementation-guide/markdown</code> when you need a plain-text implementation package for handoff notes, release packets, or external documentation.</span>
+                </article>
+                <article>
+                  <strong>Repository documentation</strong>
+                  <span>The same implementation story is also captured in <code>docs/product_implementation_guide.md</code> for developers working directly from the repo.</span>
+                </article>
+              </div>
+            </div>
+          ) : (
+            <p className="subtle">{implementationGuideError || "Loading backend implementation guide..."}</p>
+          )}
         </div>
       </section>
 

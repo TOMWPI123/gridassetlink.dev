@@ -1630,7 +1630,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
-    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design", "guide"];
+    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design"];
     if (drawer && allowedDrawers.includes(drawer as RightDrawerMode)) {
       setRightMode(drawer as RightDrawerMode);
       setRightCollapsed(false);
@@ -2914,10 +2914,7 @@ export function DashboardPage() {
   }
 
   function handleGuideClick() {
-    setRightMode("guide");
-    setRightCollapsed(false);
-    showToast("Guide opened: choose a workflow to learn or create synthetic database edits.");
-    issueMapCommand("resize");
+    window.location.assign("/guide");
   }
 
   function openGuideDesignRecords() {
@@ -3253,7 +3250,6 @@ export function DashboardPage() {
           ))}
           <button
             type="button"
-            className={rightMode === "guide" ? "active" : ""}
             onClick={handleGuideClick}
           >
             <BookOpen size={14} />
@@ -3335,7 +3331,7 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "sources" ? "active" : ""} onClick={() => setRightMode("sources")}><TableProperties size={14} />Sources</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
               <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
-              <button type="button" className={rightMode === "guide" ? "active" : ""} onClick={handleGuideClick}><BookOpen size={14} />Guide</button>
+              <button type="button" onClick={handleGuideClick}><BookOpen size={14} />Guide</button>
               <button type="button" className={rightMode === "design" ? "active" : ""} onClick={handleDesignModeClick}><PencilRuler size={14} />Design</button>
             </div>
             <div className="dashboard-drawer-body">
@@ -5877,7 +5873,7 @@ function DesignEditDrawer({
               <button type="button" onClick={() => void replayModuleSnapshot()} disabled={Boolean(busy) || !selectedModuleSnapshotEntities.length}>Replay selected snapshots to backend</button>
               <button type="button" onClick={() => void runRebuildAudit()} disabled={Boolean(busy)}>Run rebuild audit</button>
             </div>
-            <p className="dashboard-gis-message">Snapshot replay preserves row IDs by default so related fibers, splices, ports, circuits, and work-order references can be rebuilt together. User-account references are normalized to the current demo user or cleared.</p>
+            <p className="dashboard-gis-message">Snapshot replay preserves row IDs by default so related fibers, splices, ports, circuits, and work-order references can be rebuilt together. Demo actor references are normalized to the backend no-account user or cleared.</p>
             {rebuildAudit ? (
               <div className="dashboard-design-audit">
                 <div className="dashboard-design-audit-summary">

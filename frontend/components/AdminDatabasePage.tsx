@@ -651,7 +651,7 @@ export function AdminDatabasePage() {
       <div className="page-header">
         <div>
           <h1 className="eyebrowless-title">Database Administration</h1>
-          <div className="subtle">Create account-gated schemas and synthetic/demo records for any database object. Map records appear on the dashboard Design-mode planning assets layer.</div>
+          <div className="subtle">Create no-account schemas and synthetic/demo records for any database object. Map records appear on the dashboard Design-mode planning assets layer.</div>
         </div>
         <div className="toolbar">
           <button className="icon-button" type="button" onClick={() => void load()} title="Refresh"><RefreshCw size={16} /></button>
@@ -662,7 +662,7 @@ export function AdminDatabasePage() {
         <div className="panel-header">
           <div>
             <strong>Administration boundary</strong>
-            <div className="subtle">Writes require an account role allowed by the backend. Keep all records synthetic/demo unless imported and verified later.</div>
+            <div className="subtle">The backend uses a no-account demo engineer for edits. Keep all records synthetic/demo unless imported and verified later.</div>
           </div>
           <ShieldCheck size={18} />
         </div>
@@ -917,7 +917,7 @@ export function AdminDatabasePage() {
         </div>
       </section>
       {!writable ? (
-        <div className="badge red">Your current account cannot create or edit database objects. Sign in as admin, engineer, or editor.</div>
+        <div className="badge red">This no-account demo is currently read-only. Check backend write settings before editing database objects.</div>
       ) : null}
       <div className="admin-database-grid">
         <section className="panel">

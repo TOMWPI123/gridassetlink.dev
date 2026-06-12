@@ -1,27 +1,24 @@
 # Database Administration
 
-GridAssetLink uses account-gated administration for synthetic planning records.
+GridAssetLink uses no-account administration for synthetic planning records. The backend supplies an internal demo engineer identity for edit history, materialization metadata, and work-order issue flows.
 
-## Accounts
+## No-Account Mode
 
-Seeded demo accounts are available after the backend seed step:
+The default product mode is:
 
-- `admin@example.com` / `admin123`
-- `engineer@example.com` / `engineer123`
-- `fieldtech@example.com` / `fieldtech123`
-- `viewer@example.com` / `viewer123`
-- `sqlanalyst@example.com` / `sql123`
+- `AUTH_REQUIRED=false`
+- `NEXT_PUBLIC_ENABLE_AUTH=false`
 
-Authentication is enabled by default. Set `AUTH_REQUIRED=false` on the backend and `NEXT_PUBLIC_ENABLE_AUTH=false` on the frontend only for local development bypass mode.
+The app does not show sign-in, sign-out, account settings, Users, or Audit Log pages in normal navigation. The auth code remains isolated for a future production hardening phase, but the current MVP should be usable without account setup.
 
 ## Admin Workflow
 
-1. Sign in as an `admin`, `engineer`, or `editor`.
-2. Open `/admin/database`.
-3. Install the core TelecomNE rebuild schemas or create a custom object type.
-4. Add records with guided forms, templates, map drawing tools, and action buttons.
-5. Open `/dashboard?drawer=design` to view map records on the Design Mode planning layer.
-6. Use Design Mode to draw, edit, search, select, archive, export, import, materialize records, or issue work orders from selected records without hand-writing database payloads.
+1. Open `/admin/database`.
+2. Install the core TelecomNE rebuild schemas or create a custom object type.
+3. Add records with guided forms, templates, map drawing tools, and action buttons.
+4. Open `/dashboard?drawer=design` to view map records on the Design Mode planning layer.
+5. Use Design Mode to draw, edit, search, select, archive, export, import, materialize records, or issue work orders from selected records without hand-writing database payloads.
+6. Open `/guide` for the backend-served product handoff guide and workflow examples.
 
 Object types with `point`, `line`, or `polygon` geometry appear on the dashboard map when the Design Mode layer is visible. `table_only` records stay in the database and are useful for inspections, assumptions, vendors, permits, notes, inventories, and other non-map objects.
 
@@ -150,6 +147,6 @@ Work-order closeout does not automatically mark a synthetic asset verified. Upda
 
 ## Data Boundary
 
-All admin-created objects must remain synthetic/demo data unless a future import workflow explicitly labels them verified.
+All database-created objects must remain synthetic/demo data unless a future import workflow explicitly labels them verified.
 
 Do not enter CEII, SCADA, relay/protection, operational telecom, credentials, private fiber-route data, switching information, dispatch information, or engineering-critical settings.
