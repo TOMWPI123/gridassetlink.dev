@@ -601,15 +601,13 @@ async function loadOpgwCables(key: string): Promise<ModuleLayerData> {
     fetchJson<SpliceClosureCollection>("/data/iso-ne-synthetic-splice-closures.geojson"),
     fetchJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json"),
   ]);
-  const strandCounts = countByKey(strands, "cableId");
-  const assignedCounts = countByPredicate(strands, (strand) => strand.status === "assigned");
-  const availableCounts = countByPredicate(strands, (strand) => ["available", "spare", "dark"].includes(strand.status));
-  const reservedCounts = countByPredicate(strands, (strand) => strand.status === "reserved");
+  const strandSummaryByCable = summarizeFiberStrandsByCable(strands);
   const assignmentsByCable = countByCable(assignments);
   const patchPanelsByCable = countPatchPanelsByCable(patchPanels);
   const closuresByCable = countClosuresByCable(spliceClosures.features.map((feature) => feature.properties));
   const rows = opgw.features.map<JsonRecord>((feature) => {
     const properties = feature.properties;
+    const strandSummary = strandSummaryByCable.get(properties.id);
     return {
       id: properties.id,
       cable_id: properties.id,
@@ -623,10 +621,10 @@ async function loadOpgwCables(key: string): Promise<ModuleLayerData> {
       line_id: properties.lineId,
       line_name: properties.lineName,
       status: properties.status,
-      available_strands: availableCounts.get(properties.id) || 0,
-      assigned_strands: assignedCounts.get(properties.id) || 0,
-      reserved_strands: reservedCounts.get(properties.id) || 0,
-      strand_records: strandCounts.get(properties.id) || 0,
+      available_strands: strandSummary?.available || 0,
+      assigned_strands: strandSummary?.assigned || 0,
+      reserved_strands: strandSummary?.reserved || 0,
+      strand_records: strandSummary?.total || 0,
       assignments: assignmentsByCable.get(properties.id) || 0,
       services_carried: assignmentsByCable.get(properties.id) || 0,
       splice_closures: closuresByCable.get(properties.id) || 0,
@@ -990,7 +988,7 @@ type VerizonLeasedServiceRecord = {
 };
 
 async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(path, { cache: "no-store" });
+  const response = await fetch(path);
   if (!response.ok) throw new Error(`Could not load ${path}`);
   return (await response.json()) as T;
 }
@@ -1060,23 +1058,24 @@ function renewalRisk(contractEnd: unknown): string {
   return "low";
 }
 
-function countByKey<T extends Record<string, unknown>>(items: T[], key: keyof T): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    const value = clean(item[key]);
-    if (!value) continue;
-    counts.set(value, (counts.get(value) || 0) + 1);
-  }
-  return counts;
-}
+type StrandCableSummary = {
+  total: number;
+  available: number;
+  assigned: number;
+  reserved: number;
+};
 
-function countByPredicate(items: FiberStrand[], predicate: (item: FiberStrand) => boolean): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    if (!predicate(item)) continue;
-    counts.set(item.cableId, (counts.get(item.cableId) || 0) + 1);
+function summarizeFiberStrandsByCable(strands: FiberStrand[]): Map<string, StrandCableSummary> {
+  const summaries = new Map<string, StrandCableSummary>();
+  for (const strand of strands) {
+    const current = summaries.get(strand.cableId) || { total: 0, available: 0, assigned: 0, reserved: 0 };
+    current.total += 1;
+    if (strand.status === "assigned") current.assigned += 1;
+    if (strand.status === "reserved") current.reserved += 1;
+    if (strand.status === "available" || strand.status === "spare" || strand.status === "dark") current.available += 1;
+    summaries.set(strand.cableId, current);
   }
-  return counts;
+  return summaries;
 }
 
 function countByCable(assignments: FiberAssignment[]): Map<string, number> {

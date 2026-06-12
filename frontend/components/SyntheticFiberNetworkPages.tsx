@@ -20,6 +20,12 @@ type SyntheticFiberData = {
   error: string;
 };
 
+type SyntheticOpgwCableData = {
+  opgw: OpgwCableCollection["features"];
+  error: string;
+  loading: boolean;
+};
+
 const emptyData: SyntheticFiberData = {
   structures: [],
   opgw: [],
@@ -32,6 +38,12 @@ const emptyData: SyntheticFiberData = {
   error: "",
 };
 
+const emptyOpgwCableData: SyntheticOpgwCableData = {
+  opgw: [],
+  error: "",
+  loading: true,
+};
+
 export function TransmissionStructuresPage() {
   const data = useSyntheticFiberData();
   const rows = data.structures.map((feature) => feature.properties as unknown as JsonRecord);
@@ -39,9 +51,17 @@ export function TransmissionStructuresPage() {
 }
 
 export function OpgwCablesPage() {
-  const data = useSyntheticFiberData();
-  const rows = data.opgw.map((feature) => ({ ...feature.properties, structureCount: feature.properties.structureIds.length, spliceClosureCount: feature.properties.connectedSpliceClosureIds.length }) as unknown as JsonRecord);
-  return <SyntheticPage title="OPGW Cables" subtitle="Synthetic OPGW planning cables randomly assigned to public transmission lines." error={data.error}><DataTable rows={rows} columns={["cableName", "lineId", "status", "fiberCount", "routeMiles", "structureCount", "spliceClosureCount", "source"]} filterField="status" /></SyntheticPage>;
+  const data = useOpgwCableData();
+  const rows = useMemo(() => data.opgw.map((feature) => ({
+    ...feature.properties,
+    structureCount: feature.properties.structureIds.length,
+    spliceClosureCount: feature.properties.connectedSpliceClosureIds.length,
+  }) as unknown as JsonRecord), [data.opgw]);
+  return (
+    <SyntheticPage title="OPGW Cables" subtitle="Synthetic OPGW planning cables randomly assigned to public transmission lines." error={data.error}>
+      {data.loading ? <div className="panel panel-body">Loading OPGW cable index...</div> : <DataTable rows={rows} columns={["cableName", "lineId", "status", "fiberCount", "routeMiles", "structureCount", "spliceClosureCount", "source"]} filterField="status" />}
+    </SyntheticPage>
+  );
 }
 
 export function FiberStrandTablePage() {
@@ -179,6 +199,32 @@ function useSyntheticFiberData() {
   return data;
 }
 
+function useOpgwCableData() {
+  const [data, setData] = useState<SyntheticOpgwCableData>(emptyOpgwCableData);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const opgw = await fetchJson<OpgwCableCollection>("/data/iso-ne-synthetic-opgw-cables.geojson");
+        if (!cancelled) setData({ opgw: opgw.features || [], error: "", loading: false });
+      } catch (error) {
+        if (!cancelled) {
+          setData({
+            opgw: [],
+            error: error instanceof Error ? error.message : "Could not load synthetic OPGW cable data.",
+            loading: false,
+          });
+        }
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return data;
+}
+
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <article className="metric-card">
@@ -190,7 +236,7 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: ${response.status} ${response.statusText}`);
   return await response.json() as T;
 }
