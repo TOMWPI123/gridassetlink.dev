@@ -1217,6 +1217,7 @@ const moduleLayerCoverage: Record<string, StreetMapLayerKey[]> = {
   "/splice-matrix": ["existingFiberSplices", "proposedFiberSplices", "compareSpliceLayers"],
   "/fiber-strand-table": ["fiberStrandsLayer", "availableStrandCapacity"],
   "/fiber-assignment-planner": ["fiberAssignments", "availableStrandCapacity", "criticalRidingCircuits"],
+  "/guide": ["designAssets", "distributionFiberRoutes", "fiberAssignments", "spliceClosures"],
   "/import-export": ["publicTransmissionLines", "publicSubstations", "syntheticOpgwCables"],
   "/data-sources": ["publicTransmissionLines", "publicSubstations", "fccUtilityTowers", "fccMicrowaveLinks"],
   "/sql-reports": ["publicTransmissionLines", "publicSubstations", "opgwOutageImpact", "availableStrandCapacity"],
@@ -4746,6 +4747,7 @@ function DatabaseGuideDrawer({
       <div className="dashboard-guide-actions">
         <button type="button" disabled={Boolean(busyKey)} onClick={onRunAll}><Database size={14} />{busyKey === "complete-guide-package" ? "Creating..." : "Create complete guide package"}</button>
         <button type="button" onClick={onOpenDesignRecords}><PencilRuler size={14} />Open Design records</button>
+        <Link href="/guide"><BookOpen size={14} />Open full Guide module</Link>
         <Link href="/admin/database"><Database size={14} />Open database admin</Link>
       </div>
       {message ? <p className="dashboard-gis-message">{message}</p> : null}
