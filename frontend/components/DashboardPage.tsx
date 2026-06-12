@@ -1305,6 +1305,7 @@ export function DashboardPage() {
   const [designAssetTypes, setDesignAssetTypes] = useState<DesignAssetType[]>([]);
   const [designAssetRecords, setDesignAssetRecords] = useState<DesignAssetRecord[]>([]);
   const [selectedDesignAssetTypeSlug, setSelectedDesignAssetTypeSlug] = useState("");
+  const [designQuickToolKey, setDesignQuickToolKey] = useState("");
   const [pendingDesignGeometry, setPendingDesignGeometry] = useState<DesignAssetGeoJsonGeometry | null>(null);
   const [designDrawingCoordinates, setDesignDrawingCoordinates] = useState<Coordinate[]>([]);
   const [designAssetMessage, setDesignAssetMessage] = useState("");
@@ -3103,6 +3104,56 @@ export function DashboardPage() {
     issueMapCommand("resize");
   }
 
+  function openDashboardChangeTool(toolKey: string | null, toastMessage: string) {
+    setDesignModeEnabled(true);
+    setStreetLayers((current) => ({
+      ...current,
+      designAssets: true,
+      opgwSplicePoints: true,
+      spliceClosures: true,
+      existingFiberSplices: true,
+      proposedFiberSplices: true,
+      compareSpliceLayers: toolKey === "create-fiber-splice" ? true : current.compareSpliceLayers,
+    }));
+    setSearchLayerFilter(toolKey ? "opgwSplicePoints" : "designAssets");
+    setVisibilityFilter("synthetic-demo");
+    setRightMode("design");
+    setRightCollapsed(false);
+    setActiveTool("select");
+    if (toolKey) setDesignQuickToolKey(`${toolKey}:${Date.now()}`);
+    void loadDesignAssets(true);
+    showToast(toastMessage);
+    issueMapCommand("resize");
+  }
+
+  function handleChangeAssetsClick() {
+    openDashboardChangeTool(null, selectedAsset ? `Ready to change ${selectedAsset.label}.` : "Change Assets opened. Select an asset or add a new design record.");
+  }
+
+  function handleAddSplicePointClick() {
+    openDashboardChangeTool("create-splice", "Add Splice Point opened. Draw or place the closure, then save the form.");
+  }
+
+  function handleAddSpliceRowClick() {
+    openDashboardChangeTool("create-fiber-splice", "Add Splice Row opened. Enter incoming/outgoing cables and strands.");
+  }
+
+  function handleOpenSpliceMatrixClick() {
+    setStreetLayers((current) => ({
+      ...current,
+      opgwSplicePoints: true,
+      spliceClosures: true,
+      existingFiberSplices: true,
+      proposedFiberSplices: true,
+      compareSpliceLayers: true,
+    }));
+    setSearchLayerFilter("opgwSplicePoints");
+    setVisibilityFilter("synthetic-demo");
+    setRightMode("splices");
+    setRightCollapsed(false);
+    showToast("Splice Matrix opened with existing and proposed splice layers visible.");
+  }
+
   function handleGuideClick() {
     window.location.assign("/guide");
   }
@@ -3445,6 +3496,14 @@ export function DashboardPage() {
             <BookOpen size={14} />
             Guide
           </button>
+          <button
+            type="button"
+            className={rightMode === "design" ? "active" : ""}
+            onClick={handleChangeAssetsClick}
+          >
+            <Plus size={14} />
+            Change Assets
+          </button>
           <Link href="/admin/database" className="dashboard-mode-link">
             <Database size={14} />
             Backend Modules
@@ -3505,6 +3564,14 @@ export function DashboardPage() {
         <button type="button" onClick={() => issueMapCommand("fitActiveMap")}><Maximize2 size={15} />Fit active map</button>
         <button type="button" onClick={() => setMapWindowClosed(true)}><X size={15} />Close map</button>
       </div>
+
+      <DashboardChangeActions
+        selectedAsset={selectedAsset}
+        onChangeAssets={handleChangeAssetsClick}
+        onAddSplicePoint={handleAddSplicePointClick}
+        onAddSpliceRow={handleAddSpliceRowClick}
+        onOpenSpliceMatrix={handleOpenSpliceMatrixClick}
+      />
 
       <aside className="dashboard-side-layer-digest" aria-label="Active map layers">
         <LayerSummaryDigest layerSummaries={dashboardLayerSummaries} compact title="Active Map Layers" />
