@@ -13,6 +13,7 @@ import { seedTransmissionMaps } from "@/data/transmissionMaps";
 import { traceSyntheticService } from "@/lib/opgw/continuityEngine";
 import { findStrandContinuityRecord } from "@/lib/opgw/strandContinuity";
 import { API_BASE, LOCAL_GIS_API_BASE, clearStoredGisApiBase, fetchFromApiBase, getStoredGisApiBase, normalizeApiBase, saveGisApiBase } from "@/lib/api";
+import { databaseIntegrationParameterGroups, databaseObjectInteractionPaths } from "@/lib/databaseIntegrationGuide";
 import { buildSyntheticOpgwEngineeringModel } from "@/lib/opgw/spanModel";
 import { publicTransmissionLineOwner } from "@/lib/map/public-owner";
 import { LinkedAssetDetailPanel } from "@/components/map/LinkedAssetDetailPanel";
@@ -1677,7 +1678,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
-    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design"];
+    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design", "guide"];
     if (drawer && allowedDrawers.includes(drawer as RightDrawerMode)) {
       setRightMode(drawer as RightDrawerMode);
       setRightCollapsed(false);
@@ -3165,7 +3166,9 @@ export function DashboardPage() {
   }
 
   function handleGuideClick() {
-    window.location.assign("/guide");
+    setRightMode("guide");
+    setRightCollapsed(false);
+    window.history.replaceState(null, "", `${window.location.pathname}?drawer=guide`);
   }
 
   function openGuideDesignRecords() {
@@ -5175,6 +5178,24 @@ function DatabaseGuideDrawer({
       <div className="dashboard-guide-callout">
         <strong>No-code database updates</strong>
         <span>Use the buttons below to create or update synthetic Design Mode records. No JSON, payload editing, or coding is required; the app handles the database changes behind the scenes.</span>
+      </div>
+      <div className="dashboard-guide-integration">
+        <div>
+          <strong>Define required parameters first</strong>
+          <span>Every object should have identity, lifecycle, geometry, relationship keys, engineering parameters, and evidence fields before it is fully integrated with modules, map layers, traces, splices, and work orders.</span>
+        </div>
+        <div className="dashboard-guide-integration-grid">
+          {databaseIntegrationParameterGroups.map((group) => (
+            <article key={group.title}>
+              <strong>{group.title}</strong>
+              <div>{group.requiredParameters.map((parameter) => <span key={parameter}>{parameter}</span>)}</div>
+            </article>
+          ))}
+        </div>
+        <div className="dashboard-guide-mini-list">
+          <strong>Interaction paths</strong>
+          <div>{databaseObjectInteractionPaths.map((path) => <span key={path.title}>{path.title}</span>)}</div>
+        </div>
       </div>
       <div className="dashboard-guide-actions">
         <button type="button" disabled={Boolean(busyKey)} onClick={onRunAll}><Database size={14} />{busyKey === "complete-guide-package" ? "Creating..." : "Create complete guide package"}</button>

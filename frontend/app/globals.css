@@ -286,7 +286,9 @@ a { color: inherit; text-decoration: none; }
 .guide-object-grid,
 .guide-action-grid,
 .guide-workflow-list,
-.guide-quick-link-grid {
+.guide-quick-link-grid,
+.guide-integration-grid,
+.guide-integration-paths {
   display: grid;
   gap: 12px;
 }
@@ -298,7 +300,9 @@ a { color: inherit; text-decoration: none; }
 .guide-module-flow article,
 .guide-object-grid article,
 .guide-action-grid article,
-.guide-workflow-list article {
+.guide-workflow-list article,
+.guide-integration-grid article,
+.guide-integration-paths article {
   min-width: 0;
   padding: 12px;
   border: 1px solid var(--line);
@@ -314,7 +318,9 @@ a { color: inherit; text-decoration: none; }
 
 .guide-module-flow strong,
 .guide-object-grid strong,
-.guide-workflow-list strong {
+.guide-workflow-list strong,
+.guide-integration-grid strong,
+.guide-integration-paths strong {
   color: #0b4f52;
   line-height: 1.25;
 }
@@ -322,7 +328,10 @@ a { color: inherit; text-decoration: none; }
 .guide-module-flow span,
 .guide-object-grid span,
 .guide-workflow-list span,
-.guide-workflow-list li {
+.guide-workflow-list li,
+.guide-integration-grid span,
+.guide-integration-grid li,
+.guide-integration-paths span {
   color: #34495c;
   font-size: 12px;
   line-height: 1.45;
@@ -406,6 +415,34 @@ a { color: inherit; text-decoration: none; }
 .guide-action-review strong {
   color: #155b38;
   font-size: 12px;
+}
+
+.guide-integration-grid {
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+}
+
+.guide-integration-grid article,
+.guide-integration-paths article {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+}
+
+.guide-integration-grid ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.guide-integration-paths {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.guide-integration-paths > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
 }
 
 .guide-implementation {
@@ -607,6 +644,65 @@ a { color: inherit; text-decoration: none; }
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 12px;
+}
+
+.admin-integration-guide {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-integration-guide > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-interaction-heading {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-integration-guide > div:first-child span,
+.admin-interaction-heading span,
+.admin-integration-grid span,
+.admin-interaction-grid span,
+.admin-interaction-grid small {
+  color: #34495d;
+  font-size: .88rem;
+  line-height: 1.42;
+}
+
+.admin-integration-grid,
+.admin-interaction-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-integration-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-interaction-grid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.admin-integration-grid article,
+.admin-interaction-grid article {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.admin-interaction-grid small {
+  color: var(--muted);
+  font-weight: 720;
 }
 
 .admin-service-guide {
@@ -6626,6 +6722,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 }
 
 .dashboard-guide-callout,
+.dashboard-guide-integration,
 .dashboard-guide-workflows article,
 .dashboard-guide-records,
 .dashboard-guide-payload {
@@ -6638,6 +6735,55 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   display: grid;
   gap: 5px;
   padding: 10px;
+}
+
+.dashboard-guide-integration {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.dashboard-guide-integration > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.dashboard-guide-integration > div:first-child span,
+.dashboard-guide-integration-grid article > div span {
+  color: var(--dash-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.dashboard-guide-integration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dashboard-guide-integration-grid article {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(238,252,251,.1);
+  border-radius: 8px;
+  background: rgba(0,0,0,.18);
+}
+
+.dashboard-guide-integration-grid article > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.dashboard-guide-integration-grid article > div span {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(105,215,228,.1);
+  overflow-wrap: anywhere;
 }
 
 .dashboard-guide-callout span,
@@ -8513,6 +8659,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   }
   .dashboard-guide-actions,
   .dashboard-guide-card-actions,
+  .dashboard-guide-integration-grid,
   .dashboard-guide-section-grid,
   .dashboard-guide-workflow-heading {
     grid-template-columns: 1fr;
@@ -8529,7 +8676,15 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   }
   .guide-implementation-hero,
   .guide-implementation-grid,
-  .guide-checklist-grid {
+  .guide-checklist-grid,
+  .admin-integration-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .guide-integration-paths > div,
+  .admin-interaction-grid {
     grid-template-columns: 1fr;
   }
 }

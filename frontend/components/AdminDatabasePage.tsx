@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Archive, BookOpen, ClipboardList, Copy, Database, History, Map, Plus, RefreshCw, Save, ShieldCheck, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, canWrite, displayValue, formatLabel } from "@/lib/api";
+import { databaseIntegrationParameterGroups, databaseObjectInteractionPaths } from "@/lib/databaseIntegrationGuide";
 import type { DesignAssetField, DesignAssetFieldType, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignIssuedWorkOrderResult } from "@/lib/types/assets";
 import type { JsonRecord } from "@/types";
 import { DataTable } from "@/components/DataTable";
@@ -702,6 +703,34 @@ export function AdminDatabasePage() {
             <Link className="button" href="/dashboard?drawer=design"><Map size={15} />Open map design mode</Link>
             <Link className="button" href="/work-orders"><ClipboardList size={15} />View work orders</Link>
             <Link className="button" href="/import-export"><Upload size={15} />Import / Export</Link>
+          </div>
+          <div className="admin-integration-guide">
+            <div>
+              <strong>Required parameters for full database integration</strong>
+              <span>Define these fields before saving a custom object type or materializing design records into backend modules.</span>
+            </div>
+            <div className="admin-integration-grid">
+              {databaseIntegrationParameterGroups.map((group) => (
+                <article key={group.title}>
+                  <strong>{group.title}</strong>
+                  <span>{group.description}</span>
+                  <div className="guide-chip-list">{group.requiredParameters.map((parameter) => <span key={parameter}>{parameter}</span>)}</div>
+                </article>
+              ))}
+            </div>
+            <div className="admin-interaction-heading">
+              <strong>How objects interact with the rest of the database</strong>
+              <span>Use these paths to connect records to map layers, backend modules, fiber continuity, devices, services, circuits, and work orders.</span>
+            </div>
+            <div className="admin-interaction-grid">
+              {databaseObjectInteractionPaths.map((path) => (
+                <article key={path.title}>
+                  <strong>{path.title}</strong>
+                  <span>{path.summary}</span>
+                  <small>{path.actions.join(" -> ")}</small>
+                </article>
+              ))}
+            </div>
           </div>
           <div className="admin-service-guide">
             <div>

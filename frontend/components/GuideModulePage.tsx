@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BookOpen, Cable, ClipboardList, Database, GitBranch, Map, PanelTop, Plus, Route, Save, Split, TableProperties, Upload, Waypoints } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, canWrite } from "@/lib/api";
+import { databaseIntegrationParameterGroups, databaseObjectInteractionPaths } from "@/lib/databaseIntegrationGuide";
 import type { DesignAssetField, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetRecord } from "@/lib/types/assets";
 
 type GuideAssetType = {
@@ -718,6 +719,40 @@ export function GuideModulePage() {
           <span>Use this module for synthetic planning data and UI-driven edits only. Make edits to living data by staging proposed Design Mode records, issuing work orders, and reviewing closeout before materialization. Do not enter CEII, SCADA, relay/protection settings, operational telecom access, credentials, or private fiber-route details.</span>
           {message ? <span className="badge active">{message}</span> : null}
           {!writable ? <span className="badge red">This no-account demo is currently read-only. Check backend write settings before creating guide records.</span> : null}
+        </div>
+      </section>
+
+      <section className="panel guide-module-section">
+        <div className="panel-header">
+          <div>
+            <strong>Define these parameters before database integration</strong>
+            <div className="subtle">Use this checklist whenever you add poles, spans, splices, strands, patch panels, devices, services, imports, or custom objects.</div>
+          </div>
+          <Database size={18} />
+        </div>
+        <div className="panel-body">
+          <div className="guide-integration-grid">
+            {databaseIntegrationParameterGroups.map((group) => (
+              <article key={group.title}>
+                <strong>{group.title}</strong>
+                <span>{group.description}</span>
+                <div className="guide-chip-list">{group.requiredParameters.map((parameter) => <span key={parameter}>{parameter}</span>)}</div>
+                <ul>{group.interactionTips.map((tip) => <li key={tip}>{tip}</li>)}</ul>
+              </article>
+            ))}
+          </div>
+          <div className="guide-integration-paths">
+            <strong>How database objects interact with the rest of the tool</strong>
+            <div>
+              {databaseObjectInteractionPaths.map((path) => (
+                <article key={path.title}>
+                  <strong>{path.title}</strong>
+                  <span>{path.summary}</span>
+                  <div className="guide-chip-list">{path.linkedObjects.map((object) => <span key={object}>{object}</span>)}</div>
+                </article>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
