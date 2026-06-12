@@ -3497,6 +3497,7 @@ export function DashboardPage() {
       </div>
 
       <div className="dashboard-top-right-toolbar" aria-label="Map toolbar">
+        <Link href="/admin/database"><Database size={15} />Backend Modules</Link>
         <button type="button" onClick={() => issueMapCommand("resetIsoNe")}><LocateFixed size={15} />Reset to ISO-NE</button>
         <button type="button" onClick={() => issueMapCommand("fitActiveMap")}><Maximize2 size={15} />Fit active map</button>
         <button type="button" onClick={() => setMapWindowClosed(true)}><X size={15} />Close map</button>

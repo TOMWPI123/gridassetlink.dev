@@ -5651,6 +5651,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 .dashboard-mode-toggle,
 .dashboard-map-global-search,
 .dashboard-map-layer-select,
+.dashboard-top-right-toolbar a,
 .dashboard-top-right-toolbar button,
 .dashboard-left-filter-panel,
 .dashboard-right-floating-drawer,
@@ -7040,6 +7041,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   max-width: 540px;
 }
 
+.dashboard-top-right-toolbar a,
 .dashboard-top-right-toolbar button,
 .dashboard-panel-collapse,
 .dashboard-drawer-tabs button,
@@ -7049,6 +7051,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   cursor: pointer;
 }
 
+.dashboard-top-right-toolbar a,
 .dashboard-top-right-toolbar button {
   display: inline-flex;
   align-items: center;
