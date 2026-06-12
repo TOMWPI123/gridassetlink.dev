@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { GitBranch, Play } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { apiFetch, displayValue } from "@/lib/api";
 import { loadModuleLayerData } from "@/lib/moduleLayerData";
 import type { JsonRecord } from "@/types";
@@ -15,6 +15,7 @@ type CircuitTraceMode = "backend" | "synthetic" | "assignment" | "context";
 type CircuitTraceCandidate = JsonRecord & {
   display_id: string;
   display_name: string;
+  search_text: string;
   source_label: string;
   trace_href?: string;
   trace_key: string;
@@ -22,6 +23,8 @@ type CircuitTraceCandidate = JsonRecord & {
 };
 
 const MAX_FIBER_TRACE_CHOICES = 36;
+let cachedLayerCircuitCandidates: CircuitTraceCandidate[] | null = null;
+let layerCircuitCandidatesPromise: Promise<CircuitTraceCandidate[]> | null = null;
 
 export function CircuitDetailPage({ id }: { id: string }) {
   const [tab, setTab] = useState("Overview");
@@ -53,38 +56,55 @@ export function FiberTracePage() {
   const [query, setQuery] = useState("");
   const [trace, setTrace] = useState<TraceResponse | null>(null);
   const [context, setContext] = useState<CircuitTraceCandidate | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isBackendLoading, setIsBackendLoading] = useState(true);
+  const [isLayerLoading, setIsLayerLoading] = useState(true);
+  const [isTraceLoading, setIsTraceLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isPending, startTransition] = useTransition();
   const deferredQuery = useDeferredValue(query);
   useEffect(() => {
     let cancelled = false;
-    async function loadCircuits() {
-      setIsLoading(true);
+    const applyCandidates = (nextCandidates: CircuitTraceCandidate[]) => {
+      if (cancelled || !nextCandidates.length) return;
+      startTransition(() => {
+        setCircuits((current) => mergeCircuitTraceCandidates(current, nextCandidates));
+        setSelectedKey((current) => current || nextCandidates[0]?.trace_key || "");
+      });
+    };
+    async function loadBackendCircuits() {
+      setIsBackendLoading(true);
       setError("");
-      const [backendResult, moduleResult] = await Promise.allSettled([
-        apiFetch<JsonRecord[]>("/api/circuits"),
-        loadModuleLayerData("circuits"),
-      ]);
-      if (cancelled) return;
-      const backendRows = backendResult.status === "fulfilled"
-        ? backendResult.value.map((row) => ({ ...row, layer: row.layer || "Backend planning database" }))
-        : [];
-      const moduleRows = moduleResult.status === "fulfilled" && moduleResult.value ? moduleResult.value.rows : [];
-      const candidates = uniqueCircuitTraceCandidates([...backendRows, ...moduleRows].map(buildCircuitTraceCandidate));
-      setCircuits(candidates);
-      setSelectedKey(candidates[0]?.trace_key || "");
-      if (backendResult.status === "rejected" && moduleResult.status === "rejected") setError("Circuit sources did not load. Check the backend and static layer files.");
-      else if (backendResult.status === "rejected") setError("Backend circuit traces are unavailable, but synthetic layer circuits loaded.");
-      else if (moduleResult.status === "rejected") setError("Layer-backed synthetic circuits are unavailable, but backend circuits loaded.");
-      setIsLoading(false);
+      try {
+        const backendRows = await apiFetch<JsonRecord[]>("/api/circuits");
+        applyCandidates(backendRows.map((row) => buildCircuitTraceCandidate({ ...row, layer: row.layer || "Backend planning database" })));
+      } catch {
+        if (!cancelled) setError("Backend circuit traces are unavailable; loading layer-backed circuit rows instead.");
+      } finally {
+        if (!cancelled) setIsBackendLoading(false);
+      }
     }
-    void loadCircuits();
-    return () => { cancelled = true; };
-  }, []);
-  const filteredCircuits = useMemo(() => filterCircuitTraceCandidates(circuits, deferredQuery), [circuits, deferredQuery]);
-  const visibleCircuits = filteredCircuits.slice(0, MAX_FIBER_TRACE_CHOICES);
-  const selectedCircuit = filteredCircuits.find((candidate) => candidate.trace_key === selectedKey) || visibleCircuits[0] || circuits[0];
-  const traceableCount = circuits.filter((candidate) => candidate.trace_mode !== "context").length;
+    async function loadLayerCircuits() {
+      setIsLayerLoading(true);
+      try {
+        applyCandidates(await loadLayerCircuitCandidates());
+      } catch {
+        if (!cancelled) setError((current) => current || "Layer-backed synthetic circuits are unavailable, but backend circuits may still be usable.");
+      } finally {
+        if (!cancelled) setIsLayerLoading(false);
+      }
+    }
+    void loadBackendCircuits();
+    const cancelIdleLoad = cachedLayerCircuitCandidates ? (void loadLayerCircuits(), () => undefined) : scheduleIdleWork(loadLayerCircuits);
+    return () => {
+      cancelled = true;
+      cancelIdleLoad();
+    };
+  }, [startTransition]);
+  const searchResult = useMemo(() => searchCircuitTraceCandidates(circuits, deferredQuery, selectedKey), [circuits, deferredQuery, selectedKey]);
+  const visibleCircuits = searchResult.visible;
+  const selectedCircuit = searchResult.selected || circuits[0];
+  const traceableCount = useMemo(() => circuits.reduce((count, candidate) => count + (candidate.trace_mode === "context" ? 0 : 1), 0), [circuits]);
+  const isCatalogLoading = isBackendLoading || isLayerLoading || isPending;
   async function runSelectedTrace() {
     if (!selectedCircuit) return;
     setTrace(null);
@@ -96,12 +116,15 @@ export function FiberTracePage() {
     }
     if (selectedCircuit.trace_mode === "backend") {
       const backendId = String(selectedCircuit.id || selectedCircuit.circuit_id || selectedCircuit.display_id);
+      setIsTraceLoading(true);
       try {
         const nextTrace = await apiFetch<TraceResponse>(`/api/circuits/${encodeURIComponent(backendId)}/trace`);
         setTrace(nextTrace);
       } catch {
         setError("This circuit is listed, but the backend trace endpoint did not return a path. Showing circuit context instead.");
         setContext(selectedCircuit);
+      } finally {
+        setIsTraceLoading(false);
       }
       return;
     }
@@ -116,9 +139,9 @@ export function FiberTracePage() {
         </div>
         <div className="toolbar">
           {selectedCircuit?.trace_href ? (
-            <button className="button primary" onClick={runSelectedTrace} disabled={isLoading}><GitBranch size={16} />Open Trace</button>
+            <button className="button primary" type="button" onClick={runSelectedTrace} disabled={!selectedCircuit}><GitBranch size={16} />Open Trace</button>
           ) : (
-            <button className="button primary" onClick={runSelectedTrace} disabled={!selectedCircuit || isLoading}><Play size={16} />Run</button>
+            <button className="button primary" type="button" onClick={runSelectedTrace} disabled={!selectedCircuit || isTraceLoading}><Play size={16} />{isTraceLoading ? "Running" : "Run"}</button>
           )}
         </div>
       </div>
@@ -135,6 +158,7 @@ export function FiberTracePage() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
+        {isCatalogLoading ? <div className="fiber-trace-loading">Loading circuit sources progressively. The search box remains usable while synthetic layer rows stream in.</div> : null}
         {error ? <div className="fiber-trace-warning">{error}</div> : null}
         <div className="fiber-trace-result-grid" aria-label="Fiber trace circuit choices">
           {visibleCircuits.map((candidate) => (
@@ -159,7 +183,7 @@ export function FiberTracePage() {
           ))}
         </div>
         <div className="subtle">
-          Showing {visibleCircuits.length.toLocaleString()} of {filteredCircuits.length.toLocaleString()} matches. Public/reference rows are displayed as context unless a synthetic fiber continuity path exists.
+          Showing {visibleCircuits.length.toLocaleString()} of {searchResult.count.toLocaleString()} matches. Public/reference rows are displayed as context unless a synthetic fiber continuity path exists.
         </div>
       </section>
       {context ? <CircuitTraceContextPanel circuit={context} /> : <TraceViewer trace={trace} />}
@@ -182,11 +206,79 @@ function buildCircuitTraceCandidate(row: JsonRecord): CircuitTraceCandidate {
     ...row,
     display_id: displayId,
     display_name: displayName,
+    search_text: buildCircuitSearchText(row, layer, displayId, displayName),
     source_label: layer,
     trace_href: traceHref,
     trace_key: `${layer}:${id}:${circuitId}`,
     trace_mode: traceMode,
   };
+}
+
+async function loadLayerCircuitCandidates() {
+  if (cachedLayerCircuitCandidates) return cachedLayerCircuitCandidates;
+  layerCircuitCandidatesPromise ||= loadModuleLayerData("circuits").then((moduleData) => {
+    const candidates = uniqueCircuitTraceCandidates((moduleData?.rows || []).map(buildCircuitTraceCandidate));
+    cachedLayerCircuitCandidates = candidates;
+    return candidates;
+  }).catch((error) => {
+    layerCircuitCandidatesPromise = null;
+    throw error;
+  });
+  return layerCircuitCandidatesPromise;
+}
+
+function mergeCircuitTraceCandidates(current: CircuitTraceCandidate[], incoming: CircuitTraceCandidate[]) {
+  if (!current.length) return uniqueCircuitTraceCandidates(incoming);
+  const seen = new Set(current.map((candidate) => candidate.trace_key.toLowerCase()));
+  const merged = [...current];
+  incoming.forEach((candidate) => {
+    const key = candidate.trace_key.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(candidate);
+  });
+  return merged;
+}
+
+function buildCircuitSearchText(row: JsonRecord, layer: string, displayId: string, displayName: string) {
+  return [
+    displayId,
+    displayName,
+    layer,
+    row.service_type,
+    row.ownership_type,
+    row.owner,
+    row.utility_owner,
+    row.provider_id,
+    row.provider_name,
+    row.a_end_site,
+    row.z_end_site,
+    row.a_end,
+    row.z_end,
+    row.a_end_icon_node,
+    row.z_end_icon_node,
+    row.primary_path,
+    row.primary_route,
+    row.backup_path,
+    row.backup_route,
+    row.status,
+    row.operational_status,
+    row.service_status,
+  ].map((value) => displayValue(value).toLowerCase()).join(" ");
+}
+
+function scheduleIdleWork(callback: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+  const schedule = window as Window & {
+    requestIdleCallback?: (handler: () => void, options?: { timeout: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
+  if (schedule.requestIdleCallback) {
+    const handle = schedule.requestIdleCallback(callback, { timeout: 900 });
+    return () => schedule.cancelIdleCallback?.(handle);
+  }
+  const timeout = window.setTimeout(callback, 120);
+  return () => window.clearTimeout(timeout);
 }
 
 function syntheticTraceHref(row: JsonRecord, layer: string, serviceId: string, circuitId: string) {
@@ -210,29 +302,18 @@ function uniqueCircuitTraceCandidates(candidates: CircuitTraceCandidate[]) {
   });
 }
 
-function filterCircuitTraceCandidates(candidates: CircuitTraceCandidate[], query: string) {
+function searchCircuitTraceCandidates(candidates: CircuitTraceCandidate[], query: string, selectedKey: string) {
   const normalized = query.trim().toLowerCase();
-  if (!normalized) return candidates;
-  return candidates.filter((candidate) => {
-    const values = [
-      candidate.display_id,
-      candidate.display_name,
-      candidate.source_label,
-      candidate.service_type,
-      candidate.ownership_type,
-      candidate.owner,
-      candidate.utility_owner,
-      candidate.a_end_site,
-      candidate.z_end_site,
-      candidate.a_end_icon_node,
-      candidate.z_end_icon_node,
-      candidate.primary_path,
-      candidate.backup_path,
-      candidate.status,
-      candidate.operational_status,
-    ];
-    return values.some((value) => displayValue(value).toLowerCase().includes(normalized));
-  });
+  const visible: CircuitTraceCandidate[] = [];
+  let selected: CircuitTraceCandidate | null = null;
+  let count = 0;
+  for (const candidate of candidates) {
+    if (normalized && !candidate.search_text.includes(normalized)) continue;
+    count += 1;
+    if (visible.length < MAX_FIBER_TRACE_CHOICES) visible.push(candidate);
+    if (candidate.trace_key === selectedKey) selected = candidate;
+  }
+  return { count, selected, visible };
 }
 
 function CircuitTraceContextPanel({ circuit }: { circuit: CircuitTraceCandidate }) {
