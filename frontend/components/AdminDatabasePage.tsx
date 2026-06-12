@@ -4,21 +4,24 @@ import Link from "next/link";
 import { Archive, BookOpen, ClipboardList, Copy, Database, History, Map, Plus, RefreshCw, Save, ShieldCheck, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, canWrite, displayValue, formatLabel } from "@/lib/api";
-import type { DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignIssuedWorkOrderResult } from "@/lib/types/assets";
+import type { DesignAssetField, DesignAssetFieldType, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignIssuedWorkOrderResult } from "@/lib/types/assets";
 import type { JsonRecord } from "@/types";
 import { DataTable } from "@/components/DataTable";
 
-const defaultFields = JSON.stringify([
+const defaultAdminFields: DesignAssetField[] = [
   { name: "object_name", label: "Object name", type: "string", required: true },
   { name: "category", label: "Category", type: "string" },
   { name: "status", label: "Status", type: "enum", enum_options: ["proposed", "planned", "active", "as_built"] },
   { name: "notes", label: "Notes", type: "textarea" },
-], null, 2);
+];
 
-const defaultStyle = JSON.stringify({ color: "#55d6ff", radius: 8, lineWidth: 3, fillOpacity: 0.18 }, null, 2);
+const defaultAdminStyle = { color: "#55d6ff", radius: 8, lineWidth: 3, fillOpacity: 0.18 };
+const defaultAdminPropertiesObject = { object_name: "Synthetic admin-created planning object", category: "database-admin", status: "planned", notes: "Synthetic/demo data only." };
+const defaultFields = JSON.stringify(defaultAdminFields, null, 2);
+const defaultStyle = JSON.stringify(defaultAdminStyle, null, 2);
 const defaultPointGeometry = JSON.stringify({ type: "Point", coordinates: [-71.8023, 42.2626] }, null, 2);
 const defaultLineGeometry = JSON.stringify({ type: "LineString", coordinates: [[-71.82, 42.25], [-71.78, 42.28]] }, null, 2);
-const defaultProperties = JSON.stringify({ object_name: "Synthetic admin-created planning object", category: "database-admin", status: "planned", notes: "Synthetic/demo data only." }, null, 2);
+const defaultProperties = JSON.stringify(defaultAdminPropertiesObject, null, 2);
 const designRecordStatuses: DesignAssetRecord["status"][] = ["proposed", "planned", "in_review", "active", "as_built", "archived"];
 
 const adminGuideCards = [
@@ -125,8 +128,8 @@ type AdminDesignTemplate = {
   description: string;
   slug: string;
   typeName: string;
-  geometryType: DesignAssetType["geometry_type"];
-  fields: JsonRecord[];
+  geometryType: DesignAssetGeometryType;
+  fields: DesignAssetField[];
   style: JsonRecord;
   recordPrefix: string;
   recordLabel: string;
@@ -253,11 +256,14 @@ export function AdminDatabasePage() {
   const [geometryType, setGeometryType] = useState<DesignAssetType["geometry_type"]>("point");
   const [fieldsText, setFieldsText] = useState(defaultFields);
   const [styleText, setStyleText] = useState(defaultStyle);
+  const [fieldDrafts, setFieldDrafts] = useState<DesignAssetField[]>(defaultAdminFields);
+  const [styleDraft, setStyleDraft] = useState({ color: defaultAdminStyle.color, radius: String(defaultAdminStyle.radius), lineWidth: String(defaultAdminStyle.lineWidth), fillOpacity: String(defaultAdminStyle.fillOpacity) });
   const [selectedTypeSlug, setSelectedTypeSlug] = useState("");
   const [recordKey, setRecordKey] = useState(`ADMIN-OBJECT-${Date.now().toString(36).toUpperCase()}`);
   const [recordLabel, setRecordLabel] = useState("Admin-created planning object");
   const [recordStatus, setRecordStatus] = useState<DesignAssetRecord["status"]>("planned");
   const [propertiesText, setPropertiesText] = useState(defaultProperties);
+  const [propertyDraft, setPropertyDraft] = useState<Record<string, string>>(propertiesToAdminFieldDraft(defaultAdminFields, defaultAdminPropertiesObject));
   const [geometryText, setGeometryText] = useState(defaultPointGeometry);
   const [issuingRecordId, setIssuingRecordId] = useState<number | null>(null);
   const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
@@ -266,6 +272,7 @@ export function AdminDatabasePage() {
   const [editLabel, setEditLabel] = useState("");
   const [editStatus, setEditStatus] = useState<DesignAssetRecord["status"]>("planned");
   const [editPropertiesText, setEditPropertiesText] = useState("{}");
+  const [editPropertyDraft, setEditPropertyDraft] = useState<Record<string, string>>({});
   const [editGeometryText, setEditGeometryText] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [recordEvents, setRecordEvents] = useState<JsonRecord[]>([]);
@@ -279,6 +286,12 @@ export function AdminDatabasePage() {
   const mapRecords = records.filter((record) => record.geometry || record.geometry_json);
   const workLinkedRecords = records.filter((record) => designRecordWorkOrderNumber(record));
   const selectedRecord = records.find((record) => record.id === selectedRecordId) || records[0] || null;
+  const activeFields = useMemo(() => adminFieldsForType(activeType), [activeType]);
+  const selectedRecordType = useMemo(
+    () => selectedRecord ? assetTypes.find((item) => item.id === selectedRecord.asset_type_id || item.slug === selectedRecord.asset_type_slug) || null : null,
+    [assetTypes, selectedRecord?.asset_type_id, selectedRecord?.asset_type_slug],
+  );
+  const selectedRecordFields = useMemo(() => adminFieldsForType(selectedRecordType), [selectedRecordType]);
   const filteredRecords = useMemo(
     () => records.filter((record) => {
       if (recordStatusFilter === "open" && record.status === "archived") return false;
@@ -322,16 +335,20 @@ export function AdminDatabasePage() {
     if (activeType.geometry_type === "table_only") setGeometryText("");
     if (activeType.geometry_type === "point") setGeometryText(defaultPointGeometry);
     if (activeType.geometry_type === "line") setGeometryText(defaultLineGeometry);
-  }, [activeType?.slug, activeType?.geometry_type]);
+    const defaults = Object.fromEntries(activeFields.map((field) => [field.name, field.default ?? ""]));
+    setPropertyDraft(propertiesToAdminFieldDraft(activeFields, defaults));
+    setPropertiesText(JSON.stringify(adminFieldDraftToProperties(activeFields, propertiesToAdminFieldDraft(activeFields, defaults)), null, 2));
+  }, [activeType?.slug, activeType?.geometry_type, activeFields]);
 
   useEffect(() => {
     if (!selectedRecord) return;
     setEditLabel(selectedRecord.display_label);
     setEditStatus(selectedRecord.status);
     setEditPropertiesText(JSON.stringify(selectedRecord.properties || selectedRecord.properties_json || {}, null, 2));
+    setEditPropertyDraft(propertiesToAdminFieldDraft(selectedRecordFields, selectedRecord.properties || selectedRecord.properties_json || {}));
     setEditGeometryText(selectedRecord.geometry || selectedRecord.geometry_json ? JSON.stringify(selectedRecord.geometry || selectedRecord.geometry_json, null, 2) : "");
     setEditNotes(selectedRecord.notes || "");
-  }, [selectedRecord]);
+  }, [selectedRecord, selectedRecordFields]);
 
   useEffect(() => {
     if (!selectedRecord?.id) {
@@ -351,6 +368,82 @@ export function AdminDatabasePage() {
     };
   }, [selectedRecord?.id]);
 
+  function updateSchemaField(index: number, patch: Partial<DesignAssetField>) {
+    setFieldDrafts((current) => {
+      const next = current.map((field, fieldIndex) => fieldIndex === index ? { ...field, ...patch } : field);
+      setFieldsText(JSON.stringify(next, null, 2));
+      return next;
+    });
+  }
+
+  function updateSchemaFieldType(index: number, nextType: DesignAssetFieldType) {
+    setFieldDrafts((current) => {
+      const next = current.map((field, fieldIndex) => {
+        if (fieldIndex !== index) return field;
+        return {
+          ...field,
+          type: nextType,
+          enum_options: nextType === "enum" ? field.enum_options?.length ? field.enum_options : ["proposed", "planned", "active"] : [],
+        };
+      });
+      setFieldsText(JSON.stringify(next, null, 2));
+      return next;
+    });
+  }
+
+  function addSchemaField() {
+    setFieldDrafts((current) => {
+      const next = [...current, blankAdminField(current.length + 1)];
+      setFieldsText(JSON.stringify(next, null, 2));
+      return next;
+    });
+  }
+
+  function removeSchemaField(index: number) {
+    setFieldDrafts((current) => {
+      const next = current.filter((_, fieldIndex) => fieldIndex !== index);
+      setFieldsText(JSON.stringify(next, null, 2));
+      return next;
+    });
+  }
+
+  function updateStyleDraft(patch: Partial<typeof styleDraft>) {
+    setStyleDraft((current) => {
+      const next = { ...current, ...patch };
+      setStyleText(JSON.stringify(buildAdminStyle(next), null, 2));
+      return next;
+    });
+  }
+
+  function loadAdvancedSchemaFallback() {
+    try {
+      const parsedFields = JSON.parse(fieldsText) as DesignAssetField[];
+      if (!Array.isArray(parsedFields)) throw new Error("Advanced field backup must be a list.");
+      const parsedStyle = JSON.parse(styleText) as Record<string, unknown>;
+      setFieldDrafts(parsedFields);
+      setStyleDraft(styleToAdminDraft(parsedStyle));
+      setMessage("Loaded the advanced schema backup into the visual object type builder.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load the advanced schema backup.");
+    }
+  }
+
+  function updateCreateProperty(fieldName: string, value: string) {
+    setPropertyDraft((current) => {
+      const next = { ...current, [fieldName]: value };
+      setPropertiesText(JSON.stringify(adminFieldDraftToProperties(activeFields, next), null, 2));
+      return next;
+    });
+  }
+
+  function updateEditProperty(fieldName: string, value: string) {
+    setEditPropertyDraft((current) => {
+      const next = { ...current, [fieldName]: value };
+      setEditPropertiesText(JSON.stringify({ ...(selectedRecord?.properties || selectedRecord?.properties_json || {}), ...adminFieldDraftToProperties(selectedRecordFields, next) }, null, 2));
+      return next;
+    });
+  }
+
   async function createType() {
     setBusy("Creating object type");
     setMessage("");
@@ -362,9 +455,9 @@ export function AdminDatabasePage() {
           display_name: typeName,
           description: "Admin-created schema-backed planning object type. Synthetic/demo records only.",
           geometry_type: geometryType,
-          fields: JSON.parse(fieldsText),
-          searchable_fields: ["object_name", "category", "status", "notes"],
-          map_style: JSON.parse(styleText),
+          fields: fieldDrafts,
+          searchable_fields: adminSearchableFields(fieldDrafts),
+          map_style: buildAdminStyle(styleDraft),
           status: "active",
         }),
       });
@@ -384,6 +477,7 @@ export function AdminDatabasePage() {
     setMessage("");
     try {
       const geometry = activeType.geometry_type === "table_only" ? null : JSON.parse(geometryText);
+      const properties = adminFieldDraftToProperties(activeFields, propertyDraft);
       const created = await apiFetch<DesignAssetRecord>("/api/design-assets/records", {
         method: "POST",
         body: JSON.stringify({
@@ -391,7 +485,7 @@ export function AdminDatabasePage() {
           record_key: recordKey,
           display_label: recordLabel,
           status: recordStatus,
-          properties: JSON.parse(propertiesText),
+          properties,
           geometry,
           source: "synthetic_demo",
           visibility: "synthetic-demo",
@@ -433,10 +527,13 @@ export function AdminDatabasePage() {
     setGeometryType(template.geometryType);
     setFieldsText(JSON.stringify(template.fields, null, 2));
     setStyleText(JSON.stringify(template.style, null, 2));
+    setFieldDrafts(template.fields);
+    setStyleDraft(styleToAdminDraft(template.style));
     setRecordKey(`${template.recordPrefix}-${suffix}`);
     setRecordLabel(template.recordLabel);
     setRecordStatus(template.recordStatus);
     setPropertiesText(JSON.stringify({ ...template.properties, source_status: "synthetic_demo" }, null, 2));
+    setPropertyDraft(propertiesToAdminFieldDraft(template.fields, { ...template.properties, source_status: "synthetic_demo" }));
     setGeometryText(template.geometry ? JSON.stringify(template.geometry, null, 2) : "");
     const existing = assetTypes.find((assetType) => assetType.slug === template.slug);
     if (existing) {
@@ -453,12 +550,14 @@ export function AdminDatabasePage() {
     setMessage("");
     try {
       const geometry = selectedRecord.geometry_type === "table_only" || !editGeometryText.trim() ? null : JSON.parse(editGeometryText);
+      const currentProperties = selectedRecord.properties || selectedRecord.properties_json || {};
+      const editedProperties = selectedRecordFields.length ? adminFieldDraftToProperties(selectedRecordFields, editPropertyDraft) : {};
       const updated = await apiFetch<DesignAssetRecord>(`/api/design-assets/records/${selectedRecord.id}`, {
         method: "PUT",
         body: JSON.stringify({
           display_label: editLabel,
           status: statusOverride || editStatus,
-          properties: JSON.parse(editPropertiesText || "{}"),
+          properties: { ...currentProperties, ...editedProperties },
           geometry,
           notes: editNotes,
         }),
@@ -599,6 +698,7 @@ export function AdminDatabasePage() {
             ))}
           </div>
           <div className="admin-guide-actions">
+            <Link className="button" href="/dashboard?drawer=guide"><BookOpen size={15} />Open no-code guide</Link>
             <Link className="button" href="/dashboard?drawer=design"><Map size={15} />Open map design mode</Link>
             <Link className="button" href="/work-orders"><ClipboardList size={15} />View work orders</Link>
             <Link className="button" href="/import-export"><Upload size={15} />Import / Export</Link>
@@ -657,7 +757,7 @@ export function AdminDatabasePage() {
         <div className="panel-body">
           <div className="admin-workflow-grid">
             <article><strong>1. Create or install schemas</strong><span>Install the core TelecomNE schemas or define a custom object type with fields, validation hints, and map style.</span></article>
-            <article><strong>2. Add records</strong><span>Use properties JSON plus optional GeoJSON. Point, line, and polygon records appear on the dashboard Design Mode layer.</span></article>
+            <article><strong>2. Add records</strong><span>Use guide buttons, templates, forms, and map drawing tools. Point, line, and polygon records appear on the dashboard Design Mode layer.</span></article>
             <article><strong>3. Review on dashboard</strong><span>Open `/dashboard?drawer=design`, enable Design Mode, draw/edit geometry, and search the editable planning asset layer.</span></article>
             <article><strong>4. Issue and close work</strong><span>Issue work orders from living design records, track field tasks, then update records to planned, active, or as-built after verification.</span></article>
           </div>
@@ -668,7 +768,7 @@ export function AdminDatabasePage() {
         <div className="panel-header">
           <div>
             <strong>Recommended design/edit improvements</strong>
-            <div className="subtle">Templates reduce JSON hand-entry and make common design objects consistent before they become work orders or module records.</div>
+            <div className="subtle">Templates and guide actions reduce manual entry and make common design objects consistent before they become work orders or module records.</div>
           </div>
           <Upload size={18} />
         </div>
@@ -776,8 +876,20 @@ export function AdminDatabasePage() {
                     <label><span className="field-label">Status</span><select className="select" value={editStatus} onChange={(event) => setEditStatus(event.currentTarget.value as DesignAssetRecord["status"])}>
                       {designRecordStatuses.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
                     </select></label>
-                    <label className="form-grid-wide"><span className="field-label">Properties JSON</span><textarea className="textarea admin-editor-json" value={editPropertiesText} onChange={(event) => setEditPropertiesText(event.currentTarget.value)} /></label>
-                    {selectedRecord.geometry_type !== "table_only" ? <label className="form-grid-wide"><span className="field-label">Geometry GeoJSON</span><textarea className="textarea admin-editor-json" value={editGeometryText} onChange={(event) => setEditGeometryText(event.currentTarget.value)} /></label> : null}
+                    <div className="form-grid-wide">
+                      <AdminPropertyEditor fields={selectedRecordFields} draft={editPropertyDraft} onChange={updateEditProperty} emptyText="This record type has no configured form fields yet. Use the Type Designer or dashboard Guide to add a richer schema." />
+                    </div>
+                    {selectedRecord.geometry_type !== "table_only" ? (
+                      <div className="form-grid-wide">
+                        <AdminGeometryControls geometryType={selectedRecord.geometry_type} geometryText={editGeometryText} onChange={setEditGeometryText} />
+                      </div>
+                    ) : null}
+                    <details className="form-grid-wide admin-advanced-raw">
+                      <summary>Advanced raw snapshot</summary>
+                      <p className="subtle">Read-only backup for troubleshooting. Normal edits use the form controls above.</p>
+                      <label><span className="field-label">Properties snapshot</span><textarea className="textarea admin-editor-json" value={editPropertiesText} readOnly /></label>
+                      {selectedRecord.geometry_type !== "table_only" ? <label><span className="field-label">Geometry snapshot</span><textarea className="textarea admin-editor-json" value={editGeometryText} readOnly /></label> : null}
+                    </details>
                     <label className="form-grid-wide"><span className="field-label">Notes</span><textarea className="textarea" value={editNotes} onChange={(event) => setEditNotes(event.currentTarget.value)} /></label>
                   </div>
                   <div className="toolbar admin-record-actions">
@@ -819,8 +931,57 @@ export function AdminDatabasePage() {
               <option value="polygon">Polygon object</option>
               <option value="table_only">Database only</option>
             </select></label>
-            <label className="form-grid-wide"><span className="field-label">Fields JSON</span><textarea className="textarea" value={fieldsText} onChange={(event) => setFieldsText(event.currentTarget.value)} /></label>
-            <label className="form-grid-wide"><span className="field-label">Map style JSON</span><textarea className="textarea" value={styleText} onChange={(event) => setStyleText(event.currentTarget.value)} /></label>
+            <div className="form-grid-wide admin-schema-builder">
+              <div className="admin-fieldset-heading">
+                <strong>Form fields</strong>
+                <span>These fields become the no-code editor for every record of this object type.</span>
+              </div>
+              {fieldDrafts.map((field, index) => (
+                <div className="admin-schema-field-row" key={`${field.name}-${index}`}>
+                  <div className="admin-schema-field-header">
+                    <strong>{field.label || `Field ${index + 1}`}</strong>
+                    <button className="button" type="button" onClick={() => removeSchemaField(index)} disabled={fieldDrafts.length <= 1}>Remove</button>
+                  </div>
+                  <div className="form-grid">
+                    <label><span className="field-label">Label</span><input className="input" value={field.label || ""} onChange={(event) => {
+                      const label = event.currentTarget.value;
+                      updateSchemaField(index, { label, name: field.name || adminFieldNameFromLabel(label) });
+                    }} /></label>
+                    <label><span className="field-label">Field name</span><input className="input" value={field.name || ""} onChange={(event) => updateSchemaField(index, { name: adminFieldNameFromLabel(event.currentTarget.value) })} /></label>
+                    <label><span className="field-label">Type</span><select className="select" value={field.type} onChange={(event) => updateSchemaFieldType(index, event.currentTarget.value as DesignAssetFieldType)}>
+                      {adminFieldTypeOptions.map((fieldType) => <option key={fieldType} value={fieldType}>{formatLabel(fieldType)}</option>)}
+                    </select></label>
+                    <label><span className="field-label">Required</span><select className="select" value={field.required ? "true" : "false"} onChange={(event) => updateSchemaField(index, { required: event.currentTarget.value === "true" })}>
+                      <option value="false">Optional</option>
+                      <option value="true">Required</option>
+                    </select></label>
+                    <label><span className="field-label">Default</span><input className="input" value={adminDefaultText(field)} onChange={(event) => updateSchemaField(index, { default: adminDefaultFromText(field.type, event.currentTarget.value) })} /></label>
+                    <label><span className="field-label">Help text</span><input className="input" value={field.help_text || ""} onChange={(event) => updateSchemaField(index, { help_text: event.currentTarget.value })} /></label>
+                    {field.type === "enum" ? <label className="form-grid-wide"><span className="field-label">Options</span><input className="input" value={(field.enum_options || []).join(", ")} onChange={(event) => updateSchemaField(index, { enum_options: event.currentTarget.value.split(",").map((item) => item.trim()).filter(Boolean) })} /></label> : null}
+                  </div>
+                </div>
+              ))}
+              <button className="button" type="button" onClick={addSchemaField}><Plus size={15} />Add field</button>
+            </div>
+            <div className="form-grid-wide admin-style-builder">
+              <div className="admin-fieldset-heading">
+                <strong>Map style</strong>
+                <span>Choose how this object appears on the dashboard map.</span>
+              </div>
+              <div className="form-grid">
+                <label><span className="field-label">Color</span><input className="input" type="color" value={styleDraft.color} onChange={(event) => updateStyleDraft({ color: event.currentTarget.value })} /></label>
+                <label><span className="field-label">Point radius</span><input className="input" type="number" min="2" max="24" value={styleDraft.radius} onChange={(event) => updateStyleDraft({ radius: event.currentTarget.value })} /></label>
+                <label><span className="field-label">Line width</span><input className="input" type="number" min="1" max="16" value={styleDraft.lineWidth} onChange={(event) => updateStyleDraft({ lineWidth: event.currentTarget.value })} /></label>
+                <label><span className="field-label">Fill opacity</span><input className="input" type="number" min="0" max="1" step="0.05" value={styleDraft.fillOpacity} onChange={(event) => updateStyleDraft({ fillOpacity: event.currentTarget.value })} /></label>
+              </div>
+            </div>
+            <details className="form-grid-wide admin-advanced-raw">
+              <summary>Advanced schema backup</summary>
+              <p className="subtle">Optional fallback for exported schemas. Use the visual field builder for normal database updates.</p>
+              <label><span className="field-label">Field definitions backup</span><textarea className="textarea" value={fieldsText} onChange={(event) => setFieldsText(event.currentTarget.value)} /></label>
+              <label><span className="field-label">Map style backup</span><textarea className="textarea" value={styleText} onChange={(event) => setStyleText(event.currentTarget.value)} /></label>
+              <button className="button" type="button" onClick={loadAdvancedSchemaFallback}>Load backup into builder</button>
+            </details>
             <button className="button primary" type="button" onClick={() => void createType()} disabled={Boolean(busy) || !writable}><Plus size={16} />Create object type</button>
           </div>
         </section>
@@ -835,8 +996,20 @@ export function AdminDatabasePage() {
             <label><span className="field-label">Status</span><select className="select" value={recordStatus} onChange={(event) => setRecordStatus(event.currentTarget.value as DesignAssetRecord["status"])}>
               {["proposed", "planned", "in_review", "active", "as_built"].map((status) => <option key={status} value={status}>{status}</option>)}
             </select></label>
-            <label className="form-grid-wide"><span className="field-label">Properties JSON</span><textarea className="textarea" value={propertiesText} onChange={(event) => setPropertiesText(event.currentTarget.value)} /></label>
-            {activeType?.geometry_type !== "table_only" ? <label className="form-grid-wide"><span className="field-label">Geometry GeoJSON</span><textarea className="textarea" value={geometryText} onChange={(event) => setGeometryText(event.currentTarget.value)} /></label> : null}
+            <div className="form-grid-wide">
+              <AdminPropertyEditor fields={activeFields} draft={propertyDraft} onChange={updateCreateProperty} emptyText="Select or create an object type with form fields before adding records." />
+            </div>
+            {activeType?.geometry_type !== "table_only" ? (
+              <div className="form-grid-wide">
+                <AdminGeometryControls geometryType={activeType?.geometry_type || "point"} geometryText={geometryText} onChange={setGeometryText} />
+              </div>
+            ) : null}
+            <details className="form-grid-wide admin-advanced-raw">
+              <summary>Advanced raw snapshot</summary>
+              <p className="subtle">Read-only preview of what the form will save. Everyday updates should use the fields above.</p>
+              <label><span className="field-label">Properties snapshot</span><textarea className="textarea" value={propertiesText} readOnly /></label>
+              {activeType?.geometry_type !== "table_only" ? <label><span className="field-label">Geometry snapshot</span><textarea className="textarea" value={geometryText} readOnly /></label> : null}
+            </details>
             <button className="button primary" type="button" onClick={() => void createRecord()} disabled={Boolean(busy) || !writable || !activeType}><Plus size={16} />Create database object</button>
           </div>
         </section>
@@ -847,6 +1020,120 @@ export function AdminDatabasePage() {
         filterField="asset_type_display_name"
       />
     </>
+  );
+}
+
+const adminFieldTypeOptions: DesignAssetFieldType[] = ["string", "textarea", "number", "integer", "boolean", "date", "enum", "json"];
+
+function AdminPropertyEditor({ fields, draft, onChange, emptyText }: { fields: DesignAssetField[]; draft: Record<string, string>; onChange: (fieldName: string, value: string) => void; emptyText: string }) {
+  if (!fields.length) {
+    return <p className="subtle">{emptyText}</p>;
+  }
+  return (
+    <div className="admin-property-editor">
+      <div className="admin-fieldset-heading">
+        <strong>Database fields</strong>
+        <span>Use these controls to update the record. The app handles the stored structure behind the scenes.</span>
+      </div>
+      <div className="admin-property-grid">
+        {fields.map((field) => <AdminPropertyInput key={field.name} field={field} value={draft[field.name] || ""} onChange={(value) => onChange(field.name, value)} />)}
+      </div>
+    </div>
+  );
+}
+
+function AdminPropertyInput({ field, value, onChange }: { field: DesignAssetField; value: string; onChange: (value: string) => void }) {
+  const label = `${field.label || formatLabel(field.name)}${field.required ? " *" : ""}`;
+  const helpText = field.help_text || (field.type === "json" ? "Enter one item per line or separate items with commas." : "");
+  if (field.type === "textarea" || field.type === "json") {
+    return (
+      <label className="admin-property-field">
+        <span className="field-label">{field.type === "json" ? `${label} list` : label}</span>
+        <textarea className="textarea" value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder={helpText} />
+        {helpText ? <small>{helpText}</small> : null}
+      </label>
+    );
+  }
+  if (field.type === "enum") {
+    return (
+      <label className="admin-property-field">
+        <span className="field-label">{label}</span>
+        <select className="select" value={value} onChange={(event) => onChange(event.currentTarget.value)}>
+          <option value="">Select...</option>
+          {(field.enum_options || []).map((option) => <option key={option} value={option}>{formatLabel(option)}</option>)}
+        </select>
+        {helpText ? <small>{helpText}</small> : null}
+      </label>
+    );
+  }
+  if (field.type === "boolean") {
+    return (
+      <label className="admin-property-field">
+        <span className="field-label">{label}</span>
+        <select className="select" value={value} onChange={(event) => onChange(event.currentTarget.value)}>
+          <option value="">Select...</option>
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+        {helpText ? <small>{helpText}</small> : null}
+      </label>
+    );
+  }
+  return (
+    <label className="admin-property-field">
+      <span className="field-label">{label}</span>
+      <input className="input" type={field.type === "number" || field.type === "integer" ? "number" : field.type === "date" ? "date" : "text"} value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder={helpText} />
+      {helpText ? <small>{helpText}</small> : null}
+    </label>
+  );
+}
+
+function AdminGeometryControls({ geometryType, geometryText, onChange }: { geometryType: DesignAssetGeometryType; geometryText: string; onChange: (value: string) => void }) {
+  if (geometryType === "table_only") return null;
+  const draft = adminGeometryDraft(geometryType, geometryText);
+  if (geometryType === "point") {
+    return (
+      <div className="admin-geometry-editor">
+        <div className="admin-fieldset-heading">
+          <strong>Map location</strong>
+          <span>Enter the synthetic point location or edit it on the dashboard map.</span>
+        </div>
+        <div className="form-grid">
+          <label><span className="field-label">Longitude</span><input className="input" type="number" step="0.000001" value={draft.longitude} onChange={(event) => onChange(adminPointGeometryText(event.currentTarget.value, draft.latitude))} /></label>
+          <label><span className="field-label">Latitude</span><input className="input" type="number" step="0.000001" value={draft.latitude} onChange={(event) => onChange(adminPointGeometryText(draft.longitude, event.currentTarget.value))} /></label>
+        </div>
+      </div>
+    );
+  }
+  if (geometryType === "line") {
+    return (
+      <div className="admin-geometry-editor">
+        <div className="admin-fieldset-heading">
+          <strong>Route endpoints</strong>
+          <span>Set a simple synthetic line here, or use dashboard map drawing for detailed routes.</span>
+        </div>
+        <div className="form-grid">
+          <label><span className="field-label">A-end longitude</span><input className="input" type="number" step="0.000001" value={draft.aLongitude} onChange={(event) => onChange(adminLineGeometryText(event.currentTarget.value, draft.aLatitude, draft.zLongitude, draft.zLatitude))} /></label>
+          <label><span className="field-label">A-end latitude</span><input className="input" type="number" step="0.000001" value={draft.aLatitude} onChange={(event) => onChange(adminLineGeometryText(draft.aLongitude, event.currentTarget.value, draft.zLongitude, draft.zLatitude))} /></label>
+          <label><span className="field-label">Z-end longitude</span><input className="input" type="number" step="0.000001" value={draft.zLongitude} onChange={(event) => onChange(adminLineGeometryText(draft.aLongitude, draft.aLatitude, event.currentTarget.value, draft.zLatitude))} /></label>
+          <label><span className="field-label">Z-end latitude</span><input className="input" type="number" step="0.000001" value={draft.zLatitude} onChange={(event) => onChange(adminLineGeometryText(draft.aLongitude, draft.aLatitude, draft.zLongitude, event.currentTarget.value))} /></label>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="admin-geometry-editor">
+      <div className="admin-fieldset-heading">
+        <strong>Area placement</strong>
+        <span>Create a simple synthetic rectangle. Use dashboard map drawing for detailed boundaries.</span>
+      </div>
+      <div className="form-grid">
+        <label><span className="field-label">Center longitude</span><input className="input" type="number" step="0.000001" value={draft.longitude} onChange={(event) => onChange(adminPolygonGeometryText(event.currentTarget.value, draft.latitude, draft.width, draft.height))} /></label>
+        <label><span className="field-label">Center latitude</span><input className="input" type="number" step="0.000001" value={draft.latitude} onChange={(event) => onChange(adminPolygonGeometryText(draft.longitude, event.currentTarget.value, draft.width, draft.height))} /></label>
+        <label><span className="field-label">Width degrees</span><input className="input" type="number" step="0.001" value={draft.width} onChange={(event) => onChange(adminPolygonGeometryText(draft.longitude, draft.latitude, event.currentTarget.value, draft.height))} /></label>
+        <label><span className="field-label">Height degrees</span><input className="input" type="number" step="0.001" value={draft.height} onChange={(event) => onChange(adminPolygonGeometryText(draft.longitude, draft.latitude, draft.width, event.currentTarget.value))} /></label>
+      </div>
+    </div>
   );
 }
 
@@ -885,4 +1172,197 @@ function stripWorkOrderProperties(properties: Record<string, unknown>): Record<s
     "livingDatabaseStatus",
   ].forEach((key) => delete next[key]);
   return next;
+}
+
+function adminFieldsForType(assetType?: DesignAssetType | null): DesignAssetField[] {
+  return assetType?.fields?.length ? assetType.fields : assetType?.fields_json?.length ? assetType.fields_json : [];
+}
+
+function blankAdminField(index: number): DesignAssetField {
+  return { name: `field_${index}`, label: `Field ${index}`, type: "string", required: false };
+}
+
+function adminFieldNameFromLabel(value: string) {
+  const name = value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!name) return "";
+  return /^[a-z_]/.test(name) ? name.slice(0, 80) : `field_${name}`.slice(0, 80);
+}
+
+function adminDefaultText(field: DesignAssetField) {
+  if (field.default === undefined || field.default === null) return "";
+  if (field.type === "json") return Array.isArray(field.default) ? field.default.join(", ") : typeof field.default === "object" ? Object.entries(field.default as Record<string, unknown>).map(([key, value]) => `${key}: ${String(value)}`).join("\n") : String(field.default);
+  if (field.type === "boolean") return field.default === true ? "true" : field.default === false ? "false" : "";
+  return String(field.default);
+}
+
+function adminDefaultFromText(type: DesignAssetFieldType, value: string) {
+  if (!value.trim()) return undefined;
+  if (type === "integer") return Number.parseInt(value, 10);
+  if (type === "number") return Number(value);
+  if (type === "boolean") return value === "true";
+  if (type === "json") return parseAdminStructuredValue(value);
+  return value;
+}
+
+function propertiesToAdminFieldDraft(fields: DesignAssetField[], properties: Record<string, unknown>) {
+  return Object.fromEntries(fields.map((field) => [field.name, stringifyAdminFieldValue(properties[field.name] ?? field.default ?? "", field)]));
+}
+
+function stringifyAdminFieldValue(value: unknown, field: DesignAssetField) {
+  if (value === undefined || value === null) return "";
+  if (field.type === "json") {
+    if (Array.isArray(value)) return value.map((item) => String(item)).join("\n");
+    if (typeof value === "object") return Object.entries(value as Record<string, unknown>).map(([key, item]) => `${key}: ${String(item)}`).join("\n");
+    return String(value);
+  }
+  if (field.type === "boolean") return value === true ? "true" : value === false ? "false" : "";
+  return String(value);
+}
+
+function adminFieldDraftToProperties(fields: DesignAssetField[], draft: Record<string, string>) {
+  const properties: Record<string, unknown> = {};
+  fields.forEach((field) => {
+    const value = draft[field.name];
+    if (value === undefined || value === "") {
+      if (field.required) properties[field.name] = value || "";
+      return;
+    }
+    if (field.type === "integer") {
+      properties[field.name] = Number.parseInt(value, 10);
+      return;
+    }
+    if (field.type === "number") {
+      properties[field.name] = Number(value);
+      return;
+    }
+    if (field.type === "boolean") {
+      properties[field.name] = value === "true";
+      return;
+    }
+    if (field.type === "json") {
+      properties[field.name] = parseAdminStructuredValue(value);
+      return;
+    }
+    properties[field.name] = value;
+  });
+  return properties;
+}
+
+function parseAdminStructuredValue(value: string): unknown {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+  const lines = trimmed.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  if (lines.length > 1) return lines;
+  if (trimmed.includes(",")) return trimmed.split(",").map((item) => item.trim()).filter(Boolean);
+  if (trimmed.includes(":")) {
+    const entries = lines.map((line) => line.split(":").map((item) => item.trim()));
+    if (entries.every((entry) => entry.length >= 2 && entry[0])) {
+      return Object.fromEntries(entries.map(([key, ...rest]) => [key, rest.join(":")]));
+    }
+  }
+  return [trimmed];
+}
+
+function adminSearchableFields(fields: DesignAssetField[]) {
+  const preferred = fields.filter((field) => ["string", "textarea", "enum"].includes(field.type)).map((field) => field.name).slice(0, 8);
+  return preferred.length ? preferred : ["name", "object_name", "status", "notes"];
+}
+
+function buildAdminStyle(style: { color: string; radius: string; lineWidth: string; fillOpacity: string }) {
+  return {
+    color: style.color || defaultAdminStyle.color,
+    radius: Number.parseFloat(style.radius) || defaultAdminStyle.radius,
+    lineWidth: Number.parseFloat(style.lineWidth) || defaultAdminStyle.lineWidth,
+    fillOpacity: Number.parseFloat(style.fillOpacity) || 0,
+  };
+}
+
+function styleToAdminDraft(style: Record<string, unknown>) {
+  return {
+    color: typeof style.color === "string" ? style.color : defaultAdminStyle.color,
+    radius: String(typeof style.radius === "number" ? style.radius : defaultAdminStyle.radius),
+    lineWidth: String(typeof style.lineWidth === "number" ? style.lineWidth : defaultAdminStyle.lineWidth),
+    fillOpacity: String(typeof style.fillOpacity === "number" ? style.fillOpacity : defaultAdminStyle.fillOpacity),
+  };
+}
+
+function adminGeometryDraft(geometryType: DesignAssetGeometryType, geometryText: string) {
+  const fallback = geometryType === "line"
+    ? { aLongitude: "-71.82", aLatitude: "42.25", zLongitude: "-71.78", zLatitude: "42.28", longitude: "-71.80", latitude: "42.26", width: "0.04", height: "0.03" }
+    : { aLongitude: "-71.82", aLatitude: "42.25", zLongitude: "-71.78", zLatitude: "42.28", longitude: "-71.8023", latitude: "42.2626", width: "0.04", height: "0.03" };
+  try {
+    const geometry = JSON.parse(geometryText) as { type?: string; coordinates?: unknown };
+    if (geometry.type === "Point" && Array.isArray(geometry.coordinates)) {
+      const [lon, lat] = geometry.coordinates as [number, number];
+      return { ...fallback, longitude: adminNumberText(lon), latitude: adminNumberText(lat) };
+    }
+    if (geometry.type === "LineString" && Array.isArray(geometry.coordinates)) {
+      const coordinates = geometry.coordinates as [number, number][];
+      const first = coordinates[0];
+      const last = coordinates[coordinates.length - 1];
+      if (first && last) {
+        return { ...fallback, aLongitude: adminNumberText(first[0]), aLatitude: adminNumberText(first[1]), zLongitude: adminNumberText(last[0]), zLatitude: adminNumberText(last[1]) };
+      }
+    }
+    if (geometry.type === "Polygon" && Array.isArray(geometry.coordinates)) {
+      const ring = (geometry.coordinates as [number, number][][])[0] || [];
+      if (ring.length) {
+        const lons = ring.map((coordinate) => coordinate[0]).filter(Number.isFinite);
+        const lats = ring.map((coordinate) => coordinate[1]).filter(Number.isFinite);
+        const minLon = Math.min(...lons);
+        const maxLon = Math.max(...lons);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        return {
+          ...fallback,
+          longitude: adminNumberText((minLon + maxLon) / 2),
+          latitude: adminNumberText((minLat + maxLat) / 2),
+          width: adminNumberText(maxLon - minLon),
+          height: adminNumberText(maxLat - minLat),
+        };
+      }
+    }
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
+function adminNumberText(value: number) {
+  return Number.isFinite(value) ? String(Number(value.toFixed(6))) : "";
+}
+
+function adminCoordinate(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function adminPointGeometryText(longitude: string, latitude: string) {
+  return JSON.stringify({ type: "Point", coordinates: [adminCoordinate(longitude), adminCoordinate(latitude)] }, null, 2);
+}
+
+function adminLineGeometryText(aLongitude: string, aLatitude: string, zLongitude: string, zLatitude: string) {
+  return JSON.stringify({ type: "LineString", coordinates: [[adminCoordinate(aLongitude), adminCoordinate(aLatitude)], [adminCoordinate(zLongitude), adminCoordinate(zLatitude)]] }, null, 2);
+}
+
+function adminPolygonGeometryText(longitude: string, latitude: string, width: string, height: string) {
+  const centerLon = adminCoordinate(longitude);
+  const centerLat = adminCoordinate(latitude);
+  const halfWidth = Math.max(adminCoordinate(width), 0.001) / 2;
+  const halfHeight = Math.max(adminCoordinate(height), 0.001) / 2;
+  const ring = [
+    [centerLon - halfWidth, centerLat - halfHeight],
+    [centerLon + halfWidth, centerLat - halfHeight],
+    [centerLon + halfWidth, centerLat + halfHeight],
+    [centerLon - halfWidth, centerLat + halfHeight],
+    [centerLon - halfWidth, centerLat - halfHeight],
+  ];
+  return JSON.stringify({ type: "Polygon", coordinates: [ring] }, null, 2);
 }

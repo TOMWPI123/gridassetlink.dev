@@ -214,7 +214,86 @@ type DatabaseGuideWorkflow = {
   records: DatabaseGuideRecord[];
 };
 
+type DatabaseGuideCoverageArea = {
+  title: string;
+  summary: string;
+  moduleHref: string;
+  recordTypes: string[];
+  workflowKeys: string[];
+  checks: string[];
+};
+
+const databaseGuideCoverageAreas: DatabaseGuideCoverageArea[] = [
+  {
+    title: "Substations, LIUs, and patch panels",
+    summary: "Start every end-to-end design with the site, rack, LIU, patch panel, and termination records that anchor all fiber and device work.",
+    moduleHref: "/substations",
+    recordTypes: ["guide-substation-site", "guide-liu-patch-panel", "guide-device-endpoint"],
+    workflowKeys: ["substation-device-inventory", "liu-to-liu-service"],
+    checks: ["site ID exists", "LIU ports captured", "device endpoint linked", "synthetic/demo boundary noted"],
+  },
+  {
+    title: "Distribution poles and spans",
+    summary: "Use point records for poles/supports and line records for cable spans; track slack, entering cable IDs, and the span endpoints.",
+    moduleHref: "/distribution-fiber",
+    recordTypes: ["guide-distribution-pole", "guide-fiber-span"],
+    workflowKeys: ["pole-fiber-attachment", "span-fiber-route"],
+    checks: ["pole has cable IDs", "span has A/Z structure IDs", "fiber count populated", "slack loop noted"],
+  },
+  {
+    title: "Strands, services, and continuity",
+    summary: "Reserve or assign strand rows, link services to devices and LIUs, then validate continuity before issuing field work.",
+    moduleHref: "/fiber-strand-table",
+    recordTypes: ["guide-fiber-strand", "guide-service-assignment"],
+    workflowKeys: ["strand-reservation", "liu-to-liu-service"],
+    checks: ["strand status not available when reserved", "assignment links cable IDs", "splice IDs attached", "loss estimate captured"],
+  },
+  {
+    title: "Splicing and resplicing",
+    summary: "Keep existing splice rows and proposed splice rows side by side so planned resplicing never overwrites existing continuity.",
+    moduleHref: "/splice-matrix",
+    recordTypes: ["guide-splice-work", "guide-service-assignment"],
+    workflowKeys: ["resplice-service", "liu-to-liu-service"],
+    checks: ["existing rows preserved", "proposed rows separated", "affected service IDs linked", "work order required"],
+  },
+  {
+    title: "Work orders, evidence, and closeout",
+    summary: "Turn design records into field work, track tasks and required evidence, and only mark records as as-built after engineering review.",
+    moduleHref: "/work-orders",
+    recordTypes: ["guide-work-package"],
+    workflowKeys: ["work-package-closeout"],
+    checks: ["linked record keys listed", "tasks defined", "evidence required", "closeout gate documented"],
+  },
+  {
+    title: "Import, rebuild, and materialization",
+    summary: "Use Design Mode blueprints to import/edit records, capture module snapshots, replay to a blank instance, and materialize reviewed demo records.",
+    moduleHref: "/import-export",
+    recordTypes: ["guide-import-package"],
+    workflowKeys: ["import-rebuild-materialize"],
+    checks: ["source recorded", "validation status captured", "materialize mode chosen", "sensitive-data warning retained"],
+  },
+];
+
 const databaseGuideAssetTypes: DatabaseGuideAssetType[] = [
+  {
+    slug: "guide-substation-site",
+    display_name: "Guide substation site",
+    description: "Synthetic substation/site anchor record for tying LIUs, patch panels, endpoint devices, and services together.",
+    geometry_type: "point",
+    searchable_fields: ["substation_id", "substation_name", "state", "owner"],
+    map_style: { color: "#60a5fa", radius: 9, fillOpacity: 0.26 },
+    fields: [
+      { name: "substation_id", label: "Substation ID", type: "string", required: true },
+      { name: "substation_name", label: "Substation name", type: "string", required: true },
+      { name: "state", label: "State", type: "enum", enum_options: ["CT", "ME", "MA", "NH", "RI", "VT"], required: true },
+      { name: "owner", label: "Owner", type: "string" },
+      { name: "liu_ids", label: "LIU IDs", type: "json" },
+      { name: "device_ids", label: "Device IDs", type: "json" },
+      { name: "patch_panel_ids", label: "Patch panel IDs", type: "json" },
+      { name: "status", label: "Status", type: "enum", enum_options: ["proposed", "planned", "in_review", "as_built"], required: true },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
   {
     slug: "guide-distribution-pole",
     display_name: "Guide distribution pole",
@@ -332,6 +411,60 @@ const databaseGuideAssetTypes: DatabaseGuideAssetType[] = [
       { name: "status", label: "Status", type: "enum", enum_options: ["proposed", "planned", "in_review", "as_built"], required: true },
       { name: "continuity_summary", label: "Continuity summary", type: "textarea" },
       { name: "loss_estimate_db", label: "Loss estimate dB", type: "number" },
+    ],
+  },
+  {
+    slug: "guide-fiber-strand",
+    display_name: "Guide fiber strand",
+    description: "Synthetic individual strand row used to reserve, assign, retire, or validate continuity on a cable.",
+    geometry_type: "table_only",
+    searchable_fields: ["strand_key", "cable_id", "status", "assignment_id"],
+    map_style: {},
+    fields: [
+      { name: "strand_key", label: "Strand key", type: "string", required: true },
+      { name: "cable_id", label: "Cable ID", type: "string", required: true },
+      { name: "strand_number", label: "Strand number", type: "integer", required: true },
+      { name: "tube_number", label: "Tube number", type: "integer" },
+      { name: "color", label: "Color", type: "string" },
+      { name: "status", label: "Status", type: "enum", enum_options: ["available", "reserved", "assigned", "spare", "faulted", "retired"], required: true },
+      { name: "assignment_id", label: "Assignment ID", type: "string" },
+      { name: "a_end_termination", label: "A-end termination", type: "string" },
+      { name: "z_end_termination", label: "Z-end termination", type: "string" },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    slug: "guide-work-package",
+    display_name: "Guide work package",
+    description: "Synthetic work package record for planning field tasks, evidence, closeout, and engineering review.",
+    geometry_type: "table_only",
+    searchable_fields: ["work_order_key", "work_type", "status"],
+    map_style: {},
+    fields: [
+      { name: "work_order_key", label: "Work order key", type: "string", required: true },
+      { name: "work_type", label: "Work type", type: "enum", enum_options: ["fiber_install", "splice_work", "device_install", "field_verify", "closeout_review"], required: true },
+      { name: "linked_records", label: "Linked records", type: "json" },
+      { name: "required_tasks", label: "Required tasks", type: "json" },
+      { name: "evidence_requirements", label: "Evidence requirements", type: "json" },
+      { name: "status", label: "Status", type: "enum", enum_options: ["planned", "issued", "field_complete", "engineering_review", "as_built"], required: true },
+      { name: "closeout_notes", label: "Closeout notes", type: "textarea" },
+    ],
+  },
+  {
+    slug: "guide-import-package",
+    display_name: "Guide import package",
+    description: "Synthetic import/rebuild planning record for tracking source, validation, blueprint, and materialization actions.",
+    geometry_type: "table_only",
+    searchable_fields: ["import_id", "source_type", "validation_status", "materialize_mode"],
+    map_style: {},
+    fields: [
+      { name: "import_id", label: "Import ID", type: "string", required: true },
+      { name: "source_type", label: "Source type", type: "enum", enum_options: ["manual_CSV", "GeoJSON", "Shapefile", "Design_Mode_blueprint", "module_snapshot", "other"], required: true },
+      { name: "source_name", label: "Source name", type: "string" },
+      { name: "record_counts", label: "Record counts", type: "json" },
+      { name: "validation_status", label: "Validation status", type: "enum", enum_options: ["not_validated", "valid", "warning", "invalid"], required: true },
+      { name: "materialize_mode", label: "Materialize mode", type: "enum", enum_options: ["design_only", "upsert", "skip_existing"], required: true },
+      { name: "review_notes", label: "Review notes", type: "textarea" },
     ],
   },
 ];
@@ -773,6 +906,234 @@ const databaseGuideWorkflows: DatabaseGuideWorkflow[] = [
           status: "planned",
           continuity_summary: "Synthetic 87L service from WBS LIU to AUB LIU with devices on both ends.",
           loss_estimate_db: 2.1,
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+    ],
+  },
+  {
+    key: "substation-device-inventory",
+    title: "Build substation and device inventory",
+    summary: "Creates a synthetic substation anchor, LIU, endpoint device, and device-to-LIU port relationship before fiber is assigned.",
+    steps: [
+      "Create the substation/site anchor record with owner, state, LIU IDs, and device IDs.",
+      "Create or update the LIU/patch panel record for the site.",
+      "Create the endpoint device record and list device service ports.",
+      "Link the device port to the LIU port where the jumper terminates.",
+      "Use this inventory as the A-end or Z-end for future circuit/service assignments.",
+    ],
+    edits: [
+      "Upsert guide-substation-site record GUIDE-SUB-WBS-01.",
+      "Upsert guide-liu-patch-panel record GUIDE-WBS-LIU-INVENTORY-01.",
+      "Upsert guide-device-endpoint record GUIDE-WBS-SW-INVENTORY-01.",
+    ],
+    records: [
+      {
+        asset_type_slug: "guide-substation-site",
+        record_key: "GUIDE-SUB-WBS-01",
+        display_label: "Guide Webster substation inventory",
+        status: "planned",
+        geometry: { type: "Point", coordinates: [-71.8215, 42.2595] },
+        properties: {
+          substation_id: "MA-WBS-GUIDE",
+          substation_name: "Webster Guide Substation",
+          state: "MA",
+          owner: "Synthetic Demo Utility",
+          liu_ids: ["WBS-LIU-INVENTORY-01"],
+          device_ids: ["WBS-SW-INVENTORY-01"],
+          patch_panel_ids: ["WBS-LIU-INVENTORY-01"],
+          status: "planned",
+          notes: "Synthetic site anchor for guide inventory examples.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-liu-patch-panel",
+        record_key: "GUIDE-WBS-LIU-INVENTORY-01",
+        display_label: "Guide Webster inventory LIU",
+        status: "planned",
+        geometry: null,
+        properties: {
+          liu_id: "WBS-LIU-INVENTORY-01",
+          substation_id: "MA-WBS-GUIDE",
+          rack: "TELCO-R3",
+          panel_name: "Guide LIU Inventory Panel",
+          port_count: 24,
+          connector_type: "LC",
+          cable_ids: ["GUIDE-ADSS-24F-INVENTORY"],
+          port_assignments: [{ ports: "3-4", device_id: "WBS-SW-INVENTORY-01", device_port: "Gi0/24", status: "planned" }],
+          notes: "Synthetic LIU record connected to an endpoint device.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-device-endpoint",
+        record_key: "GUIDE-WBS-SW-INVENTORY-01",
+        display_label: "Guide Webster switch inventory endpoint",
+        status: "planned",
+        geometry: null,
+        properties: {
+          device_id: "WBS-SW-INVENTORY-01",
+          device_name: "WBS Guide Switch 01",
+          device_type: "switch",
+          substation_id: "MA-WBS-GUIDE",
+          rack: "TELCO-R3",
+          service_ports: [{ port: "Gi0/24", liu_port: "WBS-LIU-INVENTORY-01/3-4", service_id: "future" }],
+          connected_liu_id: "WBS-LIU-INVENTORY-01",
+          notes: "Synthetic endpoint device for guide inventory.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+    ],
+  },
+  {
+    key: "strand-reservation",
+    title: "Reserve strands and patch-panel ports",
+    summary: "Creates individual strand rows, marks a pair reserved, and links the reservation to LIU terminations and a future service assignment.",
+    steps: [
+      "Create individual strand records for the cable section or LIU-fed cable.",
+      "Set reserved or assigned status before using the strands in a service.",
+      "Capture A-end and Z-end terminations for each strand.",
+      "Create a service assignment that references the reserved strand numbers.",
+      "Release or update the strand rows if the design changes before field work.",
+    ],
+    edits: [
+      "Upsert guide-fiber-strand records GUIDE-STRAND-001 through GUIDE-STRAND-004.",
+      "Upsert guide-service-assignment record GUIDE-FUTURE-ETH-STRANDS-001.",
+    ],
+    records: [
+      ...[1, 2, 3, 4].map((strandNumber): DatabaseGuideRecord => ({
+        asset_type_slug: "guide-fiber-strand",
+        record_key: `GUIDE-STRAND-${String(strandNumber).padStart(3, "0")}`,
+        display_label: `Guide reserved strand ${strandNumber}`,
+        status: "planned",
+        geometry: null,
+        properties: {
+          strand_key: `GUIDE-STRAND-${String(strandNumber).padStart(3, "0")}`,
+          cable_id: "GUIDE-ADSS-24F-INVENTORY",
+          strand_number: strandNumber,
+          tube_number: 1,
+          color: ["Blue", "Orange", "Green", "Brown"][strandNumber - 1],
+          status: strandNumber <= 2 ? "reserved" : "available",
+          assignment_id: strandNumber <= 2 ? "ETH-GUIDE-FUTURE-001" : "",
+          a_end_termination: strandNumber <= 2 ? `WBS-LIU-INVENTORY-01/${strandNumber}` : "",
+          z_end_termination: strandNumber <= 2 ? `AUB-LIU-INVENTORY-01/${strandNumber}` : "",
+          notes: strandNumber <= 2 ? "Synthetic reserved strand for future Ethernet service." : "Synthetic available spare strand.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      })),
+      {
+        asset_type_slug: "guide-service-assignment",
+        record_key: "GUIDE-FUTURE-ETH-STRANDS-001",
+        display_label: "Guide future Ethernet strand reservation",
+        status: "planned",
+        geometry: null,
+        properties: {
+          service_id: "ETH-GUIDE-FUTURE-001",
+          service_type: "Ethernet",
+          a_end_device: "WBS-SW-INVENTORY-01",
+          z_end_device: "AUB-SW-INVENTORY-01",
+          a_end_port: "Gi0/24",
+          z_end_port: "Gi0/24",
+          a_end_liu: "WBS-LIU-INVENTORY-01/1-2",
+          z_end_liu: "AUB-LIU-INVENTORY-01/1-2",
+          cable_ids: ["GUIDE-ADSS-24F-INVENTORY"],
+          strand_numbers: [1, 2],
+          splice_ids: [],
+          status: "planned",
+          continuity_summary: "Synthetic reserved strand pair for a future Ethernet service.",
+          loss_estimate_db: 1.1,
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+    ],
+  },
+  {
+    key: "work-package-closeout",
+    title: "Create work package and closeout checklist",
+    summary: "Creates a synthetic work package that links design records to tasks, evidence requirements, and engineering closeout gates.",
+    steps: [
+      "Select the design records that require field verification or installation.",
+      "Create a work package with linked record keys.",
+      "List field tasks such as verify cable tags, patch LIU ports, splice strands, and upload evidence.",
+      "Attach required evidence types before field closeout.",
+      "Move linked records to as-built only after engineering review accepts closeout evidence.",
+    ],
+    edits: [
+      "Upsert guide-work-package record GUIDE-WO-FIBER-CLOSEOUT-001.",
+    ],
+    records: [
+      {
+        asset_type_slug: "guide-work-package",
+        record_key: "GUIDE-WO-FIBER-CLOSEOUT-001",
+        display_label: "Guide fiber installation closeout package",
+        status: "in_review",
+        geometry: null,
+        properties: {
+          work_order_key: "GUIDE-WO-FIBER-CLOSEOUT-001",
+          work_type: "fiber_install",
+          linked_records: ["GUIDE-POLE-FIBER-P001", "GUIDE-SPAN-FIBER-P000-P001", "GUIDE-SPARE-POLE-P001"],
+          required_tasks: [
+            "Verify pole and cable tag labels",
+            "Install slack loop and record measured slack",
+            "Patch LIU ports and confirm strand color",
+            "Upload splice sheet, OTDR, photos, and as-built notes",
+          ],
+          evidence_requirements: ["as-built photos", "OTDR trace", "splice sheet", "LIU port photo", "engineer closeout approval"],
+          status: "engineering_review",
+          closeout_notes: "Synthetic guide package: do not mark as-built until evidence is reviewed.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+    ],
+  },
+  {
+    key: "import-rebuild-materialize",
+    title: "Import, rebuild, and materialize records",
+    summary: "Creates an import/rebuild planning record showing how users track uploaded data, validation, blueprint imports, and materialization decisions.",
+    steps: [
+      "Import or paste a Design Mode blueprint, CSV-derived rows, or module snapshot package.",
+      "Validate records and preserve source attribution before writing records.",
+      "Use Design Mode records as the staging database while editing.",
+      "Materialize supported reviewed records with upsert or skip-existing mode.",
+      "Export the rebuild package so the design database can be replayed into a blank instance.",
+    ],
+    edits: [
+      "Upsert guide-import-package record GUIDE-IMPORT-REBUILD-001.",
+    ],
+    records: [
+      {
+        asset_type_slug: "guide-import-package",
+        record_key: "GUIDE-IMPORT-REBUILD-001",
+        display_label: "Guide import rebuild package",
+        status: "planned",
+        geometry: null,
+        properties: {
+          import_id: "GUIDE-IMPORT-REBUILD-001",
+          source_type: "Design_Mode_blueprint",
+          source_name: "Synthetic guide database rebuild package",
+          record_counts: {
+            asset_types: databaseGuideAssetTypes.length,
+            example_workflows: 8,
+            materialized_by_default: 0,
+          },
+          validation_status: "valid",
+          materialize_mode: "design_only",
+          review_notes: "Synthetic guide import package. Review before changing materialize_mode to upsert.",
         },
         source: "synthetic_demo",
         visibility: "synthetic-demo",
@@ -2601,6 +2962,47 @@ export function DashboardPage() {
     }
   }
 
+  async function runDatabaseGuideWorkflowPackage(workflows: DatabaseGuideWorkflow[], label: string, busyKey: string) {
+    setGuideBusy(busyKey);
+    setGuideMessage("");
+    try {
+      const recordsByKey = new Map<string, DatabaseGuideRecord>();
+      workflows.flatMap((workflow) => workflow.records).forEach((record) => recordsByKey.set(record.record_key, record));
+      const result = await fetchFromApiBase<DesignBlueprintInstallResult>(API_BASE, "/api/design-assets/blueprint/import", {
+        method: "POST",
+        body: JSON.stringify({
+          blueprint_version: "gridassetlink-dashboard-guide-v1",
+          synthetic_data_notice: "Dashboard guide records are synthetic/demo planning records only.",
+          mode: "upsert",
+          asset_types: databaseGuideAssetTypes,
+          records: Array.from(recordsByKey.values()),
+        }),
+      });
+      await loadDesignAssets(true);
+      setDesignModeEnabled(true);
+      setStreetLayers((current) => ({ ...current, designAssets: true }));
+      setSearchLayerFilter("designAssets");
+      setVisibilityFilter("synthetic-demo");
+      setGuideMessage(`Applied ${label}: ${result.created_records} created, ${result.updated_records} updated, ${result.created_asset_types} schemas created, ${result.updated_asset_types} schemas updated.`);
+      showToast(`Guide database edits applied for ${label}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setGuideMessage(message);
+      showToast(message);
+    } finally {
+      setGuideBusy("");
+    }
+  }
+
+  function runDatabaseGuideCoverage(area: DatabaseGuideCoverageArea) {
+    const workflows = databaseGuideWorkflows.filter((workflow) => area.workflowKeys.includes(workflow.key));
+    void runDatabaseGuideWorkflowPackage(workflows, area.title, `coverage:${area.title}`);
+  }
+
+  function runCompleteDatabaseGuidePackage() {
+    void runDatabaseGuideWorkflowPackage(databaseGuideWorkflows, "complete database guide package", "complete-guide-package");
+  }
+
   function handleTransmissionLineOwnerLayerChange(owner: string, enabled: boolean) {
     setVisibleTransmissionLineOwners((current) => ({ ...current, [owner]: enabled }));
     if (enabled) {
@@ -3069,10 +3471,13 @@ export function DashboardPage() {
               {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
               {rightMode === "guide" ? (
                 <DatabaseGuideDrawer
+                  coverageAreas={databaseGuideCoverageAreas}
                   workflows={databaseGuideWorkflows}
                   busyKey={guideBusy}
                   message={guideMessage}
                   onRunWorkflow={runDatabaseGuideWorkflow}
+                  onRunCoverage={runDatabaseGuideCoverage}
+                  onRunAll={runCompleteDatabaseGuidePackage}
                   onOpenDesignRecords={openGuideDesignRecords}
                 />
               ) : null}
@@ -4306,37 +4711,23 @@ function SummaryDrawer({ cards, publicOnly, mapStatusMessage, opgwMetrics, layer
   );
 }
 
-function guideWorkflowPayloadPreview(workflow: DatabaseGuideWorkflow) {
-  return JSON.stringify({
-    endpoint: "POST /api/design-assets/blueprint/import",
-    mode: "upsert",
-    asset_types: databaseGuideAssetTypes.map((assetType) => ({
-      slug: assetType.slug,
-      geometry_type: assetType.geometry_type,
-      fields: assetType.fields.map((field) => field.name),
-    })),
-    records: workflow.records.map((record) => ({
-      asset_type_slug: record.asset_type_slug,
-      record_key: record.record_key,
-      display_label: record.display_label,
-      status: record.status,
-      properties: record.properties,
-      geometry: record.geometry || null,
-    })),
-  }, null, 2);
-}
-
 function DatabaseGuideDrawer({
+  coverageAreas,
   workflows,
   busyKey,
   message,
   onRunWorkflow,
+  onRunCoverage,
+  onRunAll,
   onOpenDesignRecords,
 }: {
+  coverageAreas: DatabaseGuideCoverageArea[];
   workflows: DatabaseGuideWorkflow[];
   busyKey: string;
   message: string;
   onRunWorkflow: (workflow: DatabaseGuideWorkflow) => void;
+  onRunCoverage: (area: DatabaseGuideCoverageArea) => void;
+  onRunAll: () => void;
   onOpenDesignRecords: () => void;
 }) {
   return (
@@ -4349,14 +4740,39 @@ function DatabaseGuideDrawer({
         </div>
       </div>
       <div className="dashboard-guide-callout">
-        <strong>How these guide buttons work</strong>
-        <span>Each button runs <code>POST /api/design-assets/blueprint/import</code> with <code>mode: upsert</code>. That creates or updates real Design Mode records in the database while keeping every row synthetic/demo.</span>
+        <strong>No-code database updates</strong>
+        <span>Use the buttons below to create or update synthetic Design Mode records. No JSON, payload editing, or coding is required; the app handles the database changes behind the scenes.</span>
       </div>
       <div className="dashboard-guide-actions">
+        <button type="button" disabled={Boolean(busyKey)} onClick={onRunAll}><Database size={14} />{busyKey === "complete-guide-package" ? "Creating..." : "Create complete guide package"}</button>
         <button type="button" onClick={onOpenDesignRecords}><PencilRuler size={14} />Open Design records</button>
         <Link href="/admin/database"><Database size={14} />Open database admin</Link>
       </div>
       {message ? <p className="dashboard-gis-message">{message}</p> : null}
+      <div className="dashboard-guide-coverage">
+        {coverageAreas.map((area) => (
+          <article key={area.title}>
+            <div>
+              <strong>{area.title}</strong>
+              <span>{area.summary}</span>
+            </div>
+            <div className="dashboard-guide-mini-list">
+              <strong>Record types</strong>
+              <div>{area.recordTypes.map((item) => <span key={item}>{item}</span>)}</div>
+            </div>
+            <div className="dashboard-guide-mini-list">
+              <strong>Design checks</strong>
+              <div>{area.checks.map((item) => <span key={item}>{item}</span>)}</div>
+            </div>
+            <div className="dashboard-guide-card-actions">
+              <button type="button" disabled={Boolean(busyKey)} onClick={() => onRunCoverage(area)}>
+                {busyKey === `coverage:${area.title}` ? "Creating..." : "Create related examples"}
+              </button>
+              <Link href={area.moduleHref}>Open module</Link>
+            </div>
+          </article>
+        ))}
+      </div>
       <div className="dashboard-guide-workflows">
         {workflows.map((workflow) => (
           <article key={workflow.key}>
@@ -4395,10 +4811,6 @@ function DatabaseGuideDrawer({
                 ))}
               </div>
             </div>
-            <details className="dashboard-guide-payload">
-              <summary>View import payload preview</summary>
-              <pre>{guideWorkflowPayloadPreview(workflow)}</pre>
-            </details>
           </article>
         ))}
       </div>
@@ -5137,12 +5549,12 @@ function DesignEditDrawer({
     try {
       const properties = JSON.parse(agentToolPropertiesText) as unknown;
       if (!properties || typeof properties !== "object" || Array.isArray(properties)) {
-        throw new Error("Properties JSON must be an object.");
+        throw new Error("Tool field values must be a structured object.");
       }
       let geometry: DesignAssetGeoJsonGeometry | null = null;
       if (activeAgentDesignTool.geometry_type !== "table_only") {
         const geometryDraft = agentToolGeometryText.trim();
-        if (!geometryDraft) throw new Error(`${activeAgentDesignTool.label} requires GeoJSON geometry. Draw on the map or paste geometry JSON.`);
+        if (!geometryDraft) throw new Error(`${activeAgentDesignTool.label} requires map geometry. Draw on the map or use staged geometry before saving.`);
         geometry = JSON.parse(geometryDraft) as DesignAssetGeoJsonGeometry;
       }
       const result = await fetchFromApiBase<DesignAgentToolRunResult>(API_BASE, `/api/design-assets/agent-tools/${activeAgentDesignTool.tool_key}/run`, {
@@ -5381,9 +5793,9 @@ function DesignEditDrawer({
   function syncFieldBuilderFromJson() {
     try {
       const parsed = JSON.parse(assetFieldsText) as DesignAssetField[];
-      if (!Array.isArray(parsed)) throw new Error("Fields JSON must be a list.");
+      if (!Array.isArray(parsed)) throw new Error("Advanced field backup must be a list.");
       setAssetFieldDrafts(parsed);
-      setLocalMessage("Loaded advanced fields JSON into the visual field builder.");
+      setLocalMessage("Loaded advanced field backup into the visual field builder.");
     } catch (error) {
       setLocalMessage(error instanceof Error ? error.message : String(error));
     }
@@ -5519,12 +5931,18 @@ function DesignEditDrawer({
                     <button type="button" onClick={() => onBeginDrawing(activeAgentDesignTool.geometry_type)} disabled={Boolean(busy)}>Draw {activeAgentDesignTool.geometry_type}</button>
                     {pendingGeometryMatchesAgentTool ? <button type="button" onClick={usePendingGeometryForAgentTool}>Use staged map geometry</button> : null}
                   </div>
-                  <label><span>Geometry GeoJSON</span><textarea value={agentToolGeometryText} onChange={(event) => setAgentToolGeometryText(event.currentTarget.value)} /></label>
+                  <details className="dashboard-design-advanced">
+                    <summary>Advanced geometry backup</summary>
+                    <label><span>Geometry backup</span><textarea value={agentToolGeometryText} onChange={(event) => setAgentToolGeometryText(event.currentTarget.value)} /></label>
+                  </details>
                 </>
               ) : (
                 <p className="dashboard-gis-message">This tool creates a table-only database record. It will not draw a map feature unless you later assign it to a point, line, or polygon object type.</p>
               )}
-              <label><span>Properties JSON</span><textarea value={agentToolPropertiesText} onChange={(event) => setAgentToolPropertiesText(event.currentTarget.value)} /></label>
+              <details className="dashboard-design-advanced">
+                <summary>Advanced tool field backup</summary>
+                <label><span>Tool field backup</span><textarea value={agentToolPropertiesText} onChange={(event) => setAgentToolPropertiesText(event.currentTarget.value)} /></label>
+              </details>
               <label className="dashboard-design-inline-select"><span>Backend write</span><select value={agentToolMaterialize && agentToolSupportsMaterialize ? "materialize" : "design-only"} onChange={(event) => setAgentToolMaterialize(event.currentTarget.value === "materialize")} disabled={!agentToolSupportsMaterialize}>
                 {agentToolSupportsMaterialize ? <option value="materialize">Create Design record and module row</option> : null}
                 <option value="design-only">Design Mode record only</option>
@@ -5536,30 +5954,31 @@ function DesignEditDrawer({
           ) : (
             <p className="dashboard-gis-message">Install or refresh the Design Mode agent tools to quick-add objects from the dashboard.</p>
           )}
-          <div className="dashboard-design-row-title">
-            <strong>AI agent Design Mode tools</strong>
-            <span>Agents can call these POST endpoints to create Design Mode objects, then set <code>materialize</code> to true to write supported records into backend module tables.</span>
-          </div>
-          <div className="dashboard-design-blueprint-list">
-            {orderedAgentTools.map((tool) => (
-              <article className="dashboard-design-blueprint-card" key={tool.tool_key}>
-                <div>
-                  <strong>{tool.label}</strong>
-                  <span>{tool.description}</span>
-                </div>
-                <div className="dashboard-design-blueprint-meta">
-                  <span>{tool.method} {tool.endpoint}</span>
-                  <span>{tool.asset_type_slug}</span>
-                  <span>{tool.backend_entity || "Design Mode only"}</span>
-                </div>
-                <div className="dashboard-design-blueprint-slugs">
-                  {tool.required_properties.map((field) => <span key={field}>required: {field}</span>)}
-                </div>
-                <pre className="dashboard-gis-command">{JSON.stringify({ materialize: tool.supports_materialize, geometry: tool.example_geometry, properties: tool.example_properties }, null, 2)}</pre>
-              </article>
-            ))}
-            {!orderedAgentTools.length ? <p className="dashboard-gis-message">No agent tool manifest is available from the API yet.</p> : null}
-          </div>
+          <details className="dashboard-design-advanced">
+            <summary>Advanced automation manifest</summary>
+            <div className="dashboard-design-row-title">
+              <strong>Design Mode automation tools</strong>
+              <span>Reference list for integrations. Everyday updates should use the buttons, drawing controls, and field forms above.</span>
+            </div>
+            <div className="dashboard-design-blueprint-list">
+              {orderedAgentTools.map((tool) => (
+                <article className="dashboard-design-blueprint-card" key={tool.tool_key}>
+                  <div>
+                    <strong>{tool.label}</strong>
+                    <span>{tool.description}</span>
+                  </div>
+                  <div className="dashboard-design-blueprint-meta">
+                    <span>{tool.asset_type_slug}</span>
+                    <span>{tool.backend_entity || "Design Mode only"}</span>
+                  </div>
+                  <div className="dashboard-design-blueprint-slugs">
+                    {tool.required_properties.map((field) => <span key={field}>required: {field}</span>)}
+                  </div>
+                </article>
+              ))}
+              {!orderedAgentTools.length ? <p className="dashboard-gis-message">No automation manifest is available from the API yet.</p> : null}
+            </div>
+          </details>
           <div className="dashboard-gis-actions">
             <button type="button" onClick={() => void exportDesignBlueprint()} disabled={Boolean(busy)}>Export current blueprint</button>
             <button type="button" onClick={() => void exportRebuildPackage()} disabled={Boolean(busy)}>Export rebuild package</button>
@@ -5570,7 +5989,10 @@ function DesignEditDrawer({
             <button type="button" onClick={() => void importDesignBlueprint()} disabled={Boolean(busy) || !blueprintText.trim()}>Import pasted blueprint/package</button>
             <button type="button" onClick={() => void importRebuildPackageAndReplay()} disabled={Boolean(busy) || !blueprintText.trim()}>Import package + replay snapshots</button>
           </div>
-          <label><span>Blueprint or rebuild package JSON</span><textarea value={blueprintText} onChange={(event) => setBlueprintText(event.currentTarget.value)} placeholder="Paste an exported Design Mode blueprint or rebuild package JSON here, or click Export rebuild package." /></label>
+          <details className="dashboard-design-advanced">
+            <summary>Advanced blueprint import/export backup</summary>
+            <label><span>Blueprint or rebuild package backup</span><textarea value={blueprintText} onChange={(event) => setBlueprintText(event.currentTarget.value)} placeholder="Paste an exported Design Mode blueprint or rebuild package here, or click Export rebuild package." /></label>
+          </details>
         </div>
       ) : mode === "type" ? (
         <div className="dashboard-design-form">
@@ -5626,11 +6048,14 @@ function DesignEditDrawer({
             ))}
             <button className="dashboard-design-add-field" type="button" onClick={addAssetField}>Add field</button>
           </div>
-          <label><span>Advanced fields JSON</span><textarea value={assetFieldsText} onChange={(event) => setAssetFieldsText(event.currentTarget.value)} /></label>
-          <div className="dashboard-gis-actions">
-            <button type="button" onClick={syncFieldBuilderFromJson}>Load JSON into builder</button>
-          </div>
-          <label><span>Map style JSON</span><textarea value={assetStyleText} onChange={(event) => setAssetStyleText(event.currentTarget.value)} /></label>
+          <details className="dashboard-design-advanced">
+            <summary>Advanced schema backup</summary>
+            <label><span>Field definition backup</span><textarea value={assetFieldsText} onChange={(event) => setAssetFieldsText(event.currentTarget.value)} /></label>
+            <div className="dashboard-gis-actions">
+              <button type="button" onClick={syncFieldBuilderFromJson}>Load backup into builder</button>
+            </div>
+            <label><span>Map style backup</span><textarea value={assetStyleText} onChange={(event) => setAssetStyleText(event.currentTarget.value)} /></label>
+          </details>
           <button className="telecom-map-button full-width" type="button" onClick={() => void createAssetType()} disabled={Boolean(busy)}>Create object type</button>
         </div>
       ) : (
@@ -5677,7 +6102,12 @@ function DesignEditDrawer({
           <div className="dashboard-design-fields">
             {fields.map((field) => <DesignFieldInput key={field.name} field={field} value={propertiesDraft[field.name] || ""} onChange={(value) => updateProperty(field.name, value)} />)}
           </div>
-          {activeType?.geometry_type !== "table_only" ? <label><span>Geometry GeoJSON</span><textarea value={geometryText} onChange={(event) => setGeometryText(event.currentTarget.value)} /></label> : null}
+          {activeType?.geometry_type !== "table_only" ? (
+            <details className="dashboard-design-advanced">
+              <summary>Advanced geometry backup</summary>
+              <label><span>Geometry backup</span><textarea value={geometryText} onChange={(event) => setGeometryText(event.currentTarget.value)} /></label>
+            </details>
+          ) : null}
           <label><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.currentTarget.value)} /></label>
           <div className="dashboard-gis-actions">
             <button className="telecom-map-button" type="button" onClick={() => void saveRecord()} disabled={Boolean(busy) || !activeType}>Save object</button>
@@ -5711,7 +6141,7 @@ function designRecordWorkOrderId(record: DesignAssetRecord): number | null {
 function DesignFieldInput({ field, value, onChange }: { field: DesignAssetField; value: string; onChange: (value: string) => void }) {
   const label = `${field.label}${field.required ? " *" : ""}`;
   if (field.type === "textarea" || field.type === "json") {
-    return <label><span>{label}</span><textarea value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder={field.help_text || ""} /></label>;
+    return <label><span>{field.type === "json" ? `${label} list` : label}</span><textarea value={value} onChange={(event) => onChange(event.currentTarget.value)} placeholder={field.help_text || (field.type === "json" ? "Enter one item per line or separate items with commas." : "")} /></label>;
   }
   if (field.type === "enum") {
     return (
@@ -5738,7 +6168,7 @@ function defaultObjectTypeFields(): DesignAssetField[] {
     { name: "name", label: "Object name", type: "string", required: true, help_text: "Human-readable object name." },
     { name: "category", label: "Category", type: "string", required: false, help_text: "Optional grouping, owner, system, or object class." },
     { name: "status", label: "Status", type: "enum", required: true, default: "proposed", enum_options: ["proposed", "planned", "active", "as_built", "archived"] },
-    { name: "metadata", label: "Metadata JSON", type: "json", required: false, help_text: "Optional JSON object or array for custom attributes." },
+    { name: "metadata", label: "Extra attributes", type: "json", required: false, help_text: "Optional lines or comma-separated values for custom attributes." },
   ];
 }
 
@@ -5792,13 +6222,7 @@ function designFieldDefaultFromText(type: DesignAssetFieldType, value: string) {
   if (type === "integer") return Number.parseInt(value, 10);
   if (type === "number") return Number(value);
   if (type === "boolean") return value === "true";
-  if (type === "json") {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value;
-    }
-  }
+  if (type === "json") return parseDesignStructuredValue(value);
   return value;
 }
 
@@ -5812,7 +6236,11 @@ function propertiesToFieldDraft(fields: DesignAssetField[], properties: Record<s
 
 function stringifyFieldDraftValue(value: unknown, field: DesignAssetField) {
   if (value === undefined || value === null) return "";
-  if (field.type === "json") return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  if (field.type === "json") {
+    if (Array.isArray(value)) return value.map((item) => String(item)).join("\n");
+    if (typeof value === "object") return Object.entries(value as Record<string, unknown>).map(([key, item]) => `${key}: ${String(item)}`).join("\n");
+    return String(value);
+  }
   if (field.type === "boolean") return value === true ? "true" : value === false ? "false" : "";
   return String(value);
 }
@@ -5838,12 +6266,34 @@ function fieldDraftToProperties(fields: DesignAssetField[], draft: Record<string
       return;
     }
     if (field.type === "json") {
-      properties[field.name] = JSON.parse(value);
+      properties[field.name] = parseDesignStructuredValue(value);
       return;
     }
     properties[field.name] = value;
   });
   return properties;
+}
+
+function parseDesignStructuredValue(value: string): unknown {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+  const lines = trimmed.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  if (lines.length > 1) return lines;
+  if (trimmed.includes(",")) return trimmed.split(",").map((item) => item.trim()).filter(Boolean);
+  if (trimmed.includes(":")) {
+    const entries = lines.map((line) => line.split(":").map((item) => item.trim()));
+    if (entries.every((entry) => entry.length >= 2 && entry[0])) {
+      return Object.fromEntries(entries.map(([key, ...rest]) => [key, rest.join(":")]));
+    }
+  }
+  return [trimmed];
 }
 
 function defaultGeometryTextForType(geometryType: DesignAssetGeometryType, pendingGeometry: DesignAssetGeoJsonGeometry | null) {

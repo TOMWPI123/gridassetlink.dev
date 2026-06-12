@@ -19,9 +19,9 @@ Authentication is enabled by default. Set `AUTH_REQUIRED=false` on the backend a
 1. Sign in as an `admin`, `engineer`, or `editor`.
 2. Open `/admin/database`.
 3. Install the core TelecomNE rebuild schemas or create a custom object type.
-4. Add records with properties JSON and optional GeoJSON geometry.
+4. Add records with guided forms, templates, map drawing tools, and action buttons.
 5. Open `/dashboard?drawer=design` to view map records on the Design Mode planning layer.
-6. Use Design Mode to draw, edit, search, select, archive, export, import, materialize records, or issue work orders from selected records.
+6. Use Design Mode to draw, edit, search, select, archive, export, import, materialize records, or issue work orders from selected records without hand-writing database payloads.
 
 Object types with `point`, `line`, or `polygon` geometry appear on the dashboard map when the Design Mode layer is visible. `table_only` records stay in the database and are useful for inspections, assumptions, vendors, permits, notes, inventories, and other non-map objects.
 
@@ -29,7 +29,7 @@ Object types with `point`, `line`, or `polygon` geometry appear on the dashboard
 
 `/admin/database` includes a **Design database guide** section that acts as the first-stop checklist for using GridAssetLink as a living planning database.
 
-The dashboard also includes a **Guide** button next to **In Service** and **Planned**. Open it from `/dashboard?drawer=guide` to view workflows and create synthetic example database edits directly into Design Mode.
+The dashboard also includes a **Guide** button next to **In Service** and **Planned**. Open it from `/dashboard?drawer=guide` to view workflows and create synthetic example database edits directly into Design Mode with buttons.
 
 - Choose templates or core schemas before creating records.
 - Edit selected records instead of recreating them.
@@ -38,14 +38,45 @@ The dashboard also includes a **Guide** button next to **In Service** and **Plan
 - Materialize supported records only after review.
 - Preserve the synthetic/demo data boundary.
 
-The dashboard guide can upsert example Design Mode records for:
+The dashboard guide can create or update example Design Mode records for:
 
 - adding fiber and slack to a distribution pole,
 - adding a fiber cable/span between structures,
 - resplicing an existing service with existing and proposed splice rows, and
 - assigning a service from one substation LIU to another LIU with endpoint devices.
 
-Each guide action runs `POST /api/design-assets/blueprint/import` with `mode: upsert`. The records are synthetic/demo planning records and should be reviewed before materialization or work-order issue.
+The guide also includes a **Create complete guide package** button and coverage cards for the major database areas. The records are synthetic/demo planning records and should be reviewed before materialization or work-order issue.
+
+Coverage cards:
+
+- **Substations, LIUs, and patch panels**: site anchor records, LIUs, patch panels, racks, ports, and endpoint inventory.
+- **Distribution poles and spans**: pole/support records, cable IDs, span endpoints, slack, and planned fiber construction state.
+- **Strands, services, and continuity**: strand rows, reservations, assignments, service IDs, LIU terminations, and loss/continuity summaries.
+- **Splicing and resplicing**: existing splice rows, proposed splice rows, affected service IDs, and closeout requirements.
+- **Work orders, evidence, and closeout**: linked records, required tasks, evidence requirements, field status, and engineering review.
+- **Import, rebuild, and materialization**: import source, validation state, record counts, materialization mode, and review notes.
+
+Use the guide as the no-code update path:
+
+1. Click **Guide** on the dashboard.
+2. Choose a coverage card such as **Splicing and resplicing** or **Work orders, evidence, and closeout**.
+3. Click **Create related examples** to add the supporting records.
+4. Click **Open Design records** to inspect or edit the created records.
+5. Click **Open module** to review the matching module page.
+6. Issue work orders or materialize records only after review.
+
+## No-Code Object Editing
+
+The normal update path should be buttons and forms, not hand-written payloads:
+
+- Use **Recommended design/edit improvements** to load a pole, splice closure, fiber span, work package, or patch panel template.
+- Use **Form fields** to add or remove the fields that users should fill in.
+- Use **Map style** controls to pick color, point radius, line width, and fill opacity.
+- Use **Create database object** to fill in typed fields such as cable ID, fiber count, connected cable IDs, strand status, LIU port, or notes.
+- Use **Map location**, **Route endpoints**, or dashboard drawing tools for geometry.
+- Use the **Record browser and editor** to update existing records from the generated fields, then save, duplicate, archive, or issue a work order.
+
+Collapsed advanced backup sections exist only for troubleshooting or imported/exported schema recovery. Day-to-day design changes should use the visual field builder, typed record forms, guide buttons, and dashboard map drawing.
 
 ### Assigning a Service Across Fiber
 
@@ -110,10 +141,10 @@ Use materialization only for synthetic/demo planning records. It does not verify
 Design records can issue real work-order records while staying linked to the original design object. Use this when the tool is acting as a design database and field or engineering work needs to be assigned.
 
 - Dashboard: open `/dashboard?drawer=design`, select a Design Mode record, then click **Issue work order**.
+- Guide: open `/dashboard?drawer=guide`, create the related guide examples, then open Design records and issue work from the selected record.
 - Administration: open `/admin/database` and use **Living database work queue**.
-- API: `POST /api/design-assets/records/{record_id}/issue-work-order`.
 
-The work order receives default review, verification, closeout, and engineering-review tasks unless task titles are supplied in the request. The design record stores `linked_work_order_ids`, `latest_work_order_id`, `latest_work_order_number`, `work_order_status`, and `living_database_status` in its properties JSON.
+The work order receives default review, verification, closeout, and engineering-review tasks. The design record keeps the latest work-order link, status, and living-database state in its record metadata.
 
 Work-order closeout does not automatically mark a synthetic asset verified. Update the design record to `as_built` only after an engineer reviews field evidence and confirms the record should be treated as verified planning data.
 
