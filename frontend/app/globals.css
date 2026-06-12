@@ -126,7 +126,14 @@ a { color: inherit; text-decoration: none; }
 .opgw-cable-menu-body { display: grid; gap: 12px; }
 .opgw-cable-picker { display: grid; gap: 7px; }
 .opgw-cable-picker span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 820; text-transform: uppercase; }
-.opgw-cable-picker select { width: 100%; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--foreground); padding: 8px 10px; }
+.opgw-cable-picker select,
+.opgw-cable-picker input { width: 100%; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--foreground); padding: 8px 10px; }
+.opgw-cable-choice-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; content-visibility: auto; contain-intrinsic-size: 180px; }
+.opgw-cable-choice { display: grid; min-width: 0; gap: 3px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--foreground); text-align: left; cursor: pointer; }
+.opgw-cable-choice:hover,
+.opgw-cable-choice.active { border-color: #0f766e; background: #e9f7f3; color: #0b4f52; }
+.opgw-cable-choice strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.opgw-cable-choice span { color: var(--muted); font-size: 11px; font-weight: 760; }
 .opgw-cable-menu-stats { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 8px; }
 .opgw-cable-menu-stats div, .opgw-side-stat-grid div { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #f8fbfd; }
 .opgw-cable-menu-stats span, .opgw-side-stat-grid span { display: block; color: var(--muted); font-size: 10px; font-weight: 820; text-transform: uppercase; }

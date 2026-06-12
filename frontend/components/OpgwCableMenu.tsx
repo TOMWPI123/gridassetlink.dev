@@ -2,14 +2,26 @@
 
 import Link from "next/link";
 import { Cable, GitCompareArrows, Route, Search, ShieldAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import { displayValue } from "@/lib/api";
 import type { JsonRecord } from "@/types";
+
+const MAX_CABLE_CHOICES = 18;
 
 export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
   const cables = useMemo(() => rows.filter((row) => typeof row.cable_id === "string" && String(row.cable_id).startsWith("SYN-OPGW")), [rows]);
   const [selectedId, setSelectedId] = useState("");
-  const selected = cables.find((row) => row.cable_id === selectedId) || cables[0];
+  const [query, setQuery] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const deferredQuery = useDeferredValue(query);
+  const selected = useMemo(() => cables.find((row) => row.cable_id === selectedId) || cables[0], [cables, selectedId]);
+  const visibleChoices = useMemo(() => {
+    const normalizedQuery = deferredQuery.trim().toLowerCase();
+    const source = normalizedQuery
+      ? cables.filter((row) => cableSearchText(row).includes(normalizedQuery))
+      : cables;
+    return source.slice(0, MAX_CABLE_CHOICES);
+  }, [cables, deferredQuery]);
   if (!cables.length || !selected) return null;
 
   const cableId = String(selected.cable_id);
@@ -28,14 +40,31 @@ export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
       <div className="panel-body opgw-cable-menu-body">
         <label className="opgw-cable-picker">
           <span><Search size={15} /> Cable menu</span>
-          <select value={String(selected.cable_id)} onChange={(event) => setSelectedId(event.target.value)}>
-            {cables.map((row) => (
-              <option key={String(row.cable_id)} value={String(row.cable_id)}>
-                {displayValue(row.cable_name || row.route_name || row.cable_id)} / {displayValue(row.fiber_count)}F / {displayValue(row.status)}
-              </option>
-            ))}
-          </select>
+          <input
+            className="input"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search cable, route, line, or status"
+          />
         </label>
+        <div className="opgw-cable-choice-grid" aria-label="Filtered OPGW cable choices">
+          {visibleChoices.map((row) => {
+            const id = String(row.cable_id);
+            const active = id === cableId;
+            return (
+              <button
+                className={`opgw-cable-choice ${active ? "active" : ""}`}
+                key={id}
+                type="button"
+                onClick={() => startTransition(() => setSelectedId(id))}
+              >
+                <strong>{displayValue(row.cable_name || row.route_name || id)}</strong>
+                <span>{displayValue(row.fiber_count)}F / {displayValue(row.status)}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="subtle">{isPending ? "Updating selected cable..." : `Showing ${visibleChoices.length.toLocaleString()} of ${cables.length.toLocaleString()} cables. Search narrows the interactive list for smoother clicks.`}</div>
         <div className="opgw-cable-menu-stats">
           <div><span>Route</span><strong>{displayValue(selected.route_name || selected.cable_name)}</strong></div>
           <div><span>Fiber</span><strong>{displayValue(selected.fiber_count)}F</strong></div>
@@ -55,4 +84,16 @@ export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
       </div>
     </section>
   );
+}
+
+function cableSearchText(row: JsonRecord): string {
+  return [
+    row.cable_id,
+    row.cable_name,
+    row.route_name,
+    row.line_id,
+    row.line_name,
+    row.status,
+    row.fiber_count,
+  ].map((value) => displayValue(value).toLowerCase()).join(" ");
 }

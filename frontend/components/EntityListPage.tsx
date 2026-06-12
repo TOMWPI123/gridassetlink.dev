@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiDownload, apiFetch, canWrite, formatLabel } from "@/lib/api";
 import { loadModuleLayerData, type ModuleLayerData } from "@/lib/moduleLayerData";
 import type { EntityConfig, JsonRecord } from "@/types";
@@ -20,31 +20,47 @@ function ConfiguredEntityListPage({ config }: { config: EntityConfig }) {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showOpgwTable, setShowOpgwTable] = useState(config.key !== "opgw");
+  const loadIdRef = useRef(0);
   const writable = canWrite() && !["users", "audit-logs"].includes(config.key);
   const visibleRows = useMemo(() => rows.filter((row) => matchesStaticFilter(config.key, row)), [config.key, rows]);
-  async function load() {
+  const load = useCallback(async () => {
+    const loadId = loadIdRef.current + 1;
+    loadIdRef.current = loadId;
     setBusy(true);
     setError("");
     setModuleLayerData(null);
-    try {
-      const [backendResult, layerResult] = await Promise.allSettled([
-        apiFetch<JsonRecord[]>(config.endpoint),
-        loadModuleLayerData(config.key),
-      ]);
-      const backendRows = backendResult.status === "fulfilled" ? normalizeBackendRows(backendResult.value) : [];
-      const layerData = layerResult.status === "fulfilled" ? layerResult.value : null;
+    setRows([]);
+    const backendPromise = apiFetch<JsonRecord[]>(config.endpoint)
+      .then((value) => ({ rows: normalizeBackendRows(value) }))
+      .catch((reason) => ({ error: reason }));
+    const layerResult = await loadModuleLayerData(config.key)
+      .then((value) => ({ data: value }))
+      .catch((reason) => ({ error: reason }));
+    if (loadId !== loadIdRef.current) return;
+    const layerData = "data" in layerResult ? layerResult.data : null;
+    const layerRows = layerData?.rows || [];
+    if (layerData) {
       setModuleLayerData(layerData);
-      setRows([...backendRows, ...(layerData?.rows || [])]);
-      if (backendResult.status === "rejected" && !layerData?.rows.length) {
-        setError(backendResult.reason instanceof Error ? backendResult.reason.message : "Could not load data");
-      } else if (layerResult.status === "rejected") {
-        setError(layerResult.reason instanceof Error ? layerResult.reason.message : "Could not load layer data");
-      }
-    } finally {
+      setRows(layerRows);
       setBusy(false);
     }
-  }
-  useEffect(() => { load(); }, [config.endpoint, config.key]);
+    const backendResult = await backendPromise;
+    if (loadId !== loadIdRef.current) return;
+    if ("rows" in backendResult) {
+      setRows([...backendResult.rows, ...layerRows]);
+    } else if (!layerRows.length) {
+      setError(backendResult.error instanceof Error ? backendResult.error.message : "Could not load data");
+    }
+    if (!layerData && "error" in layerResult) {
+      setError(layerResult.error instanceof Error ? layerResult.error.message : "Could not load layer data");
+    }
+    setBusy(false);
+  }, [config.endpoint, config.key]);
+  useEffect(() => {
+    setShowOpgwTable(config.key !== "opgw");
+  }, [config.key]);
+  useEffect(() => { void load(); }, [load]);
   const exportRows = () => moduleLayerData ? downloadRowsAsCsv(visibleRows, `${config.key}.csv`) : apiDownload(`/api/export/${config.endpoint.replace("/api/", "")}`, `${config.key}.csv`);
   return (
     <>
@@ -54,8 +70,25 @@ function ConfiguredEntityListPage({ config }: { config: EntityConfig }) {
       {moduleLayerData ? <ModuleLayerSummary data={moduleLayerData} backendCount={rows.length - moduleLayerData.rows.length} totalCount={visibleRows.length} /> : null}
       {config.key === "substations" && !busy ? <SubstationFiberSection rows={visibleRows} /> : null}
       {config.key === "opgw" && !busy ? <OpgwCableMenu rows={visibleRows} /> : null}
-      {busy ? <div className="panel panel-body">Loading {config.title.toLowerCase()}...</div> : <DataTable rows={visibleRows} columns={config.columns} detailBase={moduleLayerData?.disableDetailLinks ? undefined : detailBaseFor(config.key, config.detailBase)} filterField={config.filterField} onExport={exportRows} />}
+      {busy ? <div className="panel panel-body">Loading {config.title.toLowerCase()}...</div> : config.key === "opgw" && !showOpgwTable ? <DeferredOpgwTablePrompt rows={visibleRows} onShow={() => setShowOpgwTable(true)} /> : <DataTable rows={visibleRows} columns={config.columns} detailBase={moduleLayerData?.disableDetailLinks ? undefined : detailBaseFor(config.key, config.detailBase)} filterField={config.filterField} onExport={exportRows} />}
     </>
+  );
+}
+
+function DeferredOpgwTablePrompt({ rows, onShow }: { rows: JsonRecord[]; onShow: () => void }) {
+  return (
+    <section className="panel deferred-opgw-table">
+      <div className="panel-header">
+        <div>
+          <strong>OPGW Inventory Table</strong>
+          <div className="subtle">The continuity controls are ready. Open the full searchable table only when you need row-level inventory.</div>
+        </div>
+        <span className="badge planned">{rows.length.toLocaleString()} rows available</span>
+      </div>
+      <div className="panel-body">
+        <button className="button" type="button" onClick={onShow}>Show OPGW Inventory Table</button>
+      </div>
+    </section>
   );
 }
 

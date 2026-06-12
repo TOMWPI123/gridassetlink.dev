@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Download, Eye, Route } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Badge, PriorityBadge } from "@/components/Badges";
 import { displayValue, formatLabel } from "@/lib/api";
 import type { JsonRecord } from "@/types";
@@ -15,12 +15,14 @@ export function DataTable({ rows, columns, detailBase, filterField, onExport }: 
   const [sortKey, setSortKey] = useState(columns[0] || "id");
   const [page, setPage] = useState(0);
   const [filterValue, setFilterValue] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const pageSize = 12;
   const filterOptions = useMemo(() => filterField ? Array.from(new Set(rows.map((row) => displayValue(row[filterField])).filter((value) => value !== "-"))).sort() : [], [filterField, rows]);
+  const normalizedQuery = deferredQuery.trim().toLowerCase();
   const filtered = useMemo(() => rows.filter((row) => {
     if (filterField && filterValue && displayValue(row[filterField]) !== filterValue) return false;
-    return !query || Object.values(row).some((value) => displayValue(value).toLowerCase().includes(query.toLowerCase()));
-  }).sort((a, b) => displayValue(a[sortKey]).localeCompare(displayValue(b[sortKey]), undefined, { numeric: true })), [filterField, filterValue, query, rows, sortKey]);
+    return !normalizedQuery || Object.values(row).some((value) => displayValue(value).toLowerCase().includes(normalizedQuery));
+  }).sort((a, b) => displayValue(a[sortKey]).localeCompare(displayValue(b[sortKey]), undefined, { numeric: true })), [filterField, filterValue, normalizedQuery, rows, sortKey]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const visible = filtered.slice(page * pageSize, page * pageSize + pageSize);
   const hasOpenColumn = Boolean(detailBase) || rows.some((row) => typeof row.open_href === "string" && row.open_href);
