@@ -3570,6 +3570,7 @@ export function DashboardPage() {
       </div>
 
       <div className="dashboard-top-right-toolbar" aria-label="Map toolbar">
+        <Link href="/admin/database"><Database size={15} />Backend Modules</Link>
         <button type="button" onClick={() => issueMapCommand("resetIsoNe")}><LocateFixed size={15} />Reset to ISO-NE</button>
         <button type="button" onClick={() => issueMapCommand("fitActiveMap")}><Maximize2 size={15} />Fit active map</button>
         <button type="button" onClick={() => setMapWindowClosed(true)}><X size={15} />Close map</button>
@@ -3864,6 +3865,7 @@ function DashboardChangeActions({
       </div>
       <div className="dashboard-change-button-grid">
         <button type="button" onClick={onChangeAssets}><PencilRuler size={14} />Edit / Add Object</button>
+        <Link href="/admin/database"><Database size={14} />Backend Modules</Link>
         <button type="button" onClick={onAddSplicePoint}><Plus size={14} />Add Splice Point</button>
         <button type="button" onClick={onAddSpliceRow}><Cable size={14} />Add Splice Row</button>
         <button type="button" onClick={onOpenSpliceMatrix}><TableProperties size={14} />Splice Matrix</button>

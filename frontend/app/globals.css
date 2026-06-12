@@ -7313,7 +7313,8 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   gap: 7px;
 }
 
-.dashboard-change-button-grid button {
+.dashboard-change-button-grid button,
+.dashboard-change-button-grid a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7328,9 +7329,11 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   font-size: 11px;
   font-weight: 840;
   cursor: pointer;
+  text-decoration: none;
 }
 
-.dashboard-change-button-grid button:hover {
+.dashboard-change-button-grid button:hover,
+.dashboard-change-button-grid a:hover {
   border-color: rgba(105,215,228,.48);
   background: rgba(105,215,228,.18);
 }
