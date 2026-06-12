@@ -22,15 +22,35 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
       <section className="splice-manager-summary-grid" aria-label="Cable continuity summary">
         <SummaryCard label="Fiber Count" value={`${cable.fiberCount}F`} />
         <SummaryCard label="Route Miles" value={view.totals.routeMiles.toFixed(2)} />
+        <SummaryCard label="Structures" value={view.totals.structures.toLocaleString()} />
         <SummaryCard label="Cable Sections" value={view.totals.cableSections.toLocaleString()} />
         <SummaryCard label="Span Segments" value={view.totals.spans.toLocaleString()} />
         <SummaryCard label="Splice Closures" value={view.totals.spliceClosures.toLocaleString()} />
         <SummaryCard label="Services Carried" value={view.totals.services.toLocaleString()} />
+        <SummaryCard label="Strands" value={view.totals.totalStrands.toLocaleString()} />
         <SummaryCard label="Estimated Loss" value={`${view.totals.estimatedLossDb.toFixed(2)} dB`} />
       </section>
 
       <section className="splice-manager-grid">
         <div className="splice-manager-main">
+          <Panel title="Cable Details" icon={<Cable size={17} />}>
+            <div className="opgw-cable-detail-grid">
+              <DetailItem label="Cable ID" value={cable.id} />
+              <DetailItem label="Route ID" value={view.routeId} />
+              <DetailItem label="Transmission line" value={cable.lineName || cable.lineId} />
+              <DetailItem label="Status" value={cable.status.replaceAll("_", " ")} />
+              <DetailItem label="Fiber type" value={cable.fiberType} />
+              <DetailItem label="Manufacturer" value={cable.manufacturer || "synthetic demo"} />
+              <DetailItem label="Cable spec" value={cable.cableSpec || "synthetic planning profile"} />
+              <DetailItem label="Buffer tubes" value={String(cable.bufferTubeCount || "-")} />
+              <DetailItem label="Fibers per tube" value={String(cable.fibersPerTube || "-")} />
+              <DetailItem label="Start structure" value={cable.startStructureId} />
+              <DetailItem label="End structure" value={cable.endStructureId} />
+              <DetailItem label="Source" value={cable.source} />
+            </div>
+            <p className="splice-side-note">{cable.notes || "Synthetic cable record. Use this module for planning review of strand, splice, structure, and service continuity only."}</p>
+          </Panel>
+
           <Panel title="Full Cable Continuity" icon={<Route size={17} />}>
             <div className="opgw-continuity-strip">
               {view.splicePoints.map((point, index) => (
@@ -75,6 +95,73 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
                 </tbody>
               </table>
             </div>
+          </Panel>
+
+          <Panel title="Transmission Structures on Cable" icon={<Workflow size={17} />}>
+            <div className="splice-table-wrap tall">
+              <table className="splice-manager-table">
+                <thead>
+                  <tr>
+                    <th>Seq</th>
+                    <th>Structure</th>
+                    <th>Type</th>
+                    <th>Voltage</th>
+                    <th>OPGW</th>
+                    <th>Splice</th>
+                    <th>Closures</th>
+                    <th>Coordinates</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {view.structures.slice(0, 420).map((structure) => (
+                    <tr key={structure.properties.id}>
+                      <td>{structure.properties.sequenceIndex}</td>
+                      <td>{structure.properties.structureNumber}<br /><small>{structure.properties.id}</small></td>
+                      <td>{structure.properties.structureType}</td>
+                      <td>{structure.properties.voltageKv ? `${structure.properties.voltageKv} kV` : "-"}</td>
+                      <td><StatusPill value={structure.properties.hasOpgw ? "has OPGW" : "no OPGW"} /></td>
+                      <td><StatusPill value={structure.properties.hasSplice ? "splice" : "pass through"} /></td>
+                      <td>{structure.properties.spliceClosureIds.join(", ") || "-"}</td>
+                      <td>{structure.properties.latitude.toFixed(5)}, {structure.properties.longitude.toFixed(5)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="splice-side-note">Showing {Math.min(view.structures.length, 420).toLocaleString()} of {view.structures.length.toLocaleString()} synthetic structures associated with this cable route.</p>
+          </Panel>
+
+          <Panel title="Fiber Strand Inventory" icon={<Cable size={17} />}>
+            {view.fiberStrands.length ? (
+              <div className="splice-table-wrap tall">
+                <table className="splice-manager-table">
+                  <thead>
+                    <tr>
+                      <th>Strand</th>
+                      <th>Tube</th>
+                      <th>Color</th>
+                      <th>Status</th>
+                      <th>Assignment</th>
+                      <th>Circuit</th>
+                      <th>Trace</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {view.fiberStrands.map((strand) => (
+                      <tr key={strand.id}>
+                        <td>{strand.strandNumber}<br /><small>{strand.id}</small></td>
+                        <td>{strand.tubeNumber || "-"}</td>
+                        <td>{strand.colorCode || "-"}</td>
+                        <td><StatusPill value={strand.status} /></td>
+                        <td>{strand.assignmentId || "-"}</td>
+                        <td>{strand.circuitId || "-"}</td>
+                        <td><Link className="table-view-link route" href={`/fiber-trace?strand=${encodeURIComponent(strand.id)}`}>View</Link></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <div className="splice-side-note">No strand rows are generated for this cable. Capacity is inferred from cable sections.</div>}
           </Panel>
 
           <Panel title="Splicing and Closures" icon={<GitCompareArrows size={17} />}>
@@ -141,8 +228,11 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
                     </div>
                     <dl>
                       <div><dt>Type</dt><dd>{service.serviceType}</dd></div>
+                      <div><dt>Circuit</dt><dd>{service.circuitId || service.serviceId}</dd></div>
                       <div><dt>Status</dt><dd><StatusPill value={service.operationalStatus} /></dd></div>
                       <div><dt>Criticality</dt><dd><StatusPill value={service.criticality} /></dd></div>
+                      <div><dt>A/Z Panels</dt><dd>{service.endpointAPatchPanelId || "-"} / {service.endpointZPatchPanelId || "-"}</dd></div>
+                      <div><dt>Bandwidth</dt><dd>{service.bandwidthProfile || "-"}</dd></div>
                       <div><dt>Loss</dt><dd>{path ? `${path.totalEstimatedLossDb.toFixed(2)} dB` : "-"}</dd></div>
                       <div><dt>Spans</dt><dd>{path?.totalSpanSegments ?? "-"}</dd></div>
                       <div><dt>Splices</dt><dd>{path?.totalSplicePoints ?? "-"}</dd></div>
@@ -239,6 +329,15 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
     <div className="splice-summary-card">
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value || "-"}</strong>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import type {
   PatchPanel,
   SpliceClosureFeature,
   SyntheticService,
+  TransmissionStructureFeature,
 } from "@/lib/types/assets";
 
 export type OpgwCableContinuityView = {
@@ -20,6 +21,7 @@ export type OpgwCableContinuityView = {
   spanSegments: OpgwSpanSegmentFeature[];
   splicePoints: OpgwSplicePointFeature[];
   spliceClosures: SpliceClosureFeature[];
+  structures: TransmissionStructureFeature[];
   fiberSplices: FiberSplice[];
   fiberStrands: FiberStrand[];
   fiberAssignments: FiberAssignment[];
@@ -61,6 +63,18 @@ export function buildOpgwCableContinuityView(cableId: string, data: FiberContinu
   const splicePoints = data.opgwSplicePoints
     .filter((point) => point.properties.opgwRouteId === routeId)
     .sort((a, b) => structureSequence(a.properties.structureNumber) - structureSequence(b.properties.structureNumber));
+  const cableStructureIds = new Set([
+    ...cable.properties.structureIds,
+    ...cableSections.flatMap((section) => [section.properties.fromStructureId, section.properties.toStructureId]),
+    ...spanSegments.flatMap((span) => [span.properties.fromStructureId, span.properties.toStructureId]),
+    ...splicePoints.map((point) => point.properties.structureId),
+  ]);
+  const structures = (data.transmissionStructures || [])
+    .filter((structure) => cableStructureIds.has(structure.properties.id))
+    .sort((a, b) => {
+      const bySequence = Number(a.properties.sequenceIndex || 0) - Number(b.properties.sequenceIndex || 0);
+      return bySequence || a.properties.structureNumber.localeCompare(b.properties.structureNumber, undefined, { numeric: true });
+    });
 
   const closureIds = new Set<string>([
     ...cable.properties.connectedSpliceClosureIds,
@@ -111,6 +125,7 @@ export function buildOpgwCableContinuityView(cableId: string, data: FiberContinu
     spanSegments,
     splicePoints,
     spliceClosures,
+    structures,
     fiberSplices,
     fiberStrands,
     fiberAssignments,

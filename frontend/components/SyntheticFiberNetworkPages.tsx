@@ -56,11 +56,64 @@ export function OpgwCablesPage() {
     ...feature.properties,
     structureCount: feature.properties.structureIds.length,
     spliceClosureCount: feature.properties.connectedSpliceClosureIds.length,
+    cable_module_view: `/opgw/cables/${encodeURIComponent(feature.properties.id)}`,
+    fiber_trace_view: `/fiber-trace?cable=${encodeURIComponent(feature.properties.id)}`,
+    map_view: `/dashboard?drawer=layers&cable=${encodeURIComponent(feature.properties.id)}`,
+    open_href: `/opgw/cables/${encodeURIComponent(feature.properties.id)}`,
+    open_label: "Open full cable module",
   }) as unknown as JsonRecord), [data.opgw]);
   return (
     <SyntheticPage title="OPGW Cables" subtitle="Synthetic OPGW planning cables randomly assigned to public transmission lines." error={data.error}>
-      {data.loading ? <div className="panel panel-body">Loading OPGW cable index...</div> : <DataTable rows={rows} columns={["cableName", "lineId", "status", "fiberCount", "routeMiles", "structureCount", "spliceClosureCount", "source"]} filterField="status" />}
+      {data.loading ? <div className="panel panel-body">Loading OPGW cable index...</div> : (
+        <>
+          <OpgwCableModuleSection rows={rows} />
+          <DataTable rows={rows} columns={["cableName", "lineId", "status", "fiberCount", "routeMiles", "structureCount", "spliceClosureCount", "cable_module_view", "fiber_trace_view", "map_view", "source"]} filterField="status" />
+        </>
+      )}
     </SyntheticPage>
+  );
+}
+
+function OpgwCableModuleSection({ rows }: { rows: JsonRecord[] }) {
+  const featured = rows
+    .slice()
+    .sort((a, b) => String(a.id || "").localeCompare(String(b.id || ""), undefined, { numeric: true }))
+    .slice(0, 8);
+  const totalMiles = rows.reduce((sum, row) => sum + Number(row.routeMiles || 0), 0);
+  const totalFibers = rows.reduce((sum, row) => sum + Number(row.fiberCount || 0), 0);
+  return (
+    <section className="panel opgw-cable-module-section">
+      <div className="panel-header">
+        <div>
+          <strong>OPGW Cable Detail Modules</strong>
+          <div className="subtle">Open a cable module to review cable metadata, strands, structures, splices, patch panels, assignments, and services carried on that cable.</div>
+        </div>
+      </div>
+      <div className="opgw-cable-module-metrics">
+        <Metric label="Cable modules" value={rows.length.toLocaleString()} detail="Full detail views available" />
+        <Metric label="Synthetic route miles" value={totalMiles.toFixed(1)} detail="Planning/demo OPGW mileage" />
+        <Metric label="Fiber capacity sum" value={totalFibers.toLocaleString()} detail="Aggregate synthetic fiber count" />
+      </div>
+      <div className="opgw-cable-module-grid">
+        {featured.map((row) => (
+          <article key={String(row.id)} className="opgw-cable-module-card">
+            <strong>{String(row.cableName || row.id)}</strong>
+            <span>{String(row.lineId || "line")} / {String(row.status || "synthetic")}</span>
+            <dl>
+              <div><dt>Fiber</dt><dd>{String(row.fiberCount)}F</dd></div>
+              <div><dt>Miles</dt><dd>{Number(row.routeMiles || 0).toFixed(2)}</dd></div>
+              <div><dt>Structures</dt><dd>{String(row.structureCount || 0)}</dd></div>
+              <div><dt>Splices</dt><dd>{String(row.spliceClosureCount || 0)}</dd></div>
+            </dl>
+            <div className="opgw-cable-module-actions">
+              <Link href={String(row.cable_module_view)}>Open Full Details</Link>
+              <Link href={String(row.fiber_trace_view)}>Fiber Trace</Link>
+              <Link href={String(row.map_view)}>Map View</Link>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
