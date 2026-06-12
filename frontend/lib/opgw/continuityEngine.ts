@@ -244,7 +244,10 @@ export function resolveContinuityTraceServices(input: ContinuityTraceInput, data
     if (service) matched.set(service.serviceId, service);
   };
 
-  if (input.serviceId) add(data.syntheticServices.find((service) => service.serviceId === decodeURIComponent(input.serviceId || "")));
+  if (input.serviceId) {
+    const serviceId = decodeURIComponent(input.serviceId || "");
+    add(data.syntheticServices.find((service) => service.serviceId === serviceId || service.circuitId === serviceId));
+  }
   if (input.assignmentId) {
     const assignmentId = decodeURIComponent(input.assignmentId);
     data.syntheticServices
