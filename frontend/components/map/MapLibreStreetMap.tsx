@@ -2101,10 +2101,12 @@ function buildDatasets(
       const isContinuityHighlight = continuitySets.assignmentIds.has(assignment.id);
       if (layers.strandContinuity && !isContinuityHighlight) return [];
       if (layers.criticalRidingCircuits && !layers.fiberAssignments && !isCriticalFiberAssignment(assignment) && !isContinuityHighlight) return [];
-      const coordinates = assignment.cableIds
-        .map((cableId) => getCableById().get(cableId))
-        .filter(Boolean)
-        .map((feature) => feature!.geometry.type === "LineString" ? feature!.geometry.coordinates : feature!.geometry.coordinates.flat());
+      const coordinates = assignment.mapCoordinates?.length
+        ? assignment.mapCoordinates
+        : assignment.cableIds
+          .map((cableId) => getCableById().get(cableId))
+          .filter(Boolean)
+          .map((feature) => feature!.geometry.type === "LineString" ? feature!.geometry.coordinates : feature!.geometry.coordinates.flat());
       if (!coordinates.length) return [];
       return [{
         type: "Feature" as const,
@@ -2764,6 +2766,7 @@ function selectionCoordinates(selection: StreetMapSelection): Coordinate[] {
   if (selection.kind === "opgw_span_segment") return selection.record.geometry.coordinates;
   if (selection.kind === "opgw_splice_point") return [selection.record.geometry.coordinates];
   if (selection.kind === "splice_closure") return [selection.record.geometry.coordinates];
+  if (selection.kind === "fiber_assignment") return selection.record.mapCoordinates?.flat() || [];
   if (selection.kind === "distribution_pole_density") return [selection.record.geometry.coordinates];
   if (selection.kind === "distribution_pole") return [selection.record.geometry.coordinates];
   if (selection.kind === "distribution_pole_fiber") return selection.record.geometry.coordinates;

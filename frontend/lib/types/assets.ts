@@ -1104,6 +1104,7 @@ export type FiberAssignment = {
   spliceIds: string[];
   estimatedDistanceMiles?: number;
   estimatedLossDb?: number;
+  mapCoordinates?: Coordinate[][];
   notes?: string;
 };
 

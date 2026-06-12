@@ -22,7 +22,7 @@ import { NodeParameterEditor } from "@/components/map/NodeParameterEditor";
 import { StreetLevelAssetMap, type ContinuityHighlight, type FocusRequest, type MapCommand, type StreetMapSelection } from "@/components/map/StreetLevelAssetMap";
 import { SubstationEditor } from "@/components/map/SubstationEditor";
 import { TransmissionMapEditor } from "@/components/map/TransmissionMapEditor";
-import type { Coordinate, DashboardMapMode, DesignAgentTool, DesignAgentToolRunResult, DesignAssetBlueprint, DesignAssetField, DesignAssetFieldType, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignBlueprintInstallResult, DesignIssuedWorkOrderResult, DesignMaterializationBatchResult, DesignMaterializationResult, DesignModuleBlueprint, DesignModuleEntity, DesignModuleSnapshotMaterializeResult, DesignModuleSnapshotResult, DesignRebuildAudit, DesignRebuildPackage, DesignRebuildPackageImportResult, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StrandContinuityRecord, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
+import type { Coordinate, DashboardMapMode, DesignAgentTool, DesignAgentToolRunResult, DesignAssetBlueprint, DesignAssetField, DesignAssetFieldType, DesignAssetGeoJsonGeometry, DesignAssetGeometryType, DesignAssetMapPayload, DesignAssetRecord, DesignAssetType, DesignBlueprintInstallResult, DesignIssuedWorkOrderResult, DesignMaterializationBatchResult, DesignMaterializationResult, DesignModuleBlueprint, DesignModuleEntity, DesignModuleSnapshotMaterializeResult, DesignModuleSnapshotResult, DesignRebuildAudit, DesignRebuildPackage, DesignRebuildPackageImportResult, DistributionFiberAssignmentCollection, DistributionFiberAssignmentFeature, DistributionPoleCollection, DistributionPoleDensityCollection, DistributionPoleDensityFeature, DistributionPoleFeature, DistributionPoleFiberRouteCollection, DistributionPoleFiberRouteFeature, DistributionPoleSplicePointCollection, DistributionPoleSplicePointFeature, DistributionSlackLoopCollection, DistributionSlackLoopFeature, FccMicrowaveLinkCollection, FccMicrowaveLinkFeature, FccUtilityTowerCollection, FccUtilityTowerFeature, FiberAssignment, FiberContinuityPath, FiberSplice, FiberStrand, GeoFeature, GeoFeatureCollection, MapDrawingTool, MapNode, NodeParameters, OpgwCableCollection, OpgwCableFeature, OpgwCableSectionFeature, OpgwRouteFeature, OpgwSpanSegmentFeature, OpgwSplicePointFeature, PatchPanel, PublicSubstationCollection, PublicSubstationFeature, PublicTransmissionLineCollection, PublicTransmissionLineFeature, SpliceClosureCollection, SpliceClosureFeature, StrandContinuityRecord, StreetMapLayerKey, Substation, SyntheticService, SyntheticSubstationFeature, TelecomCircuitProperties, TransmissionLine, TransmissionMap, TransmissionStructureCollection, TransmissionStructureFeature } from "@/lib/types/assets";
 
 const MAP_EDITING_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MAP_EDITING === "true";
 const designFieldTypeOptions: DesignAssetFieldType[] = ["string", "textarea", "number", "integer", "boolean", "date", "enum", "json"];
@@ -155,10 +155,19 @@ type DashboardContinuitySummary = {
 type StrandContinuityFocusOptions = {
   includeDevices?: boolean;
 };
+type CircuitRouteTarget = {
+  service?: SyntheticService;
+  assignments: FiberAssignment[];
+  distributionAssignment?: DistributionFiberAssignmentFeature;
+  legacyCircuit?: GeoFeature<TelecomCircuitProperties, "LineString">;
+};
 type DashboardMapDataGroup =
   | "publicReference"
   | "fccReference"
+  | "syntheticServices"
+  | "legacyTelecomCircuits"
   | "opgwTopology"
+  | "fiberAssignments"
   | "fiberDetails"
   | "patchPanels"
   | "spliceContinuity"
@@ -1264,6 +1273,7 @@ export function DashboardPage() {
   const [isolatedOpgwRouteId, setIsolatedOpgwRouteId] = useState<string | null>(null);
   const [isolatedOpgwSectionId, setIsolatedOpgwSectionId] = useState<string | null>(null);
   const [isolatedOpgwSplicePointId, setIsolatedOpgwSplicePointId] = useState<string | null>(null);
+  const [isolatedCircuitId, setIsolatedCircuitId] = useState<string | null>(null);
   const [visibleTransmissionLineOwners, setVisibleTransmissionLineOwners] = useState<Record<string, boolean>>({});
   const [visibleSubstationOwners, setVisibleSubstationOwners] = useState<Record<string, boolean>>({});
   const [visibleFccTowerOwners, setVisibleFccTowerOwners] = useState<Record<string, boolean>>({});
@@ -1273,6 +1283,7 @@ export function DashboardPage() {
   const [publicSubstations, setPublicSubstations] = useState<PublicSubstationFeature[]>([]);
   const [fccUtilityTowers, setFccUtilityTowers] = useState<FccUtilityTowerFeature[]>([]);
   const [fccMicrowaveLinks, setFccMicrowaveLinks] = useState<FccMicrowaveLinkFeature[]>([]);
+  const [legacyTelecomCircuits, setLegacyTelecomCircuits] = useState<Array<GeoFeature<TelecomCircuitProperties, "LineString">>>([]);
   const [syntheticSubstations, setSyntheticSubstations] = useState<SyntheticSubstationFeature[]>([]);
   const [transmissionStructures, setTransmissionStructures] = useState<TransmissionStructureFeature[]>([]);
   const [opgwCables, setOpgwCables] = useState<OpgwCableFeature[]>([]);
@@ -1381,6 +1392,26 @@ export function DashboardPage() {
           setFccMicrowaveLinks(fccLinks);
         }
 
+        if (group === "syntheticServices") {
+          const services = await fetchGeoJson<SyntheticService[]>("/data/iso-ne-synthetic-services.json").catch((error) => {
+            warnings.syntheticServices = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+            return [] as SyntheticService[];
+          });
+          if (!mountedRef.current) return;
+          setSyntheticServices(services);
+        }
+
+        if (group === "legacyTelecomCircuits") {
+          const circuits = await fetchGeoJson<GeoFeatureCollection<TelecomCircuitProperties, "LineString">>("/data/telecomCircuits.geojson")
+            .then((collection) => collection.features || [])
+            .catch((error) => {
+              warnings.legacyTelecomCircuits = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+              return [] as Array<GeoFeature<TelecomCircuitProperties, "LineString">>;
+            });
+          if (!mountedRef.current) return;
+          setLegacyTelecomCircuits(circuits);
+        }
+
         if (group === "opgwTopology") {
           const [structures, closures, cables] = await Promise.all([
             fetchGeoJson<TransmissionStructureCollection>("/data/iso-ne-synthetic-transmission-structures.geojson")
@@ -1421,6 +1452,15 @@ export function DashboardPage() {
           ]);
           if (!mountedRef.current) return;
           setFiberStrands(strands);
+          setFiberAssignments(assignments);
+        }
+
+        if (group === "fiberAssignments") {
+          const assignments = await fetchGeoJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json").catch((error) => {
+            warnings.fiberAssignments = `Data not loaded: ${error instanceof Error ? error.message : String(error)}`;
+            return [] as FiberAssignment[];
+          });
+          if (!mountedRef.current) return;
           setFiberAssignments(assignments);
         }
 
@@ -1530,6 +1570,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const groups: DashboardMapDataGroup[] = [];
+    const hasCircuitRouteFocus = Boolean(isolatedCircuitId);
     if (streetLayers.fccUtilityTowers || streetLayers.fccMicrowaveLinks || searchLayerFilter === "fccUtilityTowers" || searchLayerFilter === "fccMicrowaveLinks") groups.push("fccReference");
 
     const needsOpgwTopology = streetLayers.transmissionStructures
@@ -1558,13 +1599,18 @@ export function DashboardPage() {
       || Boolean(continuityHighlight);
     if (needsOpgwTopology) groups.push("opgwTopology");
 
-    if (streetLayers.availableStrandCapacity || streetLayers.fiberAssignments || streetLayers.criticalRidingCircuits || streetLayers.strandContinuity || rightMode === "strands" || rightMode === "assignments" || Boolean(continuityHighlight)) {
+    if (hasCircuitRouteFocus) {
+      groups.push("fiberAssignments");
+    } else if (streetLayers.availableStrandCapacity || streetLayers.fiberAssignments || streetLayers.criticalRidingCircuits || streetLayers.strandContinuity || rightMode === "strands" || rightMode === "assignments" || Boolean(continuityHighlight)) {
       groups.push("fiberDetails");
     }
     if (streetLayers.patchPanels || streetLayers.strandContinuity || rightMode === "strands" || Boolean(continuityHighlight)) {
       groups.push("patchPanels");
     }
-    if (streetLayers.existingFiberSplices || streetLayers.proposedFiberSplices || streetLayers.compareSpliceLayers || streetLayers.strandContinuity || rightMode === "splices" || Boolean(continuityHighlight)) {
+    if (hasCircuitRouteFocus || continuityHighlight?.serviceId) {
+      groups.push("syntheticServices");
+    }
+    if (streetLayers.existingFiberSplices || streetLayers.proposedFiberSplices || streetLayers.compareSpliceLayers || (streetLayers.strandContinuity && !hasCircuitRouteFocus) || rightMode === "splices" || (Boolean(continuityHighlight) && !hasCircuitRouteFocus)) {
       groups.push("spliceContinuity");
     }
     if (streetLayers.distributionFiberRoutes || streetLayers.distributionSplicePoints || streetLayers.distributionSlackLoops || streetLayers.distributionFiberAssignments || searchLayerFilter === "distributionFiberRoutes") {
@@ -1578,7 +1624,7 @@ export function DashboardPage() {
     }
     if (streetLayers.distributionPoles) groups.push("distributionPoleSample");
     if (groups.length) void loadMapDataGroups(groups);
-  }, [continuityHighlight, loadMapDataGroups, rightMode, searchLayerFilter, streetLayers]);
+  }, [continuityHighlight, isolatedCircuitId, loadMapDataGroups, rightMode, searchLayerFilter, streetLayers]);
 
   const loadDesignAssets = useCallback(async (force = false) => {
     if (!force && !designFeaturesEnabled) return;
@@ -1766,9 +1812,23 @@ export function DashboardPage() {
     return [draftRecord, ...visibleDesignAssetRecords];
   }, [activeDesignAssetType, designFeaturesEnabled, pendingDesignGeometry, visibleDesignAssetRecords]);
   const selectedDesignAssetRecord = selectedAsset?.kind === "design_asset_record" ? selectedAsset.record : null;
-  const visibleFiberAssignments = useMemo(
+  const syntheticFiberAssignments = useMemo(
     () => fiberAssignments.filter((assignment) => assignment.synthetic),
     [fiberAssignments],
+  );
+  const visibleFiberAssignments = useMemo(
+    () => {
+      if (!isolatedCircuitId) return syntheticFiberAssignments;
+      const target = circuitRouteTargetForQuery(
+        isolatedCircuitId,
+        syntheticServices,
+        syntheticFiberAssignments,
+        distributionFiberAssignments.filter((feature) => feature.properties.synthetic),
+        legacyTelecomCircuits,
+      );
+      return target?.assignments || [];
+    },
+    [distributionFiberAssignments, isolatedCircuitId, legacyTelecomCircuits, syntheticFiberAssignments, syntheticServices],
   );
   const visibleDistributionPoles = useMemo(
     () => distributionPoles.filter((feature) => feature.properties.synthetic),
@@ -2295,6 +2355,7 @@ export function DashboardPage() {
   }
 
   function handleSearchLayerFilterChange(layer: DashboardSearchLayer) {
+    setIsolatedCircuitId(null);
     setSearchLayerFilter(layer);
     setVisibilityFilter(visibilityForSearchLayer(layer));
   }
@@ -2374,10 +2435,12 @@ export function DashboardPage() {
         if (firstRecord && focusStrandContinuityRecord(firstRecord)) return;
       } else {
         setContinuityHighlight(undefined);
+        setIsolatedCircuitId(null);
         setSearchLayerFilter("all");
         setVisibilityFilter("all");
       }
     }
+    setIsolatedCircuitId(null);
     setStreetLayers((current) => ({ ...current, [layer]: enabled }));
     applyDashboardLayerFilterContext(layer, enabled);
   }
@@ -2773,6 +2836,121 @@ export function DashboardPage() {
     return true;
   }
 
+  function focusCircuitRoute(circuitId: string) {
+    const target = circuitRouteTargetForQuery(circuitId, syntheticServices, syntheticFiberAssignments, visibleDistributionFiberAssignments, legacyTelecomCircuits);
+    if (!target) {
+      showToast(`No synthetic fiber route matched circuit ${circuitId}.`);
+      return false;
+    }
+    const highlight = buildContinuityHighlightForCircuitTarget(target, circuitId);
+    const selection = circuitRouteSelection(target, highlight, circuitId);
+    if (!selection) {
+      showToast(`Circuit ${circuitId} does not have generated map geometry yet.`);
+      return false;
+    }
+    setIsolatedCircuitId(circuitId);
+    setIsolatedOpgwRouteId(null);
+    setIsolatedOpgwSectionId(null);
+    setIsolatedOpgwSplicePointId(null);
+    setContinuityHighlight(highlight);
+    setSelectedAsset(selection);
+    setFocusRequest({ selection, sequence: Date.now() });
+    setStreetLayers((current) => circuitRouteLayerState(current, circuitRouteLayerFamily(target, highlight)));
+    setSearch(target.service?.serviceId || target.service?.circuitId || target.assignments[0]?.id || circuitId);
+    setSearchLayerFilter(selection.kind === "distribution_fiber_assignment" ? "distributionFiberRoutes" : "strandContinuity");
+    setVisibilityFilter("synthetic-demo");
+    setSearchOpen(false);
+    setRightMode("layers");
+    setRightCollapsed(false);
+    showToast(`Showing full circuit route for ${highlight.label}. Other map layers are hidden.`);
+    return true;
+  }
+
+  function buildContinuityHighlightForCircuitTarget(target: CircuitRouteTarget, fallbackLabel: string): ContinuityHighlight {
+    const assignmentIds = new Set(target.assignments.map((assignment) => assignment.id));
+    uniqueStrings([target.service?.primaryPathAssignmentId, target.service?.backupPathAssignmentId]).forEach((assignmentId) => assignmentIds.add(assignmentId));
+    const cableIds = new Set<string>(target.service?.continuityCableIds || []);
+    target.assignments.forEach((assignment) => assignment.cableIds.forEach((cableId) => cableIds.add(cableId)));
+    const routeIds = routeIdsForCableIds(cableIds);
+    const sections = visibleOpgwCableSections.filter((section) => routeIds.has(section.properties.opgwRouteId));
+    const sectionIds = new Set(sections.map((section) => section.properties.cableSectionId));
+    const splicePointIds = new Set<string>(target.service?.continuitySplicePointIds || []);
+    target.service?.continuitySpliceClosureIds?.forEach((closureId) => {
+      const point = visibleOpgwSplicePoints.find((item) => item.properties.closureId === closureId);
+      if (point) splicePointIds.add(point.properties.splicePointId);
+    });
+    sections.forEach((section) => {
+      splicePointIds.add(section.properties.fromSplicePointId);
+      splicePointIds.add(section.properties.toSplicePointId);
+    });
+    return {
+      label: target.service?.serviceId || target.service?.circuitId || target.assignments[0]?.assignmentName || fallbackLabel,
+      serviceId: target.service?.serviceId,
+      assignmentIds: Array.from(assignmentIds),
+      cableIds: Array.from(cableIds),
+      routeIds: Array.from(routeIds),
+      sectionIds: Array.from(sectionIds),
+      splicePointIds: Array.from(splicePointIds),
+    };
+  }
+
+  function circuitRouteSelection(target: CircuitRouteTarget, highlight: ContinuityHighlight, fallbackLabel: string): StreetMapSelection | null {
+    if (target.distributionAssignment) {
+      return {
+        kind: "distribution_fiber_assignment",
+        id: target.distributionAssignment.properties.id,
+        label: target.distributionAssignment.properties.assignmentName,
+        record: target.distributionAssignment,
+      };
+    }
+    const primaryAssignment = target.assignments[0];
+    const coordinates = primaryAssignment?.mapCoordinates?.length
+      ? primaryAssignment.mapCoordinates
+      : cableCoordinateSets(highlight.cableIds);
+    const routeAssignment: FiberAssignment = primaryAssignment
+      ? {
+        ...primaryAssignment,
+        assignmentName: target.service ? `${target.service.serviceId} full route` : primaryAssignment.assignmentName,
+        cableIds: uniqueStrings([...primaryAssignment.cableIds, ...highlight.cableIds]),
+        mapCoordinates: coordinates,
+      }
+      : {
+        id: target.service?.primaryPathAssignmentId || target.service?.serviceId || fallbackLabel,
+        assignmentName: target.service?.serviceName || fallbackLabel,
+        synthetic: true,
+        serviceType: fiberAssignmentServiceTypeForCircuit(target.service?.serviceType),
+        status: assignmentStatusForCircuit(target.service?.operationalStatus),
+        cableIds: highlight.cableIds,
+        strandSegments: [],
+        spliceIds: [],
+        estimatedDistanceMiles: undefined,
+        estimatedLossDb: undefined,
+        mapCoordinates: coordinates,
+        notes: "Synthetic dashboard-only circuit route selection generated from service continuity metadata.",
+      };
+    if (coordinates.length) {
+      return { kind: "fiber_assignment", id: routeAssignment.id, label: routeAssignment.assignmentName, record: routeAssignment };
+    }
+    const cable = visibleOpgwCables.find((feature) => highlight.cableIds.includes(feature.properties.id));
+    if (cable) return { kind: "opgw_cable", id: cable.properties.id, label: cable.properties.cableName, record: cable };
+    const section = visibleOpgwCableSections.find((feature) => highlight.sectionIds?.includes(feature.properties.cableSectionId));
+    if (section) return { kind: "opgw_cable_section", id: section.properties.cableSectionId, label: section.properties.cableSectionId, record: section };
+    return null;
+  }
+
+  function circuitRouteLayerFamily(target: CircuitRouteTarget, highlight: ContinuityHighlight): "opgw" | "distribution" | "line" {
+    if (target.distributionAssignment) return "distribution";
+    if (highlight.cableIds.length || highlight.routeIds?.length || highlight.sectionIds?.length) return "opgw";
+    return "line";
+  }
+
+  function cableCoordinateSets(cableIds: string[]): Coordinate[][] {
+    const wanted = new Set(cableIds);
+    return visibleOpgwCables
+      .filter((feature) => wanted.has(feature.properties.id))
+      .flatMap((feature) => feature.geometry.type === "LineString" ? [feature.geometry.coordinates] : feature.geometry.coordinates);
+  }
+
   function routeIdsForCableIds(cableIds: Set<string>) {
     return new Set(
       visibleOpgwCables
@@ -2789,6 +2967,7 @@ export function DashboardPage() {
     const cableSectionId = params.get("cableSection") || params.get("cableSectionId");
     const cableId = params.get("cable");
     const serviceId = params.get("service");
+    const circuitId = params.get("circuit") || params.get("circuitId") || params.get("fullCircuitRoute");
     const strandContinuityId = params.get("strandContinuity") || params.get("strandContinuityId");
     const includeContinuityDevices = !shouldHideContinuityDevices(params);
     const distributionPoleId = params.get("distributionPole") || params.get("distributionPoleId");
@@ -2862,6 +3041,16 @@ export function DashboardPage() {
       return;
     }
 
+    if (circuitId) {
+      if (!syntheticServices.length || !legacyTelecomCircuits.length || !syntheticFiberAssignments.length || !visibleOpgwCables.length || !visibleOpgwCableSections.length || !visibleDistributionFiberAssignments.length) {
+        void loadMapDataGroups(["syntheticServices", "legacyTelecomCircuits", "opgwTopology", "fiberAssignments", "patchPanels", "distributionFiberRoutes", "distributionRouteDetails", "distributionFiberAssignments"]);
+        return;
+      }
+      deepLinkFocusApplied.current = true;
+      focusCircuitRoute(circuitId);
+      return;
+    }
+
     if (cableId || serviceId) {
       if (!visibleOpgwCables.length) return;
       const service = serviceId ? syntheticServices.find((item) => item.serviceId === serviceId) : undefined;
@@ -2878,7 +3067,7 @@ export function DashboardPage() {
       setRightCollapsed(false);
       showToast(`Showing map context for ${serviceId || cable.properties.id}.`);
     }
-  }, [fiberSplices, strandContinuityRecords, syntheticServices, visibleDistributionPoleFiberRoutes, visibleDistributionPoles, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints]);
+  }, [fiberSplices, legacyTelecomCircuits, loadMapDataGroups, strandContinuityRecords, syntheticFiberAssignments, syntheticServices, visibleDistributionFiberAssignments, visibleDistributionPoleFiberRoutes, visibleDistributionPoles, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints]);
 
   function clearOpgwLayerIsolation() {
     setIsolatedOpgwRouteId(null);
@@ -2891,6 +3080,7 @@ export function DashboardPage() {
 
   function handleOperatingModeChange(nextMode: DashboardOperatingMode) {
     setOperatingMode(nextMode);
+    setIsolatedCircuitId(null);
     setStreetLayers((current) => layerStateForOperatingMode(nextMode, current));
     if (nextMode === "planned") {
       setRightMode("layers");
@@ -3540,7 +3730,10 @@ export function DashboardPage() {
             <strong>Continuity Highlight</strong>
             {continuityHighlight.label}
           </span>
-          <button type="button" onClick={() => setContinuityHighlight(undefined)}>Clear</button>
+          <button type="button" onClick={() => {
+            setContinuityHighlight(undefined);
+            setIsolatedCircuitId(null);
+          }}>Clear</button>
         </div>
       ) : null}
       {toast ? <div className="dashboard-map-toast">{toast}</div> : null}
@@ -3607,6 +3800,127 @@ function formatFilterOption(value: string) {
 
 function uniqueStrings(values: Array<string | undefined | null>) {
   return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function circuitRouteTargetForQuery(
+  query: string,
+  services: SyntheticService[],
+  assignments: FiberAssignment[],
+  distributionAssignments: DistributionFiberAssignmentFeature[] = [],
+  legacyCircuits: Array<GeoFeature<TelecomCircuitProperties, "LineString">> = [],
+): CircuitRouteTarget | null {
+  const normalized = normalizeCircuitLookup(query);
+  if (!normalized) return null;
+  const service = services.find((item) => syntheticServiceMatchesCircuit(item, normalized));
+  const serviceAssignmentIds = new Set(uniqueStrings([service?.primaryPathAssignmentId, service?.backupPathAssignmentId]));
+  const matchedAssignments = assignments.filter((assignment) =>
+    serviceAssignmentIds.has(assignment.id) || fiberAssignmentMatchesCircuit(assignment, normalized)
+  );
+  const distributionAssignment = distributionAssignments.find((feature) =>
+    (service?.distributionAssignmentId && feature.properties.id === service.distributionAssignmentId)
+    || distributionAssignmentMatchesCircuit(feature, normalized)
+    || Boolean(service && distributionAssignmentMatchesCircuit(feature, normalizeCircuitLookup(service.serviceId)))
+    || Boolean(service?.circuitId && distributionAssignmentMatchesCircuit(feature, normalizeCircuitLookup(service.circuitId)))
+  );
+  const legacyCircuit = legacyCircuits.find((feature) =>
+    legacyCircuitMatchesCircuit(feature, normalized)
+    || Boolean(service?.circuitId && legacyCircuitMatchesCircuit(feature, normalizeCircuitLookup(service.circuitId)))
+    || Boolean(service?.serviceName && legacyCircuitMatchesCircuit(feature, normalizeCircuitLookup(service.serviceName)))
+  );
+  const routeAssignments = legacyCircuit && !matchedAssignments.length
+    ? [legacyCircuitToFiberAssignment(legacyCircuit, service, query)]
+    : matchedAssignments;
+  if (!service && !routeAssignments.length && !distributionAssignment && !legacyCircuit) return null;
+  return { service, assignments: routeAssignments, distributionAssignment, legacyCircuit };
+}
+
+function syntheticServiceMatchesCircuit(service: SyntheticService, normalized: string) {
+  return [
+    service.serviceId,
+    service.circuitId,
+    service.serviceName,
+    service.primaryPathAssignmentId,
+    service.backupPathAssignmentId,
+    service.distributionAssignmentId,
+  ].some((value) => normalizeCircuitLookup(value).includes(normalized));
+}
+
+function fiberAssignmentMatchesCircuit(assignment: FiberAssignment, normalized: string) {
+  return [
+    assignment.id,
+    assignment.assignmentName,
+    assignment.serviceType,
+    assignment.aEndNodeId,
+    assignment.zEndNodeId,
+    assignment.aEndStructureId,
+    assignment.zEndStructureId,
+  ].some((value) => normalizeCircuitLookup(value).includes(normalized));
+}
+
+function distributionAssignmentMatchesCircuit(feature: DistributionFiberAssignmentFeature, normalized: string) {
+  return [
+    feature.properties.id,
+    feature.properties.assignmentName,
+    feature.properties.serviceId,
+    feature.properties.circuitId,
+    feature.properties.serviceName,
+    feature.properties.routeId,
+    feature.properties.feederId,
+  ].some((value) => normalizeCircuitLookup(value).includes(normalized));
+}
+
+function legacyCircuitMatchesCircuit(feature: GeoFeature<TelecomCircuitProperties, "LineString">, normalized: string) {
+  return [
+    feature.properties.circuitId,
+    feature.properties.circuitName,
+    feature.properties.serviceType,
+    feature.properties.primaryRoute,
+    feature.properties.backupRoute,
+    feature.properties.aEnd,
+    feature.properties.zEnd,
+  ].some((value) => normalizeCircuitLookup(value).includes(normalized));
+}
+
+function legacyCircuitToFiberAssignment(feature: GeoFeature<TelecomCircuitProperties, "LineString">, service: SyntheticService | undefined, fallbackLabel: string): FiberAssignment {
+  const label = feature.properties.circuitId || service?.serviceId || fallbackLabel;
+  return {
+    id: `legacy-route:${label}`,
+    assignmentName: `${label} full circuit route`,
+    synthetic: true,
+    serviceType: fiberAssignmentServiceTypeForCircuit(service?.serviceType || feature.properties.serviceType),
+    status: assignmentStatusForCircuit(service?.operationalStatus),
+    aEndNodeId: service?.fromSiteId || feature.properties.aEnd,
+    zEndNodeId: service?.toSiteId || feature.properties.zEnd,
+    cableIds: [],
+    strandSegments: [],
+    spliceIds: [],
+    estimatedDistanceMiles: undefined,
+    estimatedLossDb: undefined,
+    mapCoordinates: [feature.geometry.coordinates],
+    notes: "Synthetic legacy circuit line geometry displayed as a dashboard-only full-route overlay. Not an operational circuit path.",
+  };
+}
+
+function normalizeCircuitLookup(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function fiberAssignmentServiceTypeForCircuit(serviceType?: string): FiberAssignment["serviceType"] {
+  if (serviceType === "SEL_ICON") return "SEL_ICON";
+  if (serviceType === "C37.94" || serviceType === "C37_94") return "C37_94";
+  if (serviceType === "DTT") return "DTT";
+  if (serviceType === "SCADA") return "SCADA";
+  if (serviceType === "Ethernet") return "Ethernet";
+  if (serviceType === "Protection" || serviceType === "87L") return "Protection";
+  if (serviceType === "Leased") return "Leased";
+  return "Other";
+}
+
+function assignmentStatusForCircuit(status?: SyntheticService["operationalStatus"]): FiberAssignment["status"] {
+  if (status === "planned") return "planned";
+  if (status === "proposed") return "proposed";
+  if (status === "retired") return "retired";
+  return "active";
 }
 
 function firstCoordinateFromAnyGeometry(value: unknown): Coordinate | undefined {
@@ -6909,6 +7223,30 @@ function strandContinuityLayerState(current: Record<StreetMapLayerKey, boolean>,
   next.telecomNodes = includeDevices;
   next.selIconNodes = includeDevices;
   next.c3794Nodes = includeDevices;
+  return next;
+}
+
+function circuitRouteLayerState(current: Record<StreetMapLayerKey, boolean>, family: "opgw" | "distribution" | "line" = "opgw") {
+  const next = Object.fromEntries(
+    (Object.keys(current) as StreetMapLayerKey[]).map((key) => [key, false]),
+  ) as Record<StreetMapLayerKey, boolean>;
+  if (family === "distribution") {
+    next.distributionFiberRoutes = true;
+    next.distributionFiberAssignments = true;
+    next.distributionSplicePoints = true;
+    next.distributionSlackLoops = true;
+    next.distributionPoles = true;
+    return next;
+  }
+  next.strandContinuity = true;
+  next.fiberAssignments = true;
+  if (family === "opgw") {
+    next.opgwRoutes = true;
+    next.opgwCableSections = true;
+    next.opgwSplicePoints = true;
+    next.spliceClosures = true;
+    next.patchPanels = true;
+  }
   return next;
 }
 

@@ -389,6 +389,7 @@ async function loadCircuits(): Promise<ModuleLayerData> {
       z_end: properties.zEnd,
       primary_route: properties.primaryRoute,
       backup_route: properties.backupRoute,
+      map_view: circuitDashboardHref(String(properties.circuitId || "")),
       layer: "Synthetic telecom circuits",
       source: "synthetic-demo",
       source_type: "synthetic-planning",
@@ -448,6 +449,7 @@ async function loadCircuits(): Promise<ModuleLayerData> {
     telecom_node_ids: service.telecomNodeIds?.join(", "),
     hardware_port_ids: service.hardwarePortIds?.join(", "),
     continuity_status: service.continuityStatus,
+    map_view: circuitDashboardHref(service.serviceId),
     layer: "Merged synthetic telecom services",
     source: "synthetic-demo",
     source_type: "synthetic-planning",
@@ -479,6 +481,7 @@ async function loadCircuits(): Promise<ModuleLayerData> {
         endpoint_z_port: properties.endpointZPort,
         telecom_node_ids: properties.telecomNodeIds?.join(", "),
         hardware_port_ids: properties.hardwarePortIds?.join(", "),
+        map_view: circuitDashboardHref(String(properties.serviceId || properties.circuitId || properties.id)),
         layer: "Synthetic distribution fiber services",
         source: properties.source,
         source_type: "synthetic-planning",
@@ -500,6 +503,7 @@ async function loadCircuits(): Promise<ModuleLayerData> {
     primary_route: assignment.cableIds.join(", "),
     estimated_distance_miles: assignment.estimatedDistanceMiles,
     estimated_loss_db: assignment.estimatedLossDb,
+    map_view: circuitDashboardHref(assignment.id),
     layer: "Synthetic fiber assignments as circuits",
     source: "synthetic-demo",
     source_type: "synthetic-planning",
@@ -543,6 +547,10 @@ async function loadCircuits(): Promise<ModuleLayerData> {
       metric("Fiber assignments", assignmentRows.length, "Synthetic strand assignment records exposed as planning services.", "Synthetic fiber layer", "Not real routing"),
     ],
   };
+}
+
+function circuitDashboardHref(circuitId: string) {
+  return `/dashboard?circuit=${encodeURIComponent(circuitId)}&routeView=full`;
 }
 
 async function loadLeasedServices(): Promise<ModuleLayerData> {

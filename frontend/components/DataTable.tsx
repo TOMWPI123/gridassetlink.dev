@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Download, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Eye, Route } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge, PriorityBadge } from "@/components/Badges";
 import { displayValue, formatLabel } from "@/lib/api";
@@ -39,7 +39,13 @@ export function DataTable({ rows, columns, detailBase, filterField, onExport }: 
 
 function renderCell(column: string, value: unknown) {
   if (isViewLinkColumn(column) && typeof value === "string" && value.startsWith("/")) {
-    return <Link className="table-view-link" href={value}>View</Link>;
+    const isMapView = column === "map_view";
+    return (
+      <Link className={`table-view-link ${isMapView ? "route" : ""}`} href={value}>
+        {isMapView ? <Route size={13} /> : null}
+        {isMapView ? "Full Route" : "View"}
+      </Link>
+    );
   }
   if (column === "priority") return <PriorityBadge value={value} />;
   if (statusLike.has(column) || column.endsWith("_status")) return <Badge value={value} />;
