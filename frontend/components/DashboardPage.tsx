@@ -3106,21 +3106,31 @@ export function DashboardPage() {
 
   function openDashboardChangeTool(toolKey: string | null, toastMessage: string) {
     setDesignModeEnabled(true);
-    setStreetLayers((current) => ({
-      ...current,
-      designAssets: true,
-      opgwSplicePoints: true,
-      spliceClosures: true,
-      existingFiberSplices: true,
-      proposedFiberSplices: true,
-      compareSpliceLayers: toolKey === "create-fiber-splice" ? true : current.compareSpliceLayers,
-    }));
+    setStreetLayers((current) => toolKey
+      ? {
+        ...current,
+        designAssets: true,
+        opgwSplicePoints: true,
+        spliceClosures: true,
+        existingFiberSplices: true,
+        proposedFiberSplices: true,
+        compareSpliceLayers: toolKey === "create-fiber-splice" ? true : current.compareSpliceLayers,
+      }
+      : { ...current, designAssets: true });
     setSearchLayerFilter(toolKey ? "opgwSplicePoints" : "designAssets");
     setVisibilityFilter("synthetic-demo");
     setRightMode("design");
     setRightCollapsed(false);
     setActiveTool("select");
-    if (toolKey) setDesignQuickToolKey(`${toolKey}:${Date.now()}`);
+    if (toolKey) {
+      setSelectedAsset((current) => current?.kind === "design_asset_record" ? null : current);
+      setPendingDesignGeometry(null);
+      setDesignDrawingCoordinates([]);
+      setSelectedDesignAssetTypeSlug(toolKey === "create-fiber-splice" ? "design-fiber-splice" : "design-splice-point");
+      setDesignQuickToolKey(`${toolKey}:${Date.now()}`);
+    } else {
+      setDesignQuickToolKey(`record:${Date.now()}`);
+    }
     void loadDesignAssets(true);
     showToast(toastMessage);
     issueMapCommand("resize");
@@ -3746,6 +3756,7 @@ export function DashboardPage() {
                   records={visibleDesignAssetRecords}
                   selectedRecord={selectedDesignAssetRecord}
                   selectedTypeSlug={selectedDesignAssetTypeSlug}
+                  quickToolKey={designQuickToolKey}
                   pendingGeometry={pendingDesignGeometry}
                   activeTool={activeTool}
                   drawingVertexCount={designDrawingCoordinates.length}
@@ -3820,6 +3831,44 @@ function FilterSelect({ label, value, options, onChange, displayLabel = formatFi
         {options.map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}
       </select>
     </label>
+  );
+}
+
+function DashboardChangeActions({
+  selectedAsset,
+  onChangeAssets,
+  onAddSplicePoint,
+  onAddSpliceRow,
+  onOpenSpliceMatrix,
+}: {
+  selectedAsset: StreetMapSelection | null;
+  onChangeAssets: () => void;
+  onAddSplicePoint: () => void;
+  onAddSpliceRow: () => void;
+  onOpenSpliceMatrix: () => void;
+}) {
+  const selectedKind = selectedAsset ? formatSelectionKind(selectedAsset.kind) : "No asset selected";
+  const selectedStatus = selectedAsset ? selectionStatus(selectedAsset) : "select from map";
+  return (
+    <aside className="dashboard-change-actions" aria-label="Dashboard asset changes">
+      <div className="dashboard-change-heading">
+        <PencilRuler size={15} />
+        <span>
+          <strong>Make Changes</strong>
+          <small>{selectedAsset ? selectedAsset.label : "Select an asset or start a new edit"}</small>
+        </span>
+      </div>
+      <div className="dashboard-change-current">
+        <span>{selectedKind}</span>
+        <strong>{selectedStatus}</strong>
+      </div>
+      <div className="dashboard-change-button-grid">
+        <button type="button" onClick={onChangeAssets}><PencilRuler size={14} />Edit / Add Object</button>
+        <button type="button" onClick={onAddSplicePoint}><Plus size={14} />Add Splice Point</button>
+        <button type="button" onClick={onAddSpliceRow}><Cable size={14} />Add Splice Row</button>
+        <button type="button" onClick={onOpenSpliceMatrix}><TableProperties size={14} />Splice Matrix</button>
+      </div>
+    </aside>
   );
 }
 
@@ -5585,6 +5634,7 @@ function DesignEditDrawer({
   records,
   selectedRecord,
   selectedTypeSlug,
+  quickToolKey,
   pendingGeometry,
   activeTool,
   drawingVertexCount,
@@ -5604,6 +5654,7 @@ function DesignEditDrawer({
   records: DesignAssetRecord[];
   selectedRecord: DesignAssetRecord | null;
   selectedTypeSlug: string;
+  quickToolKey: string;
   pendingGeometry: DesignAssetGeoJsonGeometry | null;
   activeTool: MapDrawingTool;
   drawingVertexCount: number;
@@ -5618,7 +5669,7 @@ function DesignEditDrawer({
   onSelectRecord: (record: DesignAssetRecord) => void;
   onNotify: (message: string) => void;
 }) {
-  const [mode, setMode] = useState<"record" | "type" | "blueprint">("record");
+  const [mode, setMode] = useState<"record" | "quick" | "type" | "blueprint">("record");
   const [recordKey, setRecordKey] = useState("");
   const [displayLabel, setDisplayLabel] = useState("");
   const [recordStatus, setRecordStatus] = useState<DesignAssetRecord["status"]>("proposed");
@@ -5716,6 +5767,22 @@ function DesignEditDrawer({
     if (!orderedAgentTools.length || selectedAgentToolKey) return;
     applyAgentToolExample(orderedAgentTools[0]);
   }, [orderedAgentTools, selectedAgentToolKey]);
+
+  useEffect(() => {
+    const toolKey = quickToolKey.split(":")[0];
+    if (!toolKey) return;
+    if (toolKey === "record") {
+      setMode("record");
+      setLocalMessage("Use Records to edit the selected asset or create a new object from the current asset type.");
+      return;
+    }
+    if (!orderedAgentTools.length) return;
+    const tool = orderedAgentTools.find((item) => item.tool_key === toolKey);
+    if (!tool) return;
+    applyAgentToolExample(tool);
+    setMode("quick");
+    setLocalMessage(`${tool.label} is ready. Review the fields, draw geometry if needed, then create the record.`);
+  }, [orderedAgentTools, quickToolKey]);
 
   if (!enabled) {
     return (
@@ -6198,11 +6265,75 @@ function DesignEditDrawer({
       </div>
       <div className="dashboard-design-tabs">
         <button type="button" className={mode === "record" ? "active" : ""} onClick={() => setMode("record")}>Records</button>
+        <button type="button" className={mode === "quick" ? "active" : ""} onClick={() => setMode("quick")}>Quick Add</button>
         <button type="button" className={mode === "type" ? "active" : ""} onClick={() => setMode("type")}>Type Designer</button>
-        <button type="button" className={mode === "blueprint" ? "active" : ""} onClick={() => setMode("blueprint")}>Blueprints</button>
+        <button type="button" className={mode === "blueprint" ? "active" : ""} onClick={() => setMode("blueprint")}>Packages</button>
       </div>
 
-      {mode === "blueprint" ? (
+      {mode === "quick" ? (
+        <div className="dashboard-design-form">
+          <div className="dashboard-design-row-title">
+            <strong>Quick add and splice actions</strong>
+            <span>Create poles, splice points, splice rows, spans/cables, strands, patch panels, circuits, or assignments directly from dashboard buttons.</span>
+          </div>
+          <div className="dashboard-design-tool-picker">
+            {orderedAgentTools.map((tool) => (
+              <button type="button" key={tool.tool_key} className={activeAgentDesignTool?.tool_key === tool.tool_key ? "active" : ""} onClick={() => applyAgentToolExample(tool)}>
+                <strong>{tool.label}</strong>
+                <span>{tool.geometry_type === "table_only" ? "database object" : tool.geometry_type} / {tool.supports_materialize ? tool.backend_entity : "Design Mode only"}</span>
+              </button>
+            ))}
+          </div>
+          {activeAgentDesignTool ? (
+            <div className="dashboard-design-quick-add">
+              <div className="dashboard-design-row-title">
+                <strong>{activeAgentDesignTool.label}</strong>
+                <span>{activeAgentDesignTool.description}</span>
+              </div>
+              {activeAgentDesignTool.tool_key === "create-splice" || activeAgentDesignTool.tool_key === "create-fiber-splice" ? (
+                <div className="dashboard-source-boundary">
+                  <p>Splice changes are synthetic planning records until reviewed. Use splice point for the closure/location and splice row for incoming/outgoing cable and strand continuity.</p>
+                </div>
+              ) : null}
+              <label><span>Creation tool</span><select value={activeAgentDesignTool.tool_key} onChange={(event) => {
+                const nextTool = orderedAgentTools.find((tool) => tool.tool_key === event.currentTarget.value);
+                if (nextTool) applyAgentToolExample(nextTool);
+              }}>
+                {orderedAgentTools.map((tool) => <option key={tool.tool_key} value={tool.tool_key}>{tool.label}</option>)}
+              </select></label>
+              <label><span>Record key override</span><input value={agentToolRecordKey} onChange={(event) => setAgentToolRecordKey(event.currentTarget.value)} placeholder="Leave blank to use the object ID" /></label>
+              <label><span>Display label override</span><input value={agentToolDisplayLabel} onChange={(event) => setAgentToolDisplayLabel(event.currentTarget.value)} placeholder="Leave blank to use the object name or ID" /></label>
+              {activeAgentDesignTool.geometry_type !== "table_only" ? (
+                <>
+                  <div className="dashboard-gis-actions">
+                    <button type="button" onClick={() => onBeginDrawing(activeAgentDesignTool.geometry_type)} disabled={Boolean(busy)}>Draw {activeAgentDesignTool.geometry_type}</button>
+                    {pendingGeometryMatchesAgentTool ? <button type="button" onClick={usePendingGeometryForAgentTool}>Use staged map geometry</button> : null}
+                  </div>
+                  <details className="dashboard-design-advanced">
+                    <summary>Advanced geometry backup</summary>
+                    <label><span>Geometry backup</span><textarea value={agentToolGeometryText} onChange={(event) => setAgentToolGeometryText(event.currentTarget.value)} /></label>
+                  </details>
+                </>
+              ) : (
+                <p className="dashboard-gis-message">This creates a table-only planning record. Use it for splice matrix rows, strand records, ports, or other database objects that do not need a map point.</p>
+              )}
+              <details className="dashboard-design-advanced">
+                <summary>Advanced tool field backup</summary>
+                <label><span>Tool field backup</span><textarea value={agentToolPropertiesText} onChange={(event) => setAgentToolPropertiesText(event.currentTarget.value)} /></label>
+              </details>
+              <label className="dashboard-design-inline-select"><span>Backend write</span><select value={agentToolMaterialize && agentToolSupportsMaterialize ? "materialize" : "design-only"} onChange={(event) => setAgentToolMaterialize(event.currentTarget.value === "materialize")} disabled={!agentToolSupportsMaterialize}>
+                {agentToolSupportsMaterialize ? <option value="materialize">Create Design record and module row</option> : null}
+                <option value="design-only">Design Mode record only</option>
+              </select></label>
+              <div className="dashboard-gis-actions">
+                <button className="telecom-map-button" type="button" onClick={() => void runAgentToolFromDashboard()} disabled={Boolean(busy)}>Create with selected Design tool</button>
+              </div>
+            </div>
+          ) : (
+            <p className="dashboard-gis-message">Install or refresh the Design Mode agent tools to quick-add objects from the dashboard.</p>
+          )}
+        </div>
+      ) : mode === "blueprint" ? (
         <div className="dashboard-design-form">
           <div className="dashboard-design-row-title">
             <strong>Rebuild database from Design Mode</strong>

@@ -5799,6 +5799,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 .dashboard-left-filter-panel,
 .dashboard-right-floating-drawer,
 .dashboard-bottom-left-modes,
+.dashboard-change-actions,
 .dashboard-reference-overlay,
 .dashboard-mini-reference-card,
 .dashboard-active-map-floating,
@@ -5816,7 +5817,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   left: 18px;
   right: 560px;
   display: grid;
-  grid-template-columns: auto minmax(380px, 500px) minmax(240px, 1fr);
+  grid-template-columns: auto minmax(440px, 660px) minmax(240px, 1fr);
   gap: 10px;
   align-items: center;
   min-height: 48px;
@@ -6203,9 +6204,10 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 
 .dashboard-mode-toggle {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
   min-height: 46px;
-  max-width: 500px;
+  max-width: 660px;
   padding: 5px;
   border-radius: 8px;
 }
@@ -6845,7 +6847,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 }
 
 .dashboard-design-tabs {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .dashboard-design-tabs button,
@@ -7206,6 +7208,10 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   .dashboard-design-field-grid {
     grid-template-columns: 1fr;
   }
+  .dashboard-change-button-grid,
+  .dashboard-change-current {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dashboard-top-right-toolbar {
@@ -7240,8 +7246,97 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   font-weight: 790;
 }
 
+.dashboard-change-actions {
+  top: 76px;
+  left: 18px;
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 10px;
+  border: 1px solid rgba(238,252,251,.14);
+  border-radius: 8px;
+  background: rgba(7,16,18,.84);
+  box-shadow: 0 18px 48px rgba(0,0,0,.34);
+  backdrop-filter: blur(16px);
+}
+
+.dashboard-change-heading {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.dashboard-change-heading svg {
+  color: #85eef6;
+}
+
+.dashboard-change-heading span,
+.dashboard-change-current {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-change-heading strong {
+  color: var(--dash-text);
+  font-size: 13px;
+}
+
+.dashboard-change-heading small,
+.dashboard-change-current span {
+  color: var(--dash-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-change-current {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 7px 8px;
+  border: 1px solid rgba(238,252,251,.09);
+  border-radius: 7px;
+  background: rgba(238,252,251,.055);
+}
+
+.dashboard-change-current strong {
+  color: #c8ffef;
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.dashboard-change-button-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.dashboard-change-button-grid button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid rgba(105,215,228,.28);
+  border-radius: 7px;
+  background: rgba(105,215,228,.12);
+  color: #d9fffb;
+  font-size: 11px;
+  font-weight: 840;
+  cursor: pointer;
+}
+
+.dashboard-change-button-grid button:hover {
+  border-color: rgba(105,215,228,.48);
+  background: rgba(105,215,228,.18);
+}
+
 .dashboard-active-map-floating {
-  top: 72px;
+  top: 246px;
   left: 18px;
   width: 398px;
 }
@@ -8235,7 +8330,7 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
 @media (max-width: 1280px) {
   .dashboard-floating-topbar {
     right: 420px;
-    grid-template-columns: minmax(360px, 500px) minmax(240px, 1fr);
+    grid-template-columns: minmax(420px, 620px) minmax(240px, 1fr);
   }
   .dashboard-compact-brand {
     display: none;
@@ -8249,6 +8344,10 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   .dashboard-command-terminal {
     left: 18px;
     right: 424px;
+  }
+  .dashboard-change-actions {
+    top: 76px;
+    width: min(340px, calc(100vw - 36px));
   }
   .dashboard-mini-reference-card {
     display: none;
@@ -8279,13 +8378,18 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
     max-width: none;
     justify-content: flex-start;
   }
-  .dashboard-active-map-floating {
+  .dashboard-change-actions {
     top: 226px;
     left: 12px;
     width: min(420px, calc(100vw - 24px));
   }
+  .dashboard-active-map-floating {
+    top: 380px;
+    left: 12px;
+    width: min(420px, calc(100vw - 24px));
+  }
   .dashboard-left-filter-panel {
-    top: 296px;
+    top: 450px;
     left: 12px;
     bottom: 88px;
     width: min(310px, calc(100vw - 24px));
