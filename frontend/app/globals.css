@@ -5750,6 +5750,184 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   margin: 0;
 }
 
+.dashboard-guide-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-guide-callout,
+.dashboard-guide-workflows article,
+.dashboard-guide-records,
+.dashboard-guide-payload {
+  border: 1px solid rgba(238,252,251,.12);
+  border-radius: 8px;
+  background: rgba(238,252,251,.06);
+}
+
+.dashboard-guide-callout {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
+.dashboard-guide-callout span,
+.dashboard-guide-section-grid li,
+.dashboard-guide-workflow-heading span,
+.dashboard-guide-records span,
+.dashboard-guide-records small {
+  color: var(--dash-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.dashboard-guide-callout code,
+.dashboard-guide-records code {
+  color: #c8ffef;
+}
+
+.dashboard-guide-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dashboard-guide-actions button,
+.dashboard-guide-actions a,
+.dashboard-guide-workflow-heading button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(105,215,228,.3);
+  border-radius: 8px;
+  background: rgba(105,215,228,.12);
+  color: var(--dash-text);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.dashboard-guide-actions button:hover,
+.dashboard-guide-actions a:hover,
+.dashboard-guide-workflow-heading button:hover {
+  border-color: rgba(105,215,228,.52);
+  background: rgba(105,215,228,.18);
+}
+
+.dashboard-guide-workflow-heading button:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+.dashboard-guide-workflows {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-guide-workflows article {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.dashboard-guide-workflow-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.dashboard-guide-workflow-heading > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dashboard-guide-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-guide-section-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dashboard-guide-section-grid ol,
+.dashboard-guide-section-grid ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.dashboard-guide-records {
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+}
+
+.dashboard-guide-records > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dashboard-guide-records span {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 1px solid rgba(238,252,251,.1);
+  border-radius: 999px;
+  background: rgba(0,0,0,.22);
+  overflow-wrap: anywhere;
+}
+
+.dashboard-guide-records small {
+  color: #9df0d1;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dashboard-guide-payload {
+  overflow: hidden;
+}
+
+.dashboard-guide-payload summary {
+  cursor: pointer;
+  padding: 9px;
+  color: var(--dash-text);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.dashboard-guide-payload pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 10px;
+  border-top: 1px solid rgba(238,252,251,.1);
+  background: rgba(0,0,0,.28);
+  color: #c8ffef;
+  font-size: 10px;
+  line-height: 1.45;
+  overflow: auto;
+}
+
+.dashboard-guide-workflow-heading strong,
+.dashboard-guide-section-grid strong,
+.dashboard-guide-records strong {
+  color: var(--dash-text);
+}
+
 .dashboard-design-panel {
   display: grid;
   gap: 12px;
@@ -7285,6 +7463,16 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   }
   .dashboard-drawer-tabs {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .dashboard-guide-actions,
+  .dashboard-guide-section-grid,
+  .dashboard-guide-workflow-heading {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-guide-workflow-heading button,
+  .dashboard-guide-actions button,
+  .dashboard-guide-actions a {
+    width: 100%;
   }
   .dashboard-summary-compact-grid {
     grid-template-columns: 1fr;

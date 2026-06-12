@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, PencilRuler, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Upload, Workflow, X } from "lucide-react";
+import { AlertTriangle, BookOpen, Cable, Database, ExternalLink, Filter, Gauge, Layers, LocateFixed, MapPin, Maximize2, Network, PanelRightClose, PanelRightOpen, PencilRuler, Plus, RadioTower, Route, Search, SlidersHorizontal, TableProperties, Upload, Workflow, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { appNavGroups } from "@/components/navigation";
 import { dataSourceRecords, dataSourceSafetyNotes } from "@/data/dataSources";
@@ -117,7 +117,7 @@ const distributionNetworkLayerKeys: StreetMapLayerKey[] = [
 ];
 
 type MapStatus = "loading" | "active" | "error";
-type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "scale" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor" | "design";
+type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "scale" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor" | "design" | "guide";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
 type DashboardOperatingMode = "in_service" | "planned";
 type DashboardLayerSummary = {
@@ -181,6 +181,605 @@ const addAssetOptions: Array<{ kind: AddAssetKind; label: string; note: string }
   { kind: "circuit_endpoint", label: "Circuit endpoint", note: "Protection or SCADA endpoint" },
   { kind: "work_order", label: "Work order", note: "Field task map marker" },
   { kind: "proposed_change", label: "Proposed change", note: "Private staged planning marker" },
+];
+
+type DatabaseGuideAssetType = {
+  slug: string;
+  display_name: string;
+  description: string;
+  geometry_type: DesignAssetGeometryType;
+  fields: DesignAssetField[];
+  searchable_fields: string[];
+  map_style: Record<string, unknown>;
+};
+
+type DatabaseGuideRecord = {
+  asset_type_slug: string;
+  record_key: string;
+  display_label: string;
+  status: DesignAssetRecord["status"];
+  properties: Record<string, unknown>;
+  geometry?: DesignAssetGeoJsonGeometry | null;
+  source: "synthetic_demo";
+  visibility: "synthetic-demo";
+  notes: string;
+};
+
+type DatabaseGuideWorkflow = {
+  key: string;
+  title: string;
+  summary: string;
+  steps: string[];
+  edits: string[];
+  records: DatabaseGuideRecord[];
+};
+
+const databaseGuideAssetTypes: DatabaseGuideAssetType[] = [
+  {
+    slug: "guide-distribution-pole",
+    display_name: "Guide distribution pole",
+    description: "Synthetic design guide record for adding fiber attachments to a distribution pole.",
+    geometry_type: "point",
+    searchable_fields: ["pole_id", "pole_number", "road_name", "attachment_status"],
+    map_style: { color: "#38bdf8", radius: 8, fillOpacity: 0.32 },
+    fields: [
+      { name: "pole_id", label: "Pole ID", type: "string", required: true },
+      { name: "pole_number", label: "Pole number", type: "string", required: true },
+      { name: "owner", label: "Owner", type: "string" },
+      { name: "road_name", label: "Road name", type: "string" },
+      { name: "attachment_status", label: "Attachment status", type: "enum", enum_options: ["proposed", "planned", "in_review", "as_built"], required: true },
+      { name: "fiber_cable_ids", label: "Fiber cable IDs", type: "json" },
+      { name: "span_ids", label: "Span IDs", type: "json" },
+      { name: "slack_loop_ft", label: "Slack loop feet", type: "number" },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    slug: "guide-fiber-span",
+    display_name: "Guide fiber span",
+    description: "Synthetic line record for adding aerial, underground, ADSS, or OPGW fiber spans.",
+    geometry_type: "line",
+    searchable_fields: ["span_id", "cable_id", "from_structure_id", "to_structure_id"],
+    map_style: { color: "#22c55e", lineWidth: 4, dashArray: [2, 2] },
+    fields: [
+      { name: "span_id", label: "Span ID", type: "string", required: true },
+      { name: "cable_id", label: "Cable ID", type: "string", required: true },
+      { name: "from_structure_id", label: "From structure ID", type: "string", required: true },
+      { name: "to_structure_id", label: "To structure ID", type: "string", required: true },
+      { name: "fiber_count", label: "Fiber count", type: "integer", required: true },
+      { name: "cable_type", label: "Cable type", type: "enum", enum_options: ["ADSS", "OPGW", "underground", "building_lateral"], required: true },
+      { name: "strand_range", label: "Strand range", type: "string" },
+      { name: "construction_status", label: "Construction status", type: "enum", enum_options: ["proposed", "planned", "in_review", "as_built"], required: true },
+      { name: "slack_loop_ids", label: "Slack loop IDs", type: "json" },
+      { name: "splice_ids", label: "Splice IDs", type: "json" },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    slug: "guide-splice-work",
+    display_name: "Guide splice work",
+    description: "Synthetic splice or resplice work record with existing and proposed splice matrix rows.",
+    geometry_type: "point",
+    searchable_fields: ["splice_id", "work_type", "closure_type", "status"],
+    map_style: { color: "#f59e0b", radius: 9, fillOpacity: 0.36 },
+    fields: [
+      { name: "splice_id", label: "Splice ID", type: "string", required: true },
+      { name: "closure_type", label: "Closure type", type: "enum", enum_options: ["aerial", "handhole", "patch_panel_terminal", "liu_terminal", "resplice"], required: true },
+      { name: "work_type", label: "Work type", type: "enum", enum_options: ["new_splice", "resplice", "express", "branch", "repair"], required: true },
+      { name: "existing_rows", label: "Existing splice rows", type: "json" },
+      { name: "proposed_rows", label: "Proposed splice rows", type: "json" },
+      { name: "affected_service_ids", label: "Affected service IDs", type: "json" },
+      { name: "status", label: "Status", type: "enum", enum_options: ["proposed", "planned", "in_review", "as_built"], required: true },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    slug: "guide-liu-patch-panel",
+    display_name: "Guide LIU or patch panel",
+    description: "Synthetic LIU/patch-panel record for substation terminations and port assignments.",
+    geometry_type: "table_only",
+    searchable_fields: ["liu_id", "substation_id", "panel_name", "rack"],
+    map_style: {},
+    fields: [
+      { name: "liu_id", label: "LIU ID", type: "string", required: true },
+      { name: "substation_id", label: "Substation ID", type: "string", required: true },
+      { name: "rack", label: "Rack", type: "string" },
+      { name: "panel_name", label: "Panel name", type: "string", required: true },
+      { name: "port_count", label: "Port count", type: "integer", required: true },
+      { name: "connector_type", label: "Connector type", type: "enum", enum_options: ["LC", "SC", "ST", "FC", "Unknown"], required: true },
+      { name: "cable_ids", label: "Cable IDs", type: "json" },
+      { name: "port_assignments", label: "Port assignments", type: "json" },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    slug: "guide-device-endpoint",
+    display_name: "Guide device endpoint",
+    description: "Synthetic device endpoint record for service assignment at a substation.",
+    geometry_type: "table_only",
+    searchable_fields: ["device_id", "device_name", "device_type", "substation_id"],
+    map_style: {},
+    fields: [
+      { name: "device_id", label: "Device ID", type: "string", required: true },
+      { name: "device_name", label: "Device name", type: "string", required: true },
+      { name: "device_type", label: "Device type", type: "enum", enum_options: ["SEL_ICON", "relay", "RTU", "router", "switch", "NID", "other"], required: true },
+      { name: "substation_id", label: "Substation ID", type: "string", required: true },
+      { name: "rack", label: "Rack", type: "string" },
+      { name: "service_ports", label: "Service ports", type: "json" },
+      { name: "connected_liu_id", label: "Connected LIU ID", type: "string" },
+      { name: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    slug: "guide-service-assignment",
+    display_name: "Guide service assignment",
+    description: "Synthetic circuit/service assignment record tying devices, LIUs, strands, and splices together.",
+    geometry_type: "table_only",
+    searchable_fields: ["service_id", "service_type", "a_end_device", "z_end_device", "status"],
+    map_style: {},
+    fields: [
+      { name: "service_id", label: "Service ID", type: "string", required: true },
+      { name: "service_type", label: "Service type", type: "enum", enum_options: ["SEL_ICON", "C37_94", "Ethernet", "SCADA", "Protection", "DTT", "Leased", "Spare", "Other"], required: true },
+      { name: "a_end_device", label: "A-end device", type: "string" },
+      { name: "z_end_device", label: "Z-end device", type: "string" },
+      { name: "a_end_port", label: "A-end port", type: "string" },
+      { name: "z_end_port", label: "Z-end port", type: "string" },
+      { name: "a_end_liu", label: "A-end LIU", type: "string" },
+      { name: "z_end_liu", label: "Z-end LIU", type: "string" },
+      { name: "cable_ids", label: "Cable IDs", type: "json" },
+      { name: "strand_numbers", label: "Strand numbers", type: "json" },
+      { name: "splice_ids", label: "Splice IDs", type: "json" },
+      { name: "status", label: "Status", type: "enum", enum_options: ["proposed", "planned", "in_review", "as_built"], required: true },
+      { name: "continuity_summary", label: "Continuity summary", type: "textarea" },
+      { name: "loss_estimate_db", label: "Loss estimate dB", type: "number" },
+    ],
+  },
+];
+
+const databaseGuideWorkflows: DatabaseGuideWorkflow[] = [
+  {
+    key: "pole-fiber-attachment",
+    title: "Add fiber to a pole",
+    summary: "Creates a pole attachment record, the entering fiber span, and a reserved spare-fiber assignment that can become a service later.",
+    steps: [
+      "Create or select the pole/support structure.",
+      "Attach the cable ID and span IDs to the pole record.",
+      "Create the line span geometry into the pole.",
+      "Reserve strand numbers or a spare buffer for future service.",
+      "Issue a work order if field make-ready, slack, or tagging is needed.",
+    ],
+    edits: [
+      "Upsert guide-distribution-pole record GUIDE-POLE-FIBER-P001.",
+      "Upsert guide-fiber-span record GUIDE-SPAN-FIBER-P000-P001.",
+      "Upsert guide-service-assignment record GUIDE-SPARE-POLE-P001.",
+    ],
+    records: [
+      {
+        asset_type_slug: "guide-distribution-pole",
+        record_key: "GUIDE-POLE-FIBER-P001",
+        display_label: "Guide pole fiber attachment P001",
+        status: "planned",
+        geometry: { type: "Point", coordinates: [-71.8028, 42.2637] },
+        properties: {
+          pole_id: "P001",
+          pole_number: "P-001",
+          owner: "Synthetic Demo Utility",
+          road_name: "Guide Road",
+          attachment_status: "planned",
+          fiber_cable_ids: ["GUIDE-ADSS-24F-001"],
+          span_ids: ["GUIDE-SPAN-FIBER-P000-P001"],
+          slack_loop_ft: 100,
+          notes: "Synthetic guide edit: add ADSS fiber and slack to this pole.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-fiber-span",
+        record_key: "GUIDE-SPAN-FIBER-P000-P001",
+        display_label: "Guide ADSS span into pole P001",
+        status: "planned",
+        geometry: { type: "LineString", coordinates: [[-71.8065, 42.2625], [-71.8028, 42.2637]] },
+        properties: {
+          span_id: "GUIDE-SPAN-FIBER-P000-P001",
+          cable_id: "GUIDE-ADSS-24F-001",
+          from_structure_id: "P000",
+          to_structure_id: "P001",
+          fiber_count: 24,
+          cable_type: "ADSS",
+          strand_range: "1-24",
+          construction_status: "planned",
+          slack_loop_ids: ["GUIDE-SLACK-P001"],
+          splice_ids: [],
+          notes: "Synthetic span feeding a pole attachment guide example.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-service-assignment",
+        record_key: "GUIDE-SPARE-POLE-P001",
+        display_label: "Guide reserved spare strands at pole P001",
+        status: "planned",
+        geometry: null,
+        properties: {
+          service_id: "SPARE-GUIDE-P001",
+          service_type: "Spare",
+          a_end_device: "",
+          z_end_device: "",
+          a_end_port: "",
+          z_end_port: "",
+          a_end_liu: "",
+          z_end_liu: "",
+          cable_ids: ["GUIDE-ADSS-24F-001"],
+          strand_numbers: [1, 2],
+          splice_ids: [],
+          status: "planned",
+          continuity_summary: "Reserved spare pair staged at pole P001 for future service.",
+          loss_estimate_db: 0.9,
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+    ],
+  },
+  {
+    key: "span-fiber-route",
+    title: "Add fiber to a span",
+    summary: "Creates both support structures, a span line, and the cable/strand details needed for route planning.",
+    steps: [
+      "Create or select the A-end and Z-end poles or structures.",
+      "Create a fiber span line between the structures.",
+      "Set cable type, fiber count, strand range, and status.",
+      "Add slack-loop and splice references if either end terminates or branches.",
+      "Validate that planned strands are not double-booked before materializing.",
+    ],
+    edits: [
+      "Upsert guide-distribution-pole records GUIDE-POLE-SPAN-A and GUIDE-POLE-SPAN-Z.",
+      "Upsert guide-fiber-span record GUIDE-SPAN-P010-P011.",
+      "Upsert guide-service-assignment record GUIDE-RESERVE-SPAN-P010-P011.",
+    ],
+    records: [
+      {
+        asset_type_slug: "guide-distribution-pole",
+        record_key: "GUIDE-POLE-SPAN-A",
+        display_label: "Guide span A-end pole P010",
+        status: "planned",
+        geometry: { type: "Point", coordinates: [-71.8152, 42.2724] },
+        properties: {
+          pole_id: "P010",
+          pole_number: "P-010",
+          owner: "Synthetic Demo Utility",
+          road_name: "Span Road",
+          attachment_status: "planned",
+          fiber_cable_ids: ["GUIDE-ADSS-48F-010"],
+          span_ids: ["GUIDE-SPAN-P010-P011"],
+          slack_loop_ft: 50,
+          notes: "A-end support for span guide example.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-distribution-pole",
+        record_key: "GUIDE-POLE-SPAN-Z",
+        display_label: "Guide span Z-end pole P011",
+        status: "planned",
+        geometry: { type: "Point", coordinates: [-71.8104, 42.2749] },
+        properties: {
+          pole_id: "P011",
+          pole_number: "P-011",
+          owner: "Synthetic Demo Utility",
+          road_name: "Span Road",
+          attachment_status: "planned",
+          fiber_cable_ids: ["GUIDE-ADSS-48F-010"],
+          span_ids: ["GUIDE-SPAN-P010-P011"],
+          slack_loop_ft: 50,
+          notes: "Z-end support for span guide example.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-fiber-span",
+        record_key: "GUIDE-SPAN-P010-P011",
+        display_label: "Guide 48F ADSS span P010 to P011",
+        status: "planned",
+        geometry: { type: "LineString", coordinates: [[-71.8152, 42.2724], [-71.8127, 42.2739], [-71.8104, 42.2749]] },
+        properties: {
+          span_id: "GUIDE-SPAN-P010-P011",
+          cable_id: "GUIDE-ADSS-48F-010",
+          from_structure_id: "P010",
+          to_structure_id: "P011",
+          fiber_count: 48,
+          cable_type: "ADSS",
+          strand_range: "1-48",
+          construction_status: "planned",
+          slack_loop_ids: ["GUIDE-SLACK-P010", "GUIDE-SLACK-P011"],
+          splice_ids: ["GUIDE-SPLICE-P011"],
+          notes: "Synthetic guide span with slack at both ends and a planned splice at P011.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-service-assignment",
+        record_key: "GUIDE-RESERVE-SPAN-P010-P011",
+        display_label: "Guide reserved pair on span P010 to P011",
+        status: "planned",
+        geometry: null,
+        properties: {
+          service_id: "RESERVE-GUIDE-P010-P011",
+          service_type: "Spare",
+          a_end_device: "",
+          z_end_device: "",
+          a_end_port: "",
+          z_end_port: "",
+          a_end_liu: "",
+          z_end_liu: "",
+          cable_ids: ["GUIDE-ADSS-48F-010"],
+          strand_numbers: [7, 8],
+          splice_ids: ["GUIDE-SPLICE-P011"],
+          status: "planned",
+          continuity_summary: "Reserved pair on the newly designed 48F span.",
+          loss_estimate_db: 1.2,
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+    ],
+  },
+  {
+    key: "resplice-service",
+    title: "Resplice an existing service",
+    summary: "Creates a resplice work point and proposed splice matrix edits that move a service from one strand pair to another.",
+    steps: [
+      "Select the splice closure or LIU where the change happens.",
+      "Capture existing splice rows before editing.",
+      "Create proposed splice rows with from-cable, from-strand, to-cable, and to-strand.",
+      "Link affected services and strands to the resplice work record.",
+      "Issue a work order and keep the proposed rows separate until closeout.",
+    ],
+    edits: [
+      "Upsert guide-splice-work record GUIDE-RESPLICE-SC-014.",
+      "Upsert guide-service-assignment record GUIDE-SCADA-RESPLICE-014.",
+    ],
+    records: [
+      {
+        asset_type_slug: "guide-splice-work",
+        record_key: "GUIDE-RESPLICE-SC-014",
+        display_label: "Guide resplice SC-014",
+        status: "in_review",
+        geometry: { type: "Point", coordinates: [-71.7951, 42.2766] },
+        properties: {
+          splice_id: "GUIDE-SC-014",
+          closure_type: "resplice",
+          work_type: "resplice",
+          existing_rows: [
+            { from_cable: "GUIDE-ADSS-48F-010", from_strand: 7, to_cable: "GUIDE-ADSS-48F-011", to_strand: 7, splice_type: "straight_through" },
+            { from_cable: "GUIDE-ADSS-48F-010", from_strand: 8, to_cable: "GUIDE-ADSS-48F-011", to_strand: 8, splice_type: "straight_through" },
+          ],
+          proposed_rows: [
+            { from_cable: "GUIDE-ADSS-48F-010", from_strand: 9, to_cable: "GUIDE-ADSS-48F-011", to_strand: 9, splice_type: "straight_through" },
+            { from_cable: "GUIDE-ADSS-48F-010", from_strand: 10, to_cable: "GUIDE-ADSS-48F-011", to_strand: 10, splice_type: "straight_through" },
+          ],
+          affected_service_ids: ["SCADA-GUIDE-014"],
+          status: "in_review",
+          notes: "Synthetic guide resplice: move SCADA service from strands 7-8 to 9-10.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-service-assignment",
+        record_key: "GUIDE-SCADA-RESPLICE-014",
+        display_label: "Guide SCADA service proposed resplice",
+        status: "in_review",
+        geometry: null,
+        properties: {
+          service_id: "SCADA-GUIDE-014",
+          service_type: "SCADA",
+          a_end_device: "WOR-RTU-GUIDE-01",
+          z_end_device: "FRA-SW-GUIDE-01",
+          a_end_port: "Eth1",
+          z_end_port: "Gi0/12",
+          a_end_liu: "WOR-LIU-GUIDE-01",
+          z_end_liu: "FRA-LIU-GUIDE-01",
+          cable_ids: ["GUIDE-ADSS-48F-010", "GUIDE-ADSS-48F-011"],
+          strand_numbers: [9, 10],
+          splice_ids: ["GUIDE-SC-014"],
+          status: "in_review",
+          continuity_summary: "Proposed resplice preserves SCADA service continuity on replacement strands 9-10.",
+          loss_estimate_db: 1.7,
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+    ],
+  },
+  {
+    key: "liu-to-liu-service",
+    title: "Assign service from LIU to LIU",
+    summary: "Creates endpoint devices, LIU panels, terminal splice records, and a complete service assignment between substations.",
+    steps: [
+      "Create LIU records at both substations with panel, port count, and cable IDs.",
+      "Create endpoint devices and record their service ports.",
+      "Add terminal splice records at both LIUs.",
+      "Create the service assignment with devices, ports, LIUs, cable IDs, strand numbers, and splice IDs.",
+      "Validate continuity and estimated loss, then issue work for field verification.",
+    ],
+    edits: [
+      "Upsert guide-liu-patch-panel records GUIDE-WBS-LIU-01 and GUIDE-AUB-LIU-01.",
+      "Upsert guide-device-endpoint records GUIDE-WBS-ICON-01 and GUIDE-AUB-SEL411L-01.",
+      "Upsert guide-splice-work terminal records GUIDE-WBS-LIU-SPLICE and GUIDE-AUB-LIU-SPLICE.",
+      "Upsert guide-service-assignment record GUIDE-87L-WBS-AUB-101.",
+    ],
+    records: [
+      {
+        asset_type_slug: "guide-liu-patch-panel",
+        record_key: "GUIDE-WBS-LIU-01",
+        display_label: "Guide Webster LIU 01",
+        status: "planned",
+        geometry: null,
+        properties: {
+          liu_id: "WBS-LIU-GUIDE-01",
+          substation_id: "MA-WBS",
+          rack: "TELCO-R1",
+          panel_name: "WBS LIU Panel 01",
+          port_count: 48,
+          connector_type: "LC",
+          cable_ids: ["GUIDE-OPGW-WBS-AUB-48F"],
+          port_assignments: [{ ports: "1-2", service_id: "87L-GUIDE-WBS-AUB-101", strands: [1, 2] }],
+          notes: "Synthetic LIU endpoint for guide service assignment.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-liu-patch-panel",
+        record_key: "GUIDE-AUB-LIU-01",
+        display_label: "Guide Auburn LIU 01",
+        status: "planned",
+        geometry: null,
+        properties: {
+          liu_id: "AUB-LIU-GUIDE-01",
+          substation_id: "MA-AUB",
+          rack: "TELCO-R2",
+          panel_name: "AUB LIU Panel 01",
+          port_count: 48,
+          connector_type: "LC",
+          cable_ids: ["GUIDE-OPGW-WBS-AUB-48F"],
+          port_assignments: [{ ports: "1-2", service_id: "87L-GUIDE-WBS-AUB-101", strands: [1, 2] }],
+          notes: "Synthetic LIU endpoint for guide service assignment.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-device-endpoint",
+        record_key: "GUIDE-WBS-ICON-01",
+        display_label: "Guide WBS ICON endpoint",
+        status: "planned",
+        geometry: null,
+        properties: {
+          device_id: "WBS-ICON-GUIDE-01",
+          device_name: "WBS ICON Guide 01",
+          device_type: "SEL_ICON",
+          substation_id: "MA-WBS",
+          rack: "TELCO-R1",
+          service_ports: [{ port: "C37.94-1", liu_port: "WBS-LIU-GUIDE-01/1-2", service_id: "87L-GUIDE-WBS-AUB-101" }],
+          connected_liu_id: "WBS-LIU-GUIDE-01",
+          notes: "Synthetic endpoint device for guide 87L service.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-device-endpoint",
+        record_key: "GUIDE-AUB-SEL411L-01",
+        display_label: "Guide AUB SEL-411L endpoint",
+        status: "planned",
+        geometry: null,
+        properties: {
+          device_id: "AUB-SEL411L-GUIDE-01",
+          device_name: "AUB SEL-411L Guide 01",
+          device_type: "relay",
+          substation_id: "MA-AUB",
+          rack: "PROT-R1",
+          service_ports: [{ port: "C37.94-1", liu_port: "AUB-LIU-GUIDE-01/1-2", service_id: "87L-GUIDE-WBS-AUB-101" }],
+          connected_liu_id: "AUB-LIU-GUIDE-01",
+          notes: "Synthetic relay endpoint for guide 87L service.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-splice-work",
+        record_key: "GUIDE-WBS-LIU-SPLICE",
+        display_label: "Guide WBS terminal LIU splice",
+        status: "planned",
+        geometry: { type: "Point", coordinates: [-71.8215, 42.2595] },
+        properties: {
+          splice_id: "GUIDE-WBS-LIU-SPLICE",
+          closure_type: "liu_terminal",
+          work_type: "new_splice",
+          existing_rows: [],
+          proposed_rows: [
+            { from_cable: "GUIDE-OPGW-WBS-AUB-48F", from_strand: 1, to_cable: "WBS-LIU-GUIDE-01", to_strand: 1, splice_type: "terminal" },
+            { from_cable: "GUIDE-OPGW-WBS-AUB-48F", from_strand: 2, to_cable: "WBS-LIU-GUIDE-01", to_strand: 2, splice_type: "terminal" },
+          ],
+          affected_service_ids: ["87L-GUIDE-WBS-AUB-101"],
+          status: "planned",
+          notes: "Synthetic terminal splice at WBS LIU.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-splice-work",
+        record_key: "GUIDE-AUB-LIU-SPLICE",
+        display_label: "Guide AUB terminal LIU splice",
+        status: "planned",
+        geometry: { type: "Point", coordinates: [-71.8391, 42.2479] },
+        properties: {
+          splice_id: "GUIDE-AUB-LIU-SPLICE",
+          closure_type: "liu_terminal",
+          work_type: "new_splice",
+          existing_rows: [],
+          proposed_rows: [
+            { from_cable: "GUIDE-OPGW-WBS-AUB-48F", from_strand: 1, to_cable: "AUB-LIU-GUIDE-01", to_strand: 1, splice_type: "terminal" },
+            { from_cable: "GUIDE-OPGW-WBS-AUB-48F", from_strand: 2, to_cable: "AUB-LIU-GUIDE-01", to_strand: 2, splice_type: "terminal" },
+          ],
+          affected_service_ids: ["87L-GUIDE-WBS-AUB-101"],
+          status: "planned",
+          notes: "Synthetic terminal splice at AUB LIU.",
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+      {
+        asset_type_slug: "guide-service-assignment",
+        record_key: "GUIDE-87L-WBS-AUB-101",
+        display_label: "Guide 87L WBS to AUB fiber assignment",
+        status: "planned",
+        geometry: null,
+        properties: {
+          service_id: "87L-GUIDE-WBS-AUB-101",
+          service_type: "C37_94",
+          a_end_device: "WBS-ICON-GUIDE-01",
+          z_end_device: "AUB-SEL411L-GUIDE-01",
+          a_end_port: "C37.94-1",
+          z_end_port: "C37.94-1",
+          a_end_liu: "WBS-LIU-GUIDE-01/1-2",
+          z_end_liu: "AUB-LIU-GUIDE-01/1-2",
+          cable_ids: ["GUIDE-OPGW-WBS-AUB-48F"],
+          strand_numbers: [1, 2],
+          splice_ids: ["GUIDE-WBS-LIU-SPLICE", "GUIDE-AUB-LIU-SPLICE"],
+          status: "planned",
+          continuity_summary: "Synthetic 87L service from WBS LIU to AUB LIU with devices on both ends.",
+          loss_estimate_db: 2.1,
+        },
+        source: "synthetic_demo",
+        visibility: "synthetic-demo",
+        notes: "Created by the dashboard guide. Synthetic/demo data only.",
+      },
+    ],
+  },
 ];
 
 type DashboardSearchLayer =
@@ -336,6 +935,8 @@ export function DashboardPage() {
   const [pendingDesignGeometry, setPendingDesignGeometry] = useState<DesignAssetGeoJsonGeometry | null>(null);
   const [designDrawingCoordinates, setDesignDrawingCoordinates] = useState<Coordinate[]>([]);
   const [designAssetMessage, setDesignAssetMessage] = useState("");
+  const [guideBusy, setGuideBusy] = useState("");
+  const [guideMessage, setGuideMessage] = useState("");
   const [gisApiBase, setGisApiBase] = useState(API_BASE);
   const designFeaturesEnabled = MAP_EDITING_ENABLED || designModeEnabled;
   const mountedRef = useRef(false);
@@ -667,7 +1268,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
-    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design"];
+    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design", "guide"];
     if (drawer && allowedDrawers.includes(drawer as RightDrawerMode)) {
       setRightMode(drawer as RightDrawerMode);
       setRightCollapsed(false);
@@ -1950,6 +2551,56 @@ export function DashboardPage() {
     issueMapCommand("resize");
   }
 
+  function handleGuideClick() {
+    setRightMode("guide");
+    setRightCollapsed(false);
+    showToast("Guide opened: choose a workflow to learn or create synthetic database edits.");
+    issueMapCommand("resize");
+  }
+
+  function openGuideDesignRecords() {
+    setDesignModeEnabled(true);
+    setStreetLayers((current) => ({ ...current, designAssets: true }));
+    setSearchLayerFilter("designAssets");
+    setVisibilityFilter("synthetic-demo");
+    setSelectedDesignAssetTypeSlug("guide-distribution-pole");
+    setRightMode("design");
+    setRightCollapsed(false);
+    void loadDesignAssets(true);
+    showToast("Opened Design Mode records created by the guide.");
+    issueMapCommand("resize");
+  }
+
+  async function runDatabaseGuideWorkflow(workflow: DatabaseGuideWorkflow) {
+    setGuideBusy(workflow.key);
+    setGuideMessage("");
+    try {
+      const result = await fetchFromApiBase<DesignBlueprintInstallResult>(API_BASE, "/api/design-assets/blueprint/import", {
+        method: "POST",
+        body: JSON.stringify({
+          blueprint_version: "gridassetlink-dashboard-guide-v1",
+          synthetic_data_notice: "Dashboard guide records are synthetic/demo planning records only.",
+          mode: "upsert",
+          asset_types: databaseGuideAssetTypes,
+          records: workflow.records,
+        }),
+      });
+      await loadDesignAssets(true);
+      setDesignModeEnabled(true);
+      setStreetLayers((current) => ({ ...current, designAssets: true }));
+      setSearchLayerFilter("designAssets");
+      setVisibilityFilter("synthetic-demo");
+      setGuideMessage(`Applied ${workflow.title}: ${result.created_records} created, ${result.updated_records} updated, ${result.created_asset_types} schemas created, ${result.updated_asset_types} schemas updated.`);
+      showToast(`Guide database edits applied for ${workflow.title}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setGuideMessage(message);
+      showToast(message);
+    } finally {
+      setGuideBusy("");
+    }
+  }
+
   function handleTransmissionLineOwnerLayerChange(owner: string, enabled: boolean) {
     setVisibleTransmissionLineOwners((current) => ({ ...current, [owner]: enabled }));
     if (enabled) {
@@ -2199,6 +2850,14 @@ export function DashboardPage() {
           ))}
           <button
             type="button"
+            className={rightMode === "guide" ? "active" : ""}
+            onClick={handleGuideClick}
+          >
+            <BookOpen size={14} />
+            Guide
+          </button>
+          <button
+            type="button"
             className={designModeEnabled && rightMode === "design" ? "active" : ""}
             onClick={handleDesignModeClick}
           >
@@ -2273,6 +2932,7 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "sources" ? "active" : ""} onClick={() => setRightMode("sources")}><TableProperties size={14} />Sources</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
               <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
+              <button type="button" className={rightMode === "guide" ? "active" : ""} onClick={handleGuideClick}><BookOpen size={14} />Guide</button>
               <button type="button" className={rightMode === "design" ? "active" : ""} onClick={handleDesignModeClick}><PencilRuler size={14} />Design</button>
             </div>
             <div className="dashboard-drawer-body">
@@ -2407,6 +3067,15 @@ export function DashboardPage() {
               ) : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
               {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
+              {rightMode === "guide" ? (
+                <DatabaseGuideDrawer
+                  workflows={databaseGuideWorkflows}
+                  busyKey={guideBusy}
+                  message={guideMessage}
+                  onRunWorkflow={runDatabaseGuideWorkflow}
+                  onOpenDesignRecords={openGuideDesignRecords}
+                />
+              ) : null}
               {rightMode === "design" ? (
                 <DesignEditDrawer
                   enabled={designFeaturesEnabled}
@@ -3633,6 +4302,106 @@ function SummaryDrawer({ cards, publicOnly, mapStatusMessage, opgwMetrics, layer
         ))}
       </div>
       {mapStatusMessage ? <p className="dashboard-map-status-message">{mapStatusMessage}</p> : null}
+    </section>
+  );
+}
+
+function guideWorkflowPayloadPreview(workflow: DatabaseGuideWorkflow) {
+  return JSON.stringify({
+    endpoint: "POST /api/design-assets/blueprint/import",
+    mode: "upsert",
+    asset_types: databaseGuideAssetTypes.map((assetType) => ({
+      slug: assetType.slug,
+      geometry_type: assetType.geometry_type,
+      fields: assetType.fields.map((field) => field.name),
+    })),
+    records: workflow.records.map((record) => ({
+      asset_type_slug: record.asset_type_slug,
+      record_key: record.record_key,
+      display_label: record.display_label,
+      status: record.status,
+      properties: record.properties,
+      geometry: record.geometry || null,
+    })),
+  }, null, 2);
+}
+
+function DatabaseGuideDrawer({
+  workflows,
+  busyKey,
+  message,
+  onRunWorkflow,
+  onOpenDesignRecords,
+}: {
+  workflows: DatabaseGuideWorkflow[];
+  busyKey: string;
+  message: string;
+  onRunWorkflow: (workflow: DatabaseGuideWorkflow) => void;
+  onOpenDesignRecords: () => void;
+}) {
+  return (
+    <section className="dashboard-guide-panel" aria-label="Database guide">
+      <div className="dashboard-panel-heading">
+        <BookOpen size={16} />
+        <div>
+          <strong>Database Guide</strong>
+          <span>Step-by-step synthetic edits for poles, spans, splicing, LIUs, devices, strands, and services.</span>
+        </div>
+      </div>
+      <div className="dashboard-guide-callout">
+        <strong>How these guide buttons work</strong>
+        <span>Each button runs <code>POST /api/design-assets/blueprint/import</code> with <code>mode: upsert</code>. That creates or updates real Design Mode records in the database while keeping every row synthetic/demo.</span>
+      </div>
+      <div className="dashboard-guide-actions">
+        <button type="button" onClick={onOpenDesignRecords}><PencilRuler size={14} />Open Design records</button>
+        <Link href="/admin/database"><Database size={14} />Open database admin</Link>
+      </div>
+      {message ? <p className="dashboard-gis-message">{message}</p> : null}
+      <div className="dashboard-guide-workflows">
+        {workflows.map((workflow) => (
+          <article key={workflow.key}>
+            <div className="dashboard-guide-workflow-heading">
+              <div>
+                <strong>{workflow.title}</strong>
+                <span>{workflow.summary}</span>
+              </div>
+              <button type="button" disabled={Boolean(busyKey)} onClick={() => onRunWorkflow(workflow)}>
+                {busyKey === workflow.key ? "Creating..." : "Create example DB edits"}
+              </button>
+            </div>
+            <div className="dashboard-guide-section-grid">
+              <div>
+                <strong>Workflow</strong>
+                <ol>
+                  {workflow.steps.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+              </div>
+              <div>
+                <strong>Database edits</strong>
+                <ul>
+                  {workflow.edits.map((edit) => <li key={edit}>{edit}</li>)}
+                </ul>
+              </div>
+            </div>
+            <div className="dashboard-guide-records">
+              <strong>Records created or updated</strong>
+              <div>
+                {workflow.records.map((record) => (
+                  <span key={record.record_key}>
+                    <code>{record.record_key}</code>
+                    {record.asset_type_slug}
+                    <small>{record.status}</small>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <details className="dashboard-guide-payload">
+              <summary>View import payload preview</summary>
+              <pre>{guideWorkflowPayloadPreview(workflow)}</pre>
+            </details>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

@@ -29,12 +29,23 @@ Object types with `point`, `line`, or `polygon` geometry appear on the dashboard
 
 `/admin/database` includes a **Design database guide** section that acts as the first-stop checklist for using GridAssetLink as a living planning database.
 
+The dashboard also includes a **Guide** button next to **In Service** and **Planned**. Open it from `/dashboard?drawer=guide` to view workflows and create synthetic example database edits directly into Design Mode.
+
 - Choose templates or core schemas before creating records.
 - Edit selected records instead of recreating them.
 - Use statuses as design workflow gates.
 - Issue work orders from records that need field or engineering action.
 - Materialize supported records only after review.
 - Preserve the synthetic/demo data boundary.
+
+The dashboard guide can upsert example Design Mode records for:
+
+- adding fiber and slack to a distribution pole,
+- adding a fiber cable/span between structures,
+- resplicing an existing service with existing and proposed splice rows, and
+- assigning a service from one substation LIU to another LIU with endpoint devices.
+
+Each guide action runs `POST /api/design-assets/blueprint/import` with `mode: upsert`. The records are synthetic/demo planning records and should be reviewed before materialization or work-order issue.
 
 ### Assigning a Service Across Fiber
 
