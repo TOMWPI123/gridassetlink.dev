@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Cable, GitCompareArrows, Route, Search, ShieldAlert } from "lucide-react";
-import { useDeferredValue, useMemo, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { displayValue } from "@/lib/api";
 import type { JsonRecord } from "@/types";
 
 const MAX_CABLE_CHOICES = 18;
 
 export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
+  const router = useRouter();
   const cables = useMemo(() => rows.filter((row) => typeof row.cable_id === "string" && String(row.cable_id).startsWith("SYN-OPGW")), [rows]);
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
+  const [pendingHref, setPendingHref] = useState("");
   const [isPending, startTransition] = useTransition();
   const deferredQuery = useDeferredValue(query);
   const selected = useMemo(() => cables.find((row) => row.cable_id === selectedId) || cables[0], [cables, selectedId]);
@@ -22,11 +25,34 @@ export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
       : cables;
     return source.slice(0, MAX_CABLE_CHOICES);
   }, [cables, deferredQuery]);
-  if (!cables.length || !selected) return null;
+  const cableId = selected ? String(selected.cable_id) : "";
+  const encodedCableId = encodeURIComponent(cableId);
+  const continuityHref = selected ? String(selected.open_href || `/opgw/cables/${encodedCableId}`) : "";
+  const spliceHref = selected && typeof selected.splice_manager_href === "string" ? selected.splice_manager_href : "";
+  const fiberTraceHref = selected ? `/fiber-trace?cable=${encodedCableId}` : "";
+  const outageImpactHref = selected ? `/outage-impact?cable=${encodedCableId}` : "";
+  const actionHrefs = useMemo(
+    () => Array.from(new Set([continuityHref, spliceHref, fiberTraceHref, outageImpactHref].filter(Boolean))),
+    [continuityHref, fiberTraceHref, outageImpactHref, spliceHref],
+  );
 
-  const cableId = String(selected.cable_id);
-  const continuityHref = String(selected.open_href || `/opgw/cables/${encodeURIComponent(cableId)}`);
-  const spliceHref = typeof selected.splice_manager_href === "string" ? selected.splice_manager_href : "";
+  useEffect(() => {
+    if (!actionHrefs.length) return;
+    const timeout = window.setTimeout(() => {
+      actionHrefs.forEach((href) => router.prefetch(href));
+    }, 180);
+    return () => window.clearTimeout(timeout);
+  }, [actionHrefs, router]);
+
+  function warmRoute(href: string) {
+    router.prefetch(href);
+  }
+
+  function markOpening(href: string) {
+    setPendingHref(href);
+  }
+
+  if (!cables.length || !selected) return null;
 
   return (
     <section className="panel opgw-cable-menu">
@@ -75,12 +101,13 @@ export function OpgwCableMenu({ rows }: { rows: JsonRecord[] }) {
           <div><span>Splices</span><strong>{displayValue(selected.splice_closures)}</strong></div>
         </div>
         <div className="opgw-cable-menu-actions">
-          <Link href={continuityHref}><Cable size={15} />Open Cable</Link>
-          <Link href={continuityHref}><Route size={15} />Full Continuity</Link>
-          {spliceHref ? <Link href={spliceHref}><GitCompareArrows size={15} />Splicing</Link> : null}
-          <Link href={`/fiber-trace?cable=${encodeURIComponent(cableId)}`}><Route size={15} />Fiber Trace</Link>
-          <Link href={`/outage-impact?cable=${encodeURIComponent(cableId)}`}><ShieldAlert size={15} />Outage Impact</Link>
+          <Link className={pendingHref === continuityHref ? "is-loading" : ""} href={continuityHref} prefetch onClick={() => markOpening(continuityHref)} onFocus={() => warmRoute(continuityHref)} onMouseEnter={() => warmRoute(continuityHref)}><Cable size={15} />Open Cable</Link>
+          <Link className={pendingHref === continuityHref ? "is-loading" : ""} href={continuityHref} prefetch onClick={() => markOpening(continuityHref)} onFocus={() => warmRoute(continuityHref)} onMouseEnter={() => warmRoute(continuityHref)}><Route size={15} />Full Continuity</Link>
+          {spliceHref ? <Link className={pendingHref === spliceHref ? "is-loading" : ""} href={spliceHref} prefetch onClick={() => markOpening(spliceHref)} onFocus={() => warmRoute(spliceHref)} onMouseEnter={() => warmRoute(spliceHref)}><GitCompareArrows size={15} />Splicing</Link> : null}
+          <Link className={pendingHref === fiberTraceHref ? "is-loading" : ""} href={fiberTraceHref} prefetch onClick={() => markOpening(fiberTraceHref)} onFocus={() => warmRoute(fiberTraceHref)} onMouseEnter={() => warmRoute(fiberTraceHref)}><Route size={15} />Fiber Trace</Link>
+          <Link className={pendingHref === outageImpactHref ? "is-loading" : ""} href={outageImpactHref} prefetch onClick={() => markOpening(outageImpactHref)} onFocus={() => warmRoute(outageImpactHref)} onMouseEnter={() => warmRoute(outageImpactHref)}><ShieldAlert size={15} />Outage Impact</Link>
         </div>
+        {pendingHref ? <div className="opgw-action-feedback">Opening selected cable view...</div> : null}
       </div>
     </section>
   );

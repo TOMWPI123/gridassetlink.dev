@@ -15,8 +15,14 @@ import { buildSyntheticOpgwEngineeringModel } from "@/lib/opgw/spanModel";
 import type { FiberContinuityData } from "@/lib/opgw/continuityEngine";
 
 const DATA_DIR = path.join(process.cwd(), "public", "data");
+let syntheticFiberContinuityDataPromise: Promise<FiberContinuityData> | null = null;
 
 export async function loadSyntheticFiberContinuityData(): Promise<FiberContinuityData> {
+  syntheticFiberContinuityDataPromise ||= readSyntheticFiberContinuityData();
+  return syntheticFiberContinuityDataPromise;
+}
+
+async function readSyntheticFiberContinuityData(): Promise<FiberContinuityData> {
   const [
     publicLines,
     structures,
