@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { DataTable } from "@/components/DataTable";
 import { findStrandContinuityRecord, strandContinuityDashboardHref } from "@/lib/opgw/strandContinuity";
-import type { FiberAssignment, FiberSplice, FiberStrand, OpgwCableCollection, PatchPanel, SpliceClosureCollection, StrandContinuityRecord, TransmissionStructureCollection } from "@/lib/types/assets";
+import type { FiberAssignment, FiberSplice, FiberStrand, OpgwCableCollection, PatchPanel, SpliceClosureCollection, StrandContinuityRecord, SyntheticService, TransmissionStructureCollection } from "@/lib/types/assets";
 import type { JsonRecord } from "@/types";
 
 type SyntheticFiberData = {
@@ -26,6 +26,43 @@ type SyntheticOpgwCableData = {
   loading: boolean;
 };
 
+type SyntheticTelecomHardware = {
+  nodes?: Array<{
+    nodeId: string;
+    nodeName: string;
+    deviceRole?: string;
+    model?: string;
+    serviceIds?: string[];
+  }>;
+};
+
+type OpgwCableLinkedAssets = {
+  spans: number;
+  strands: number;
+  availableStrands: number;
+  assignedStrands: number;
+  reservedStrands: number;
+  spliceRows: number;
+  spliceClosures: number;
+  patchPanels: number;
+  assignments: number;
+  services: number;
+  devices: number;
+  strandSample: string[];
+  spliceSample: string[];
+  patchPanelSample: string[];
+  assignmentSample: string[];
+  serviceSample: string[];
+  deviceSample: string[];
+  deviceRoleSample: string[];
+};
+
+type OpgwCableLinkedAssetData = {
+  summaries: Map<string, OpgwCableLinkedAssets>;
+  loading: boolean;
+  error: string;
+};
+
 const emptyData: SyntheticFiberData = {
   structures: [],
   opgw: [],
@@ -44,6 +81,50 @@ const emptyOpgwCableData: SyntheticOpgwCableData = {
   loading: true,
 };
 
+const emptyLinkedAssetSummary: OpgwCableLinkedAssets = {
+  spans: 0,
+  strands: 0,
+  availableStrands: 0,
+  assignedStrands: 0,
+  reservedStrands: 0,
+  spliceRows: 0,
+  spliceClosures: 0,
+  patchPanels: 0,
+  assignments: 0,
+  services: 0,
+  devices: 0,
+  strandSample: [],
+  spliceSample: [],
+  patchPanelSample: [],
+  assignmentSample: [],
+  serviceSample: [],
+  deviceSample: [],
+  deviceRoleSample: [],
+};
+
+function createEmptyLinkedAssetSummary(): OpgwCableLinkedAssets {
+  return {
+    spans: 0,
+    strands: 0,
+    availableStrands: 0,
+    assignedStrands: 0,
+    reservedStrands: 0,
+    spliceRows: 0,
+    spliceClosures: 0,
+    patchPanels: 0,
+    assignments: 0,
+    services: 0,
+    devices: 0,
+    strandSample: [],
+    spliceSample: [],
+    patchPanelSample: [],
+    assignmentSample: [],
+    serviceSample: [],
+    deviceSample: [],
+    deviceRoleSample: [],
+  };
+}
+
 export function TransmissionStructuresPage() {
   const data = useSyntheticFiberData();
   const rows = data.structures.map((feature) => feature.properties as unknown as JsonRecord);
@@ -52,47 +133,86 @@ export function TransmissionStructuresPage() {
 
 export function OpgwCablesPage() {
   const data = useOpgwCableData();
-  const rows = useMemo(() => data.opgw.map((feature) => ({
-    ...feature.properties,
-    structureCount: feature.properties.structureIds.length,
-    spliceClosureCount: feature.properties.connectedSpliceClosureIds.length,
-    cable_module_view: `/opgw/cables/${encodeURIComponent(feature.properties.id)}`,
-    fiber_trace_view: `/fiber-trace?cable=${encodeURIComponent(feature.properties.id)}`,
-    map_view: `/dashboard?drawer=layers&cable=${encodeURIComponent(feature.properties.id)}`,
-    open_href: `/opgw/cables/${encodeURIComponent(feature.properties.id)}`,
-    open_label: "Open full cable module",
-  }) as unknown as JsonRecord), [data.opgw]);
+  const linkedAssetData = useOpgwCableLinkedAssetData(data.opgw);
+  const rows = useMemo(() => data.opgw.map((feature) => {
+    const linked = linkedAssetData.summaries.get(feature.properties.id) || emptyLinkedAssetSummary;
+    const linkedAssetFingerprint = [
+      feature.properties.id,
+      feature.properties.cableName,
+      `${linked.spans} spans`,
+      `${linked.strands} strands`,
+      `${linked.spliceRows} splice rows`,
+      `${linked.patchPanels} patch panels`,
+      `${linked.assignments} assignments`,
+      `${linked.services} services`,
+      `${linked.devices} devices`,
+      ...linked.deviceSample,
+      ...linked.serviceSample,
+    ].filter(Boolean).join(" | ");
+    return {
+      ...feature.properties,
+      structureCount: feature.properties.structureIds.length,
+      spanCount: linked.spans,
+      strandCount: linked.strands,
+      assignedStrands: linked.assignedStrands,
+      availableStrands: linked.availableStrands,
+      reservedStrands: linked.reservedStrands,
+      spliceClosureCount: linked.spliceClosures || feature.properties.connectedSpliceClosureIds.length,
+      spliceRowCount: linked.spliceRows,
+      patchPanelCount: linked.patchPanels,
+      assignmentCount: linked.assignments,
+      serviceCount: linked.services,
+      linkedDeviceCount: linked.devices,
+      linkedDevices: linked.deviceSample.join(", ") || "-",
+      linkedDeviceRoles: linked.deviceRoleSample.join(", ") || "-",
+      linkedAssetFingerprint,
+      cable_module_view: `/opgw/cables/${encodeURIComponent(feature.properties.id)}`,
+      continuity_view: `/fiber-trace?cable=${encodeURIComponent(feature.properties.id)}`,
+      fiber_trace_view: `/fiber-trace?cable=${encodeURIComponent(feature.properties.id)}`,
+      map_view: `/dashboard?drawer=layers&cable=${encodeURIComponent(feature.properties.id)}`,
+      open_href: `/opgw/cables/${encodeURIComponent(feature.properties.id)}`,
+      open_label: "Open full cable module",
+    } as unknown as JsonRecord;
+  }), [data.opgw, linkedAssetData.summaries]);
   return (
     <SyntheticPage title="OPGW Cables" subtitle="Synthetic OPGW planning cables randomly assigned to public transmission lines." error={data.error}>
       {data.loading ? <div className="panel panel-body">Loading OPGW cable index...</div> : (
         <>
-          <OpgwCableModuleSection rows={rows} />
-          <DataTable rows={rows} columns={["cableName", "lineId", "status", "fiberCount", "routeMiles", "structureCount", "spliceClosureCount", "cable_module_view", "fiber_trace_view", "map_view", "source"]} filterField="status" />
+          <OpgwCableModuleSection rows={rows} linkedLoading={linkedAssetData.loading} linkedError={linkedAssetData.error} />
+          <DataTable rows={rows} columns={["cableName", "id", "lineId", "status", "fiberCount", "routeMiles", "structureCount", "spanCount", "strandCount", "linkedDeviceCount", "linkedAssetFingerprint", "cable_module_view", "continuity_view", "map_view", "source"]} filterField="status" />
         </>
       )}
     </SyntheticPage>
   );
 }
 
-function OpgwCableModuleSection({ rows }: { rows: JsonRecord[] }) {
+function OpgwCableModuleSection({ rows, linkedLoading, linkedError }: { rows: JsonRecord[]; linkedLoading: boolean; linkedError: string }) {
   const featured = rows
     .slice()
     .sort((a, b) => String(a.id || "").localeCompare(String(b.id || ""), undefined, { numeric: true }))
     .slice(0, 8);
   const totalMiles = rows.reduce((sum, row) => sum + Number(row.routeMiles || 0), 0);
   const totalFibers = rows.reduce((sum, row) => sum + Number(row.fiberCount || 0), 0);
+  const totalStrands = rows.reduce((sum, row) => sum + Number(row.strandCount || 0), 0);
+  const totalSpans = rows.reduce((sum, row) => sum + Number(row.spanCount || 0), 0);
+  const totalDevices = rows.reduce((sum, row) => sum + Number(row.linkedDeviceCount || 0), 0);
   return (
     <section className="panel opgw-cable-module-section">
       <div className="panel-header">
         <div>
           <strong>OPGW Cable Detail Modules</strong>
-          <div className="subtle">Open a cable module to review cable metadata, strands, structures, splices, patch panels, assignments, and services carried on that cable.</div>
+          <div className="subtle">Open a cable module to review cable metadata plus linked spans, strands, splice rows, patch panels, assignments, services, and endpoint devices derived from the cable ID/name.</div>
         </div>
       </div>
+      {linkedLoading ? <div className="panel-body subtle">Loading linked asset identifiers for strands, splices, services, and devices...</div> : null}
+      {linkedError ? <div className="badge red">{linkedError}</div> : null}
       <div className="opgw-cable-module-metrics">
         <Metric label="Cable modules" value={rows.length.toLocaleString()} detail="Full detail views available" />
         <Metric label="Synthetic route miles" value={totalMiles.toFixed(1)} detail="Planning/demo OPGW mileage" />
         <Metric label="Fiber capacity sum" value={totalFibers.toLocaleString()} detail="Aggregate synthetic fiber count" />
+        <Metric label="Linked strands" value={totalStrands.toLocaleString()} detail="Existing strand rows keyed by cable ID" />
+        <Metric label="Structure spans" value={totalSpans.toLocaleString()} detail="Synthetic span count from cable structures" />
+        <Metric label="Linked devices" value={totalDevices.toLocaleString()} detail="Device nodes matched through carried services" />
       </div>
       <div className="opgw-cable-module-grid">
         {featured.map((row) => (
@@ -103,11 +223,20 @@ function OpgwCableModuleSection({ rows }: { rows: JsonRecord[] }) {
               <div><dt>Fiber</dt><dd>{String(row.fiberCount)}F</dd></div>
               <div><dt>Miles</dt><dd>{Number(row.routeMiles || 0).toFixed(2)}</dd></div>
               <div><dt>Structures</dt><dd>{String(row.structureCount || 0)}</dd></div>
-              <div><dt>Splices</dt><dd>{String(row.spliceClosureCount || 0)}</dd></div>
+              <div><dt>Spans</dt><dd>{String(row.spanCount || 0)}</dd></div>
+              <div><dt>Strands</dt><dd>{String(row.strandCount || 0)}</dd></div>
+              <div><dt>Splices</dt><dd>{String(row.spliceRowCount || row.spliceClosureCount || 0)}</dd></div>
+              <div><dt>Devices</dt><dd>{String(row.linkedDeviceCount || 0)}</dd></div>
             </dl>
+            <div className="subtle">
+              <strong>Linked assets:</strong> {String(row.linkedAssetFingerprint || row.id)}
+            </div>
+            <div className="subtle">
+              <strong>Device IDs:</strong> {String(row.linkedDevices || "-")}
+            </div>
             <div className="opgw-cable-module-actions">
               <Link href={String(row.cable_module_view)}>Open Full Details</Link>
-              <Link href={String(row.fiber_trace_view)}>Fiber Trace</Link>
+              <Link href={String(row.continuity_view || row.fiber_trace_view)}>Full Continuity</Link>
               <Link href={String(row.map_view)}>Map View</Link>
             </div>
           </article>
@@ -276,6 +405,162 @@ function useOpgwCableData() {
     };
   }, []);
   return data;
+}
+
+function useOpgwCableLinkedAssetData(opgw: OpgwCableCollection["features"]): OpgwCableLinkedAssetData {
+  const [data, setData] = useState<OpgwCableLinkedAssetData>({ summaries: new Map(), loading: false, error: "" });
+  useEffect(() => {
+    if (!opgw.length) {
+      setData({ summaries: new Map(), loading: false, error: "" });
+      return;
+    }
+    let cancelled = false;
+    async function load() {
+      setData((current) => ({ ...current, loading: true, error: "" }));
+      try {
+        const [strands, splices, assignments, panels, services, hardware] = await Promise.all([
+          fetchJson<FiberStrand[]>("/data/iso-ne-synthetic-fiber-strands.json"),
+          fetchJson<FiberSplice[]>("/data/iso-ne-synthetic-fiber-splices.json"),
+          fetchJson<FiberAssignment[]>("/data/iso-ne-synthetic-fiber-assignments.json"),
+          fetchJson<PatchPanel[]>("/data/iso-ne-synthetic-patch-panels.json"),
+          fetchJson<SyntheticService[]>("/data/iso-ne-synthetic-services.json"),
+          fetchJson<SyntheticTelecomHardware>("/data/iso-ne-synthetic-telecom-hardware.json").catch(() => ({ nodes: [] })),
+        ]);
+        if (cancelled) return;
+        setData({ summaries: buildOpgwCableLinkedAssetSummaries(opgw, { strands, splices, assignments, panels, services, hardware }), loading: false, error: "" });
+      } catch (error) {
+        if (!cancelled) setData({ summaries: new Map(), loading: false, error: error instanceof Error ? error.message : "Could not load linked cable assets." });
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [opgw]);
+  return data;
+}
+
+function buildOpgwCableLinkedAssetSummaries(
+  opgw: OpgwCableCollection["features"],
+  data: {
+    strands: FiberStrand[];
+    splices: FiberSplice[];
+    assignments: FiberAssignment[];
+    panels: PatchPanel[];
+    services: SyntheticService[];
+    hardware: SyntheticTelecomHardware;
+  },
+) {
+  const summaries = new Map<string, OpgwCableLinkedAssets>();
+  const closureToCableIds = new Map<string, Set<string>>();
+  opgw.forEach((feature) => {
+    const cableId = feature.properties.id;
+    summaries.set(cableId, {
+      ...createEmptyLinkedAssetSummary(),
+      spans: Math.max(0, feature.properties.structureIds.length - 1),
+      spliceClosures: feature.properties.connectedSpliceClosureIds.length,
+      spliceSample: feature.properties.connectedSpliceClosureIds.slice(0, 3),
+    });
+    feature.properties.connectedSpliceClosureIds.forEach((closureId) => addSetValue(closureToCableIds, closureId, cableId));
+  });
+
+  data.strands.forEach((strand) => {
+    const summary = summaries.get(strand.cableId);
+    if (!summary) return;
+    summary.strands += 1;
+    if (strand.status === "assigned") summary.assignedStrands += 1;
+    if (strand.status === "reserved") summary.reservedStrands += 1;
+    if (strand.status === "available" || strand.status === "dark" || strand.status === "spare") summary.availableStrands += 1;
+    pushSample(summary.strandSample, strand.id);
+  });
+
+  data.splices.forEach((splice) => {
+    const cableIds = new Set<string>([splice.fromCableId, splice.toCableId]);
+    closureToCableIds.get(splice.spliceClosureId)?.forEach((cableId) => cableIds.add(cableId));
+    cableIds.forEach((cableId) => {
+      const summary = summaries.get(cableId);
+      if (!summary) return;
+      summary.spliceRows += 1;
+      pushSample(summary.spliceSample, splice.id);
+    });
+  });
+
+  data.panels.forEach((panel) => {
+    panel.fiberCableIds.forEach((cableId) => {
+      const summary = summaries.get(cableId);
+      if (!summary) return;
+      summary.patchPanels += 1;
+      pushSample(summary.patchPanelSample, panel.id);
+    });
+  });
+
+  data.assignments.forEach((assignment) => {
+    const cableIds = new Set<string>([
+      ...assignment.cableIds,
+      ...assignment.strandSegments.map((segment) => segment.cableId),
+    ]);
+    cableIds.forEach((cableId) => {
+      const summary = summaries.get(cableId);
+      if (!summary) return;
+      summary.assignments += 1;
+      pushSample(summary.assignmentSample, assignment.id);
+    });
+  });
+
+  const serviceIdsByCable = new Map<string, Set<string>>();
+  const serviceToCableIds = new Map<string, Set<string>>();
+  data.services.forEach((service) => {
+    const cableIds = new Set((service.continuityCableIds || []).filter((cableId) => summaries.has(cableId)));
+    cableIds.forEach((cableId) => {
+      const summary = summaries.get(cableId);
+      if (!summary) return;
+      summary.services += 1;
+      pushSample(summary.serviceSample, service.serviceId);
+      addSetValue(serviceIdsByCable, cableId, service.serviceId);
+      addSetValue(serviceToCableIds, service.serviceId, cableId);
+    });
+    service.telecomNodeIds?.forEach((nodeId) => {
+      cableIds.forEach((cableId) => addDeviceToSummary(summaries.get(cableId), nodeId));
+    });
+  });
+
+  (data.hardware.nodes || []).forEach((node) => {
+    const cableIds = new Set<string>();
+    node.serviceIds?.forEach((serviceId) => serviceToCableIds.get(serviceId)?.forEach((cableId) => cableIds.add(cableId)));
+    cableIds.forEach((cableId) => {
+      const summary = summaries.get(cableId);
+      addDeviceToSummary(summary, node.nodeId, node.deviceRole);
+    });
+  });
+
+  serviceIdsByCable.forEach((serviceIds, cableId) => {
+    const summary = summaries.get(cableId);
+    if (!summary) return;
+    summary.services = serviceIds.size;
+  });
+
+  return summaries;
+}
+
+function addDeviceToSummary(summary: OpgwCableLinkedAssets | undefined, nodeId: string | undefined, role?: string) {
+  if (!summary || !nodeId || summary.deviceSample.includes(nodeId)) return;
+  summary.devices += 1;
+  pushSample(summary.deviceSample, nodeId);
+  if (role) pushSample(summary.deviceRoleSample, role);
+}
+
+function addSetValue<K, V>(map: Map<K, Set<V>>, key: K, value: V) {
+  let current = map.get(key);
+  if (!current) {
+    current = new Set<V>();
+    map.set(key, current);
+  }
+  current.add(value);
+}
+
+function pushSample(values: string[], value: string | undefined, maxItems = 4) {
+  if (!value || values.includes(value) || values.length >= maxItems) return;
+  values.push(value);
 }
 
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {

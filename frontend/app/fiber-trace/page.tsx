@@ -20,6 +20,10 @@ type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+const MAX_RENDERED_TRACE_PATHS = 12;
+const MAX_RENDERED_TRACE_SERVICES = 36;
+const MAX_RENDERED_TRACE_SEGMENTS = 90;
+
 export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams;
   const splicePointId = firstQueryValue(params?.splicePoint);
@@ -392,6 +396,10 @@ function OpgwFiberTraceView({
   managerHref?: string;
 }) {
   const firstPath = paths[0];
+  const displayedPaths = paths.slice(0, MAX_RENDERED_TRACE_PATHS);
+  const hiddenPathCount = Math.max(0, paths.length - displayedPaths.length);
+  const displayedServices = services.slice(0, MAX_RENDERED_TRACE_SERVICES);
+  const hiddenServiceCount = Math.max(0, services.length - displayedServices.length);
   return (
     <main className="splice-manager-page">
       <header className="splice-manager-hero">
@@ -422,14 +430,15 @@ function OpgwFiberTraceView({
           <section className="splice-manager-panel">
             <div className="splice-manager-panel-title"><strong>Ordered Continuity Paths</strong></div>
             <div className="continuity-list">
-              {paths.length ? paths.map((path) => <ContinuityPathCard path={path} key={path.continuityPathId} />) : <p className="subtle">No synthetic continuity paths are associated with this selection.</p>}
+              {displayedPaths.length ? displayedPaths.map((path) => <ContinuityPathCard path={path} key={path.continuityPathId} />) : <p className="subtle">No synthetic continuity paths are associated with this selection.</p>}
+              {hiddenPathCount ? <p className="subtle">Showing {displayedPaths.length} of {paths.length} matched paths to keep the trace view responsive. The summary totals still include the full trace result.</p> : null}
             </div>
           </section>
 
           <section className="splice-manager-panel">
             <div className="splice-manager-panel-title"><strong>Services Carried</strong></div>
             <div className="service-carried-list">
-              {services.length ? services.map((service) => (
+              {displayedServices.length ? displayedServices.map((service) => (
                 <article key={service.serviceId}>
                   <strong>{service.serviceId}</strong>
                   <span>{service.serviceName}</span>
@@ -441,6 +450,7 @@ function OpgwFiberTraceView({
                   </div>
                 </article>
               )) : <p className="subtle">No synthetic services are attached to this trace input. Cable, splice, and strand context is still shown for planning review.</p>}
+              {hiddenServiceCount ? <p className="subtle">Showing {displayedServices.length} of {services.length} carried services. Use the continuity API for the full machine-readable result.</p> : null}
             </div>
           </section>
         </div>
@@ -467,6 +477,8 @@ function OpgwFiberTraceView({
 }
 
 function ContinuityPathCard({ path }: { path: FiberContinuityPath }) {
+  const displayedSegments = path.segments.slice(0, MAX_RENDERED_TRACE_SEGMENTS);
+  const hiddenSegmentCount = Math.max(0, path.segments.length - displayedSegments.length);
   return (
     <article className={`continuity-card ${path.pathStatus}`}>
       <div>
@@ -482,13 +494,20 @@ function ContinuityPathCard({ path }: { path: FiberContinuityPath }) {
         <div><dt>Loss</dt><dd>{path.totalEstimatedLossDb.toFixed(2)} dB</dd></div>
       </dl>
       <ol>
-        {path.segments.map((segment) => (
+        {displayedSegments.map((segment) => (
           <li key={segment.pathSegmentId}>
             <span>{segment.sequenceNumber}</span>
             <strong>{segment.objectType.replaceAll("_", " ")}</strong>
             <em>{segment.objectId}</em>
           </li>
         ))}
+        {hiddenSegmentCount ? (
+          <li>
+            <span>...</span>
+            <strong>{hiddenSegmentCount} additional trace segments omitted from the rendered list</strong>
+            <em>Summary counters above include the full synthetic path.</em>
+          </li>
+        ) : null}
       </ol>
       {path.warningSummary.length ? (
         <div className="splice-warning-list">
