@@ -123,11 +123,11 @@ export function FiberStrandTablePage() {
     const continuityRecord = findStrandContinuityRecord(strand, data.strandContinuity);
     return {
       ...strand,
-      continuity_id: continuityRecord?.strandContinuityId || "-",
-      continuity_view: continuityRecord ? strandContinuityDashboardHref(continuityRecord) : "No continuity record",
+      continuity_source: continuityRecord ? "Derived from linked cable, splice, assignment, and service data" : "No linked assignment/splice path",
+      derived_continuity_view: continuityRecord ? strandContinuityDashboardHref(continuityRecord) : "No linked path",
     } as unknown as JsonRecord;
   });
-  return <SyntheticPage title="Fiber Strand Table" subtitle="One synthetic strand record per generated OPGW fiber. Use View to isolate its cable, structures, splices, patch panels, assignment, service, and end-device links on the dashboard." error={data.error}><DataTable rows={rows} columns={["cableId", "strandNumber", "tubeNumber", "colorCode", "status", "assignmentId", "circuitId", "continuity_id", "continuity_view"]} filterField="status" /></SyntheticPage>;
+  return <SyntheticPage title="Fiber Strand Table" subtitle="One synthetic strand record per generated OPGW fiber. Use the derived continuity view to isolate its existing cable, structures, splices, patch panels, assignment, service, and end-device links on the dashboard." error={data.error}><DataTable rows={rows} columns={["cableId", "strandNumber", "tubeNumber", "colorCode", "status", "assignmentId", "circuitId", "continuity_source", "derived_continuity_view"]} filterField="status" /></SyntheticPage>;
 }
 
 export function SplicePointsPage() {
@@ -161,12 +161,12 @@ export function StrandContinuityPage() {
   }) as unknown as JsonRecord);
   const panelIds = new Set(data.strandContinuity.flatMap((record) => [record.aEndPatchPanelId, record.zEndPatchPanelId].filter(Boolean)));
   return (
-    <SyntheticPage title="Strand Continuity" subtitle="Synthetic end-to-end strand paths from substation patch panels through splices, fiber assets, services, and terminal devices. Dashboard strand views isolate the map to the strand continuity layer." error={data.error}>
+    <SyntheticPage title="Derived Strand Continuity" subtitle="Read-only strand views assembled from existing fiber strands, OPGW cables, splice closures, fiber splices, patch panels, assignments, services, and endpoint references. This does not create a separate continuity database object." error={data.error}>
       <section className="metric-grid" aria-label="Strand continuity metrics">
-        <Metric label="Continuity paths" value={data.strandContinuity.length.toLocaleString()} detail="Generated strand-level demos" />
+        <Metric label="Derived views" value={data.strandContinuity.length.toLocaleString()} detail="Resolved from linked strand data" />
         <Metric label="Patch panels" value={panelIds.size.toLocaleString()} detail="A/Z panel terminations" />
-        <Metric label="Splice records" value={data.strandContinuity.reduce((sum, record) => sum + record.fiberSpliceIds.length, 0).toLocaleString()} detail="Synthetic strand continuity records" />
-        <Metric label="Splice references" value={data.strandContinuity.reduce((sum, record) => sum + record.spliceClosureIds.length, 0).toLocaleString()} detail="Diverse splice path hops" />
+        <Metric label="Fiber splices" value={data.strandContinuity.reduce((sum, record) => sum + record.fiberSpliceIds.length, 0).toLocaleString()} detail="Existing linked splice rows" />
+        <Metric label="Splice closures" value={data.strandContinuity.reduce((sum, record) => sum + record.spliceClosureIds.length, 0).toLocaleString()} detail="Linked splice path hops" />
       </section>
       <section className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-header">
@@ -174,20 +174,20 @@ export function StrandContinuityPage() {
           <span className="badge active">isolated layer mode</span>
         </div>
         <div className="panel-body">
-          <p className="subtle">Open any row on the map to turn off unrelated layers, highlight the strand assignment, and show the cable, structure, splice, patch-panel, service, and end-device database links.</p>
+          <p className="subtle">Open any row on the map to turn off unrelated layers, highlight the selected strand assignment, and show the cable, structure, splice, patch-panel, service, and end-device links that already exist in the database.</p>
           <div className="strand-continuity-card-grid">
             {data.strandContinuity.slice(0, 12).map((record) => (
               <article className="strand-continuity-card" key={record.id}>
                 <strong>{record.continuityName}</strong>
                 <span>{record.serviceType} / {record.strandNumbers.join(", ")} strands / {record.estimatedLossDb.toFixed(2)} dB</span>
                 <small>{record.aEndPatchPanelId || "A-end panel"} to {record.zEndPatchPanelId || "Z-end panel"}</small>
-                <Link href={strandContinuityDashboardHref(record)}>Open Strand View</Link>
+                <Link href={strandContinuityDashboardHref(record)}>Open Derived Strand View</Link>
               </article>
             ))}
           </div>
         </div>
       </section>
-      <DataTable rows={rows} columns={["strandContinuityId", "continuityName", "serviceType", "status", "strand_set", "aEndPatchPanelId", "zEndPatchPanelId", "cable_count", "splice_closure_count", "segment_count", "routeMiles", "estimatedLossDb", "map_view"]} filterField="serviceType" />
+      <DataTable rows={rows} columns={["continuityName", "assignmentId", "serviceId", "circuitId", "serviceType", "status", "strand_set", "aEndPatchPanelId", "zEndPatchPanelId", "cable_count", "splice_closure_count", "segment_count", "routeMiles", "estimatedLossDb", "map_view"]} filterField="serviceType" />
     </SyntheticPage>
   );
 }

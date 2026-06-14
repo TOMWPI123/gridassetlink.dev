@@ -171,6 +171,7 @@ type DashboardLayerSummary = {
 type DashboardContinuitySummary = {
   label: string;
   strandContinuityId?: string;
+  sourceNote: string;
   strandNumbers: number[];
   strandIds: string[];
   filterLabel: string;
@@ -2898,8 +2899,11 @@ export function DashboardPage() {
       if (spliceClosureIds.has(point.properties.closureId || "")) splicePointIds.add(point.properties.splicePointId);
     });
     const strandLabel = strand ? `strand ${strand.strandNumber}` : record.strandNumbers.length ? `strands ${record.strandNumbers.join(", ")}` : "strand path";
+    const continuityLabel = strand
+      ? `${strand.id} / ${strand.cableId} ${strandLabel}`
+      : `${record.assignmentId || record.serviceId || record.id} / ${Array.from(cableIds).join(", ") || "linked cables"} ${strandLabel}`;
     return {
-      label: `${record.strandContinuityId || record.id} / ${strandLabel}`,
+      label: continuityLabel,
       strandContinuityId: record.id,
       serviceId: record.serviceId,
       assignmentIds: uniqueStrings([record.assignmentId]),
@@ -2945,7 +2949,7 @@ export function DashboardPage() {
     setVisibilityFilter("synthetic-demo");
     setRightMode("summary");
     setRightCollapsed(false);
-    showToast(`Strand View isolated for ${record.strandContinuityId || record.id} with linked cable, structure, splice, service, and end-device records.`);
+    showToast(`Strand View isolated for ${highlight.label} using linked cable, structure, splice, service, and end-device records.`);
     return true;
   }
 
@@ -4004,7 +4008,7 @@ function ContinuitySummaryPanel({ summary }: { summary: DashboardContinuitySumma
       <div className="dashboard-continuity-service">
         <strong>{summary.primaryServiceName}</strong>
         <span>{summary.endpointA} to {summary.endpointZ}</span>
-        {summary.strandContinuityId ? <span>{summary.strandContinuityId} / strand {summary.strandNumbers.join(", ") || "path"}</span> : null}
+        <span>{summary.sourceNote}</span>
         {summary.strandIds.length ? <span>Fiber strand ID: {summary.strandIds.join(", ")}</span> : null}
       </div>
       <div className="dashboard-continuity-metrics">
@@ -4044,7 +4048,7 @@ function ContinuitySummaryPanel({ summary }: { summary: DashboardContinuitySumma
       ) : null}
       {summary.continuitySegmentRows.length ? (
         <div className="dashboard-continuity-segments">
-          <strong>Ordered strand continuity</strong>
+          <strong>Derived database path</strong>
           <ol>
             {summary.continuitySegmentRows.map((segment) => (
               <li key={`${segment.sequenceNumber}-${segment.href}`}>
@@ -4459,30 +4463,86 @@ function buildDashboardContinuitySummary({
       })),
     },
   ].map((group) => ({ ...group, links: compactContinuityLinks(group.links) })).filter((group) => group.links.length);
-  const continuitySegmentRows = (strandContinuityRecord?.continuitySegments || [])
-    .filter((segment) => {
-      if (!selectedStrandNumberSet.size) return true;
-      if (segment.objectType !== "fiber_splice" && segment.objectType !== "strand") return true;
-      if (!segment.strandNumbers?.length) return true;
-      return segment.strandNumbers.some((strandNumber) => selectedStrandNumberSet.has(strandNumber));
-    })
-    .map((segment) => {
-      const segmentStrandNumbers = segment.strandNumbers?.filter((strandNumber) => !selectedStrandNumberSet.size || selectedStrandNumberSet.has(strandNumber));
-      const segmentStrandIds = segmentStrandNumbers
-        ?.flatMap((strandNumber) => selectedFiberStrands.filter((fiberStrand) => fiberStrand.strandNumber === strandNumber).map((fiberStrand) => fiberStrand.id));
+  const continuitySegmentSources: Omit<DashboardContinuitySegmentRow, "sequenceNumber">[] = [
+    ...selectedPatchPanelIds.map((panelId) => {
+      const panel = patchPanels.find((item) => item.id === panelId);
       return {
-        sequenceNumber: segment.sequenceNumber,
-        objectType: segment.objectType.replaceAll("_", " "),
-        label: segment.label,
-        href: continuityObjectHref(segment.objectType, segment.objectId),
-        detail: uniqueStrings([
-          segment.cableId,
-          segmentStrandNumbers?.length ? `strand ${segmentStrandNumbers.join(", ")}` : undefined,
-          segmentStrandIds?.length ? `fiber strand ID ${segmentStrandIds.join(", ")}` : undefined,
-          segment.lossDb !== undefined ? `${segment.lossDb.toFixed(3)} dB` : undefined,
-        ]).join(" / "),
+        objectType: "patch panel",
+        label: panel?.name || panelId,
+        href: `/patch-panels/${encodeURIComponent(panelId)}`,
+        detail: panel ? `${panel.locationType} ${panel.locationId} / ${panel.portCount} ports` : "linked patch panel record",
       };
-    });
+    }),
+    ...selectedFiberStrands.map((fiberStrand) => ({
+      objectType: "fiber strand",
+      label: fiberStrand.id,
+      href: `/fiber-strands?search=${encodeURIComponent(fiberStrand.id)}`,
+      detail: `${fiberStrand.cableId} / strand ${fiberStrand.strandNumber} / ${fiberStrand.status}`,
+    })),
+    ...selectedCables.map((cable) => ({
+      objectType: "OPGW cable",
+      label: cable.properties.cableName,
+      href: `/opgw/cables/${encodeURIComponent(cable.properties.id)}`,
+      detail: `${cable.properties.fiberCount}F / ${cable.properties.routeMiles.toFixed(2)} mi / ${cable.properties.status}`,
+    })),
+    ...selectedStructures.map((structure) => ({
+      objectType: "transmission structure",
+      label: structure.properties.structureNumber,
+      href: `/transmission-structures?search=${encodeURIComponent(structure.properties.structureNumber)}`,
+      detail: `${structure.properties.structureType} / ${structure.properties.lineId}`,
+    })),
+    ...selectedSpliceClosureIds.map((closureId) => {
+      const closure = spliceClosures.find((feature) => feature.properties.id === closureId)?.properties;
+      return {
+        objectType: "splice closure",
+        label: closure?.name || closureId,
+        href: `/splice-closures/${encodeURIComponent(closureId)}`,
+        detail: closure ? `${closure.closureType} / ${closure.structureNumber} / ${closure.status}` : "linked splice closure record",
+      };
+    }),
+    ...selectedFiberSpliceIds.map((spliceId) => {
+      const splice = fiberSplices.find((item) => item.id === spliceId);
+      return {
+        objectType: "fiber splice",
+        label: spliceId,
+        href: `/splice-matrix?search=${encodeURIComponent(spliceId)}`,
+        detail: splice
+          ? `${splice.fromCableId}:${splice.fromStrandNumber} to ${splice.toCableId}:${splice.toStrandNumber} / ${splice.spliceType} / ${splice.lossDb?.toFixed(3) || "0.000"} dB`
+          : "linked fiber splice record",
+      };
+    }),
+    ...selectedAssignments.map((assignmentId) => {
+      const assignment = fiberAssignments.find((item) => item.id === assignmentId);
+      return {
+        objectType: "fiber assignment",
+        label: assignment?.assignmentName || assignmentId,
+        href: `/fiber-assignments?search=${encodeURIComponent(assignmentId)}`,
+        detail: assignment ? `${assignment.serviceType} / ${assignment.status}` : "linked assignment record",
+      };
+    }),
+    ...(displayServices.length ? displayServices : matchedServices).map((service) => ({
+      objectType: "service",
+      label: `${service.serviceId} / ${service.serviceName}`,
+      href: `/circuits?search=${encodeURIComponent(service.serviceId)}`,
+      detail: `${service.serviceType} / ${service.operationalStatus} / ${service.fromSiteName} to ${service.toSiteName}`,
+    })),
+    ...selectedDeviceIds.map((deviceId) => ({
+      objectType: "terminal device",
+      label: strandContinuityRecord?.terminatedDeviceId === deviceId ? strandContinuityRecord.terminatedDeviceName || deviceId : deviceId,
+      href: `/devices?search=${encodeURIComponent(deviceId)}`,
+      detail: "linked endpoint reference from assigned service",
+    })),
+    ...selectedDevicePortIds.map((portId) => ({
+      objectType: "device port",
+      label: strandContinuityRecord?.terminatedDevicePortId === portId ? strandContinuityRecord.terminatedDevicePortName || portId : portId,
+      href: `/device-ports?search=${encodeURIComponent(portId)}`,
+      detail: "linked endpoint port reference from assigned service",
+    })),
+  ];
+  const continuitySegmentRows = continuitySegmentSources.map((segment, index) => ({
+    sequenceNumber: index + 1,
+    ...segment,
+  }));
   const traceHref = continuityHighlight.serviceId
     ? `/fiber-trace?service=${encodeURIComponent(continuityHighlight.serviceId)}`
     : strandContinuityRecord?.serviceId
@@ -4493,8 +4553,11 @@ function buildDashboardContinuitySummary({
         ? `/fiber-trace?splicePoint=${encodeURIComponent(selectedSplicePointId)}`
         : `/fiber-trace`;
   return {
-    label: continuityHighlight.label,
+    label: selectedFiberStrandIds.length
+      ? `Existing fiber strand continuity for ${selectedFiberStrandIds.slice(0, 3).join(", ")}${selectedFiberStrandIds.length > 3 ? ` + ${selectedFiberStrandIds.length - 3} more` : ""}`
+      : continuityHighlight.label,
     strandContinuityId: strandContinuityRecord?.strandContinuityId || continuityHighlight.strandContinuityId,
+    sourceNote: "Derived view only. No new continuity database object is created.",
     strandNumbers: displayedStrandNumbers,
     strandIds: selectedFiberStrandIds,
     filterLabel: searchLayerLabel(filterContext.searchLayerFilter),
@@ -4522,7 +4585,7 @@ function buildDashboardContinuitySummary({
     totalStructures: selectedStructures.length,
     databaseLinkGroups,
     continuitySegmentRows,
-    layerIsolationLabel: "Only Strand Continuity is enabled in the layer display; linked records render as strand context.",
+    layerIsolationLabel: "Only the selected strand path is enabled; the summary is derived from existing database objects.",
   };
 }
 
@@ -5790,7 +5853,7 @@ function FiberStrandTable({
                     <button
                       type="button"
                       disabled={!continuityRecord}
-                      title={continuityRecord ? "View full strand continuity with linked cable, structures, splices, patch panels, service, and end device" : "No continuity record for this strand"}
+                      title={continuityRecord ? "View derived continuity from this strand's linked cable, structures, splices, patch panels, service, and end device" : "No linked assignment/splice path for this strand"}
                       onClick={(event) => {
                         event.stopPropagation();
                         if (continuityRecord) onViewContinuity(continuityRecord, strand);
@@ -7568,7 +7631,7 @@ function buildDashboardLayerSummaries({
     layer("fiberStrandsLayer", "Fiber strands", "Synthetic OPGW Fiber", fiberStrandCount, fiberStrandCount, "/fiber-strand-table", "Synthetic strand records generated from OPGW fiber counts", "Synthetic/demo strand inventory only."),
     layer("availableStrandCapacity", "Available strand capacity", "Analysis overlays", availableStrandCount, availableStrandCount, "/fiber-strand-table", "Capacity overlay calculated from synthetic strand statuses", "Capacity is demo planning data only."),
     layer("fiberAssignments", "Fiber assignments", "Planning assets", fiberAssignmentCount, fiberAssignmentCount, "/fiber-assignments", "Synthetic service-to-strand assignment model", "Synthetic/demo assignments only."),
-    layer("strandContinuity", "Strand Continuity", "Analysis overlays", strandContinuityCount, strandContinuityCount, "/strand-continuity", "Synthetic end-to-end strand paths from patch panels through splices to terminated devices", "Synthetic/demo continuity records only."),
+    layer("strandContinuity", "Strand Continuity", "Analysis overlays", strandContinuityCount, strandContinuityCount, "/strand-continuity", "Derived end-to-end strand views from existing fiber strands, cables, splices, patch panels, assignments, services, and devices", "Synthetic/demo linked asset data only. No separate continuity object is created."),
     layer("criticalRidingCircuits", "Critical riding circuits", "Analysis overlays", criticalRidingCircuitCount, criticalRidingCircuitCount, "/outage-impact", "Synthetic critical service assignments riding OPGW paths", "Fictional circuits only; not operational routing."),
     layer("opgwOutageImpact", "Outage impact", "Analysis overlays", outageImpactCount, outageImpactCount, "/outage-impact", "Synthetic outage-risk overlay from route capacity and assignment flags", "Demo impact analysis only."),
     layer("opgwOpenWorkOrders", "Open OPGW work orders", "Planning assets", openOpgwWorkOrderCount, openOpgwWorkOrderCount, "/work-orders", "Synthetic OPGW work-order indicators", "Demo work orders only."),
