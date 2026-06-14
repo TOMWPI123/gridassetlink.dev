@@ -1499,6 +1499,14 @@ type ContinuityHighlightSets = {
   cableIds: Set<string>;
   sectionIds: Set<string>;
   splicePointIds: Set<string>;
+  spliceClosureIds: Set<string>;
+  fiberSpliceIds: Set<string>;
+  patchPanelIds: Set<string>;
+  structureIds: Set<string>;
+  deviceIds: Set<string>;
+  devicePortIds: Set<string>;
+  fiberStrandIds: Set<string>;
+  strandNumbers: Set<number>;
   assignmentIds: Set<string>;
 };
 
@@ -1617,25 +1625,45 @@ function buildContinuityHighlightSets(
   const cableIds = new Set(continuityHighlight?.cableIds || []);
   const sectionIds = new Set(continuityHighlight?.sectionIds || []);
   const splicePointIds = new Set(continuityHighlight?.splicePointIds || []);
+  const spliceClosureIds = new Set(continuityHighlight?.spliceClosureIds || []);
+  const fiberSpliceIds = new Set(continuityHighlight?.fiberSpliceIds || []);
+  const patchPanelIds = new Set(continuityHighlight?.patchPanelIds || []);
+  const structureIds = new Set(continuityHighlight?.structureIds || []);
+  const deviceIds = new Set(continuityHighlight?.deviceIds || []);
+  const devicePortIds = new Set(continuityHighlight?.devicePortIds || []);
+  const fiberStrandIds = new Set(continuityHighlight?.fiberStrandIds || []);
+  const strandNumbers = new Set(continuityHighlight?.strandNumbers || []);
   const assignmentIds = new Set(continuityHighlight?.assignmentIds || []);
 
   opgwCables.forEach((cable) => {
-    if (cableIds.has(cable.properties.id)) routeIds.add(opgwRouteIdForCable(cable));
+    if (cableIds.has(cable.properties.id)) {
+      routeIds.add(opgwRouteIdForCable(cable));
+      cable.properties.structureIds.forEach((structureId) => structureIds.add(structureId));
+      cable.properties.connectedSpliceClosureIds.forEach((closureId) => spliceClosureIds.add(closureId));
+    }
   });
   opgwCableSections.forEach((section) => {
     if (sectionIds.has(section.properties.cableSectionId)) {
       routeIds.add(section.properties.opgwRouteId);
       splicePointIds.add(section.properties.fromSplicePointId);
       splicePointIds.add(section.properties.toSplicePointId);
+      structureIds.add(section.properties.fromStructureId);
+      structureIds.add(section.properties.toStructureId);
+      section.properties.associatedSpliceClosureIds.forEach((closureId) => spliceClosureIds.add(closureId));
+      section.properties.associatedPatchPanelIds.forEach((panelId) => patchPanelIds.add(panelId));
     }
     if (routeIds.has(section.properties.opgwRouteId)) {
       sectionIds.add(section.properties.cableSectionId);
       splicePointIds.add(section.properties.fromSplicePointId);
       splicePointIds.add(section.properties.toSplicePointId);
+      structureIds.add(section.properties.fromStructureId);
+      structureIds.add(section.properties.toStructureId);
+      section.properties.associatedSpliceClosureIds.forEach((closureId) => spliceClosureIds.add(closureId));
+      section.properties.associatedPatchPanelIds.forEach((panelId) => patchPanelIds.add(panelId));
     }
   });
 
-  return { routeIds, cableIds, sectionIds, splicePointIds, assignmentIds };
+  return { routeIds, cableIds, sectionIds, splicePointIds, spliceClosureIds, fiberSpliceIds, patchPanelIds, structureIds, deviceIds, devicePortIds, fiberStrandIds, strandNumbers, assignmentIds };
 }
 
 function opgwRouteIdForCable(cable: OpgwCableFeature) {
@@ -1838,22 +1866,28 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    structures: layers.transmissionStructures ? collection(transmissionStructures.map((feature) => ({
-      type: "Feature",
-      properties: {
-        kind: "transmission_structure",
-        id: feature.properties.id,
-        label: feature.properties.structureNumber,
-        structureNumber: feature.properties.structureNumber,
-        status: feature.properties.hasSplice ? "splice" : feature.properties.hasOpgw ? "opgw" : "synthetic",
-        structureType: feature.properties.structureType,
-        hasOpgw: feature.properties.hasOpgw,
-        hasSplice: feature.properties.hasSplice,
-        lineId: feature.properties.lineId,
-        synthetic: true,
-      },
-      geometry: feature.geometry,
-    }))) : emptyCollection,
+    structures: layers.transmissionStructures || layers.strandContinuity ? collection(transmissionStructures.flatMap((feature) => {
+      const isContinuityHighlight = continuitySets.structureIds.has(feature.properties.id);
+      if (layers.strandContinuity && !isContinuityHighlight) return [];
+      return [{
+        type: "Feature" as const,
+        properties: {
+          kind: "transmission_structure",
+          id: feature.properties.id,
+          label: feature.properties.structureNumber,
+          structureNumber: feature.properties.structureNumber,
+          status: feature.properties.hasSplice ? "splice" : feature.properties.hasOpgw ? "opgw" : "synthetic",
+          structureType: feature.properties.structureType,
+          hasOpgw: feature.properties.hasOpgw,
+          hasSplice: feature.properties.hasSplice,
+          lineId: feature.properties.lineId,
+          synthetic: true,
+          isContinuityHighlight,
+          continuityLabel: continuityHighlight?.label || null,
+        },
+        geometry: feature.geometry,
+      }];
+    })) : emptyCollection,
     opgwRoutes: layers.assumedOpgwRoutes || layers.opgwRoutes || layers.opgwOutageImpact || layers.strandContinuity ? collection(opgwRoutes.flatMap((feature) => {
       const isContinuityHighlight = continuitySets.routeIds.has(feature.properties.opgwRouteId);
       if (layers.strandContinuity && !isContinuityHighlight) return [];
@@ -1963,7 +1997,7 @@ function buildDatasets(
     })) : emptyCollection,
     opgwSplicePoints: layers.opgwSplicePoints || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers || layers.strandContinuity ? collection(opgwSplicePoints.flatMap((feature) => {
       const metrics = spliceMetricsByPoint.get(feature.properties.splicePointId);
-      const isContinuityHighlight = continuitySets.splicePointIds.has(feature.properties.splicePointId);
+      const isContinuityHighlight = continuitySets.splicePointIds.has(feature.properties.splicePointId) || continuitySets.spliceClosureIds.has(feature.properties.closureId || "");
       if (layers.strandContinuity && !isContinuityHighlight) return [];
       const hasExisting = (metrics?.activeSyntheticServices || 0) > 0 || feature.properties.status === "synthetic_assumption" || feature.properties.status === "verified";
       const hasProposed = (metrics?.proposedSyntheticServices || 0) > 0 || feature.properties.status === "planned";
@@ -2061,7 +2095,7 @@ function buildDatasets(
     })) : emptyCollection,
     spliceClosures: layers.spliceClosures || layers.existingFiberSplices || layers.proposedFiberSplices || layers.compareSpliceLayers || layers.strandContinuity ? collection(spliceClosures.flatMap((feature) => {
       const pointId = closureToSplicePointId.get(feature.properties.id) || "";
-      const isContinuityHighlight = continuitySets.splicePointIds.has(pointId);
+      const isContinuityHighlight = continuitySets.splicePointIds.has(pointId) || continuitySets.spliceClosureIds.has(feature.properties.id);
       if (layers.strandContinuity && !isContinuityHighlight) return [];
       const metrics = spliceMetricsByPoint.get(pointId);
       const hasExisting = feature.properties.status === "existing" || (metrics?.activeSyntheticServices || 0) > 0;
@@ -2273,8 +2307,8 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    patchPanels: layers.patchPanels ? collection(patchPanels.flatMap((panel) => {
-      const isContinuityHighlight = panel.fiberCableIds.some((cableId) => continuitySets.cableIds.has(cableId));
+    patchPanels: layers.patchPanels || layers.strandContinuity ? collection(patchPanels.flatMap((panel) => {
+      const isContinuityHighlight = continuitySets.patchPanelIds.has(panel.id) || panel.fiberCableIds.some((cableId) => continuitySets.cableIds.has(cableId));
       if (layers.strandContinuity && !isContinuityHighlight) return [];
       if (panel.locationType !== "structure") return [];
       const structure = getStructureById().get(panel.locationId);
@@ -2344,9 +2378,9 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    nodes: collection(nodes.filter((node) => hasCoordinates(node) && nodeVisibleForLayers(node, layers)).map((node) => ({
+    nodes: collection(nodes.filter((node) => hasCoordinates(node) && (nodeVisibleForLayers(node, layers) || (layers.strandContinuity && continuitySets.deviceIds.has(node.id)))).map((node) => ({
       type: "Feature",
-      properties: { kind: "node", id: node.id, label: node.name, status: node.status, nodeType: node.nodeType, visibility: node.visibility },
+      properties: { kind: "node", id: node.id, label: node.name, status: node.status, nodeType: node.nodeType, visibility: node.visibility, isContinuityHighlight: continuitySets.deviceIds.has(node.id), continuityLabel: continuityHighlight?.label || null },
       geometry: { type: "Point", coordinates: [node.longitude as number, node.latitude as number] },
     }))),
     workOrders: layers.workOrderLocations ? collection(nodes.filter(hasCoordinates).flatMap((node, nodeIndex) => node.linkedWorkOrderIds.map((workOrderId, workOrderIndex) => ({

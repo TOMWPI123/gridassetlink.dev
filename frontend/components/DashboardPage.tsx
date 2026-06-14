@@ -134,6 +134,9 @@ type DashboardLayerSummary = {
 };
 type DashboardContinuitySummary = {
   label: string;
+  strandContinuityId?: string;
+  strandNumbers: number[];
+  strandIds: string[];
   filterLabel: string;
   serviceIds: string[];
   primaryServiceName: string;
@@ -142,6 +145,7 @@ type DashboardContinuitySummary = {
   pathStatus: FiberContinuityPath["pathStatus"] | "no_service";
   totalTransmissionLines: number;
   totalCableSections: number;
+  totalStructures: number;
   totalSpanSegments: number;
   totalSplicePoints: number;
   totalPatchPanels: number;
@@ -152,9 +156,31 @@ type DashboardContinuitySummary = {
   servicesCarried: number;
   warningSummary: string[];
   traceHref: string;
+  selectedCableIds: string[];
+  databaseLinkGroups: DashboardContinuityLinkGroup[];
+  continuitySegmentRows: DashboardContinuitySegmentRow[];
+  layerIsolationLabel: string;
+};
+type DashboardContinuityLink = {
+  id: string;
+  label: string;
+  href: string;
+  detail?: string;
+};
+type DashboardContinuityLinkGroup = {
+  title: string;
+  links: DashboardContinuityLink[];
+};
+type DashboardContinuitySegmentRow = {
+  sequenceNumber: number;
+  objectType: string;
+  label: string;
+  href: string;
+  detail?: string;
 };
 type StrandContinuityFocusOptions = {
   includeDevices?: boolean;
+  strand?: FiberStrand;
 };
 type CircuitRouteTarget = {
   service?: SyntheticService;
@@ -2072,11 +2098,14 @@ export function DashboardPage() {
       opgwSplicePoints: visibleOpgwSplicePoints,
       spliceClosures: visibleSpliceClosures,
       fiberSplices,
+      fiberStrands,
+      strandContinuityRecords,
+      transmissionStructures: visibleTransmissionStructures,
       fiberAssignments: visibleFiberAssignments,
       patchPanels: visiblePatchPanels,
       filterContext: { searchLayerFilter },
     }),
-    [continuityHighlight, fiberSplices, searchLayerFilter, syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSpliceClosures],
+    [continuityHighlight, fiberSplices, fiberStrands, searchLayerFilter, strandContinuityRecords, syntheticServices, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visiblePatchPanels, visibleSpliceClosures, visibleTransmissionStructures],
   );
   const ownerOptions = useMemo(
     () => buildOwnerOptions(visiblePublicSubstations, visiblePublicTransmissionLines, visibleFccUtilityTowers, visibleFccMicrowaveLinks),
@@ -2788,30 +2817,76 @@ export function DashboardPage() {
     };
   }
 
-  function buildContinuityHighlightForStrandRecord(record: StrandContinuityRecord): ContinuityHighlight {
+  function buildContinuityHighlightForStrandRecord(record: StrandContinuityRecord, strand?: FiberStrand): ContinuityHighlight {
     const cableIds = new Set(record.cableIds);
     const routeIds = routeIdsForCableIds(cableIds);
     const sections = visibleOpgwCableSections.filter((section) => routeIds.has(section.properties.opgwRouteId));
     const splicePointIds = new Set(splicePointIdsFromSections(sections));
     const spliceClosureIds = new Set(record.spliceClosureIds);
+    const structureIds = new Set<string>();
+    const patchPanelIds = new Set(uniqueStrings([record.aEndPatchPanelId, record.zEndPatchPanelId]));
+    const deviceIds = new Set(uniqueStrings([record.terminatedDeviceId]));
+    const devicePortIds = new Set(uniqueStrings([record.terminatedDevicePortId]));
+    const strandNumbers = strand ? [strand.strandNumber] : record.strandNumbers;
+    const selectedStrandNumberSet = new Set(strandNumbers);
+    const fiberStrandIds = new Set<string>();
+    const selectedStrandToken = strand ? String(strand.strandNumber).padStart(3, "0") : "";
+    const fiberSpliceIds = new Set(strand
+      ? record.fiberSpliceIds.filter((spliceId) => spliceId.includes(`-${selectedStrandToken}-`) || spliceId.includes(`:${strand.strandNumber}`))
+      : record.fiberSpliceIds
+    );
+    fiberStrands.forEach((fiberStrand) => {
+      if (cableIds.has(fiberStrand.cableId) && selectedStrandNumberSet.has(fiberStrand.strandNumber)) fiberStrandIds.add(fiberStrand.id);
+    });
+    if (strand) fiberStrandIds.add(strand.id);
+    visibleOpgwCables.forEach((cable) => {
+      if (!cableIds.has(cable.properties.id)) return;
+      cable.properties.structureIds.forEach((structureId) => structureIds.add(structureId));
+      cable.properties.connectedSpliceClosureIds.forEach((closureId) => spliceClosureIds.add(closureId));
+    });
+    sections.forEach((section) => {
+      structureIds.add(section.properties.fromStructureId);
+      structureIds.add(section.properties.toStructureId);
+      section.properties.associatedSpliceClosureIds.forEach((closureId) => spliceClosureIds.add(closureId));
+      section.properties.associatedPatchPanelIds.forEach((panelId) => patchPanelIds.add(panelId));
+    });
+    record.continuitySegments.forEach((segment) => {
+      if (segment.objectType === "patch_panel") patchPanelIds.add(segment.objectId);
+      if (segment.objectType === "patch_panel_port") devicePortIds.add(segment.objectId);
+      if (segment.objectType === "splice_closure") spliceClosureIds.add(segment.objectId);
+      if (segment.objectType === "fiber_splice" && (!strand || !segment.strandNumbers?.length || segment.strandNumbers.includes(strand.strandNumber))) fiberSpliceIds.add(segment.objectId);
+      if (segment.objectType === "telecom_device") deviceIds.add(segment.objectId);
+      if (segment.objectType === "device_port") devicePortIds.add(segment.objectId);
+    });
     visibleOpgwSplicePoints.forEach((point) => {
       if (spliceClosureIds.has(point.properties.closureId || "")) splicePointIds.add(point.properties.splicePointId);
     });
+    const strandLabel = strand ? `strand ${strand.strandNumber}` : record.strandNumbers.length ? `strands ${record.strandNumbers.join(", ")}` : "strand path";
     return {
-      label: record.strandContinuityId || record.id,
+      label: `${record.strandContinuityId || record.id} / ${strandLabel}`,
+      strandContinuityId: record.id,
       serviceId: record.serviceId,
       assignmentIds: uniqueStrings([record.assignmentId]),
       cableIds: Array.from(cableIds),
       routeIds: Array.from(routeIds),
       sectionIds: sections.map((section) => section.properties.cableSectionId),
       splicePointIds: Array.from(splicePointIds),
+      spliceClosureIds: Array.from(spliceClosureIds),
+      fiberSpliceIds: Array.from(fiberSpliceIds),
+      patchPanelIds: Array.from(patchPanelIds),
+      structureIds: Array.from(structureIds),
+      deviceIds: Array.from(deviceIds),
+      devicePortIds: Array.from(devicePortIds),
+      fiberStrandIds: Array.from(fiberStrandIds),
+      strandNumbers,
+      mapCoordinates: record.mapCoordinates,
     };
   }
 
   function focusStrandContinuityRecord(record: StrandContinuityRecord, options: StrandContinuityFocusOptions = {}) {
     if (!visibleOpgwCables.length && !visibleFiberAssignments.length) return false;
     const includeDevices = options.includeDevices ?? true;
-    const highlight = buildContinuityHighlightForStrandRecord(record);
+    const highlight = buildContinuityHighlightForStrandRecord(record, options.strand);
     const assignment = visibleFiberAssignments.find((item) => item.id === record.assignmentId);
     const cable = visibleOpgwCables.find((feature) => record.cableIds.includes(feature.properties.id));
     const section = visibleOpgwCableSections.find((feature) => highlight.sectionIds?.includes(feature.properties.cableSectionId));
@@ -2832,9 +2907,9 @@ export function DashboardPage() {
     setStreetLayers((current) => strandContinuityLayerState(current, { includeDevices }));
     setSearchLayerFilter("strandContinuity");
     setVisibilityFilter("synthetic-demo");
-    setRightMode("layers");
+    setRightMode("summary");
     setRightCollapsed(false);
-    showToast(`Strand View isolated for ${record.strandContinuityId || record.id}${includeDevices ? "" : " without device layers"}.`);
+    showToast(`Strand View isolated for ${record.strandContinuityId || record.id} with linked cable, structure, splice, service, and end-device records.`);
     return true;
   }
 
@@ -3736,7 +3811,7 @@ export function DashboardPage() {
                   opgwCables={visibleOpgwCables}
                   strandContinuityRecords={strandContinuityRecords}
                   onUpdateStrands={updateFiberStrands}
-                  onViewContinuity={(record) => focusStrandContinuityRecord(record, { includeDevices: false })}
+                  onViewContinuity={(record, strand) => focusStrandContinuityRecord(record, { includeDevices: true, strand })}
                 />
               ) : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
@@ -3890,11 +3965,14 @@ function ContinuitySummaryPanel({ summary }: { summary: DashboardContinuitySumma
       <div className="dashboard-continuity-service">
         <strong>{summary.primaryServiceName}</strong>
         <span>{summary.endpointA} to {summary.endpointZ}</span>
+        {summary.strandContinuityId ? <span>{summary.strandContinuityId} / strand {summary.strandNumbers.join(", ") || "path"}</span> : null}
+        {summary.strandIds.length ? <span>Fiber strand ID: {summary.strandIds.join(", ")}</span> : null}
       </div>
       <div className="dashboard-continuity-metrics">
         <div><span>Status</span><strong>{summary.pathStatus.replaceAll("_", " ")}</strong></div>
         <div><span>Lines</span><strong>{summary.totalTransmissionLines}</strong></div>
         <div><span>Sections</span><strong>{summary.totalCableSections}</strong></div>
+        <div><span>Structures</span><strong>{summary.totalStructures}</strong></div>
         <div><span>Spans</span><strong>{summary.totalSpanSegments}</strong></div>
         <div><span>Splices</span><strong>{summary.totalSplicePoints}</strong></div>
         <div><span>Patch panels</span><strong>{summary.totalPatchPanels}</strong></div>
@@ -3903,10 +3981,43 @@ function ContinuitySummaryPanel({ summary }: { summary: DashboardContinuitySumma
       </div>
       <div className="dashboard-continuity-tags">
         <span>Filter: {summary.filterLabel}</span>
+        <span>{summary.layerIsolationLabel}</span>
         <span>{summary.criticality}</span>
         <span>{summary.protectionLevel}</span>
         <span>{summary.layerType}</span>
       </div>
+      {summary.databaseLinkGroups.length ? (
+        <div className="dashboard-continuity-link-groups">
+          {summary.databaseLinkGroups.map((group) => (
+            <div className="dashboard-continuity-link-group" key={group.title}>
+              <strong>{group.title}</strong>
+              <div>
+                {group.links.map((link) => (
+                  <Link href={link.href} key={`${group.title}-${link.id}`}>
+                    <span>{link.label}</span>
+                    {link.detail ? <small>{link.detail}</small> : null}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {summary.continuitySegmentRows.length ? (
+        <div className="dashboard-continuity-segments">
+          <strong>Ordered strand continuity</strong>
+          <ol>
+            {summary.continuitySegmentRows.map((segment) => (
+              <li key={`${segment.sequenceNumber}-${segment.href}`}>
+                <Link href={segment.href}>
+                  <span>{segment.sequenceNumber}. {segment.label}</span>
+                  <small>{segment.objectType}{segment.detail ? ` / ${segment.detail}` : ""}</small>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
       <div className="dashboard-continuity-actions">
         <Link href={summary.traceHref}>Open full fiber trace</Link>
       </div>
@@ -3925,6 +4036,40 @@ function formatFilterOption(value: string) {
 
 function uniqueStrings(values: Array<string | undefined | null>) {
   return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function continuityObjectHref(objectType: string, objectId: string) {
+  const encoded = encodeURIComponent(objectId);
+  if (objectType === "patch_panel" || objectType === "patch_panel_port") return objectType === "patch_panel" ? `/patch-panels/${encoded}` : `/patch-panels?search=${encoded}`;
+  if (objectType === "fiber_cable") return `/opgw/cables/${encoded}`;
+  if (objectType === "strand") return `/fiber-strands?search=${encoded}`;
+  if (objectType === "splice_closure") return `/splice-closures/${encoded}`;
+  if (objectType === "fiber_splice") return `/splice-matrix?search=${encoded}`;
+  if (objectType === "telecom_device") return `/devices?search=${encoded}`;
+  if (objectType === "device_port") return `/device-ports?search=${encoded}`;
+  if (objectType === "service") return `/fiber-trace?service=${encoded}`;
+  return `/dashboard?drawer=summary&search=${encoded}`;
+}
+
+function dashboardContinuityRecordForHighlight(highlight: ContinuityHighlight, records: StrandContinuityRecord[]) {
+  return records.find((record) =>
+    record.id === highlight.strandContinuityId
+    || record.strandContinuityId === highlight.strandContinuityId
+    || record.id === highlight.label
+    || record.strandContinuityId === highlight.label
+    || (highlight.serviceId && record.serviceId === highlight.serviceId)
+    || highlight.assignmentIds.includes(record.assignmentId)
+  );
+}
+
+function compactContinuityLinks(links: DashboardContinuityLink[]) {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    const key = `${link.href}:${link.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function circuitRouteTargetForQuery(
@@ -4078,6 +4223,9 @@ function buildDashboardContinuitySummary({
   opgwSplicePoints,
   spliceClosures,
   fiberSplices,
+  fiberStrands,
+  strandContinuityRecords,
+  transmissionStructures,
   fiberAssignments,
   patchPanels,
   filterContext,
@@ -4090,12 +4238,16 @@ function buildDashboardContinuitySummary({
   opgwSplicePoints: OpgwSplicePointFeature[];
   spliceClosures: SpliceClosureFeature[];
   fiberSplices: FiberSplice[];
+  fiberStrands: FiberStrand[];
+  strandContinuityRecords: StrandContinuityRecord[];
+  transmissionStructures: TransmissionStructureFeature[];
   fiberAssignments: FiberAssignment[];
   patchPanels: PatchPanel[];
   filterContext: { searchLayerFilter: DashboardSearchLayer };
 }): DashboardContinuitySummary | undefined {
   if (!continuityHighlight) return undefined;
   if (!isContinuitySearchLayerFilter(filterContext.searchLayerFilter)) return undefined;
+  const strandContinuityRecord = dashboardContinuityRecordForHighlight(continuityHighlight, strandContinuityRecords);
   const assignmentIds = new Set(continuityHighlight.assignmentIds);
   const cableIds = new Set(continuityHighlight.cableIds);
   const splicePointIds = new Set(continuityHighlight.splicePointIds);
@@ -4117,15 +4269,185 @@ function buildDashboardContinuitySummary({
   const selectedSplicePointId = continuityHighlight.splicePointIds[0];
   const paths = matchedServices.map((service) => traceSyntheticService(service, data, selectedSplicePointId));
   const filteredPaths = filterContinuityPathsForSelectedLayer(paths, filterContext.searchLayerFilter);
-  if (!filteredPaths.length && filterContext.searchLayerFilter !== "all") return undefined;
+  if (!filteredPaths.length && filterContext.searchLayerFilter !== "all" && !strandContinuityRecord) return undefined;
   const filteredServiceIds = new Set(filteredPaths.map((path) => path.serviceId));
   const filteredServices = matchedServices.filter((service) => filteredServiceIds.has(service.serviceId));
   const displayPaths = filterContext.searchLayerFilter === "all" ? paths : filteredPaths;
   const displayServices = filterContext.searchLayerFilter === "all" ? matchedServices : filteredServices;
   const firstService = displayServices[0] || matchedServices[0];
   const firstPath = displayPaths[0];
+  const selectedCableIds = uniqueStrings([...(strandContinuityRecord?.cableIds || []), ...continuityHighlight.cableIds]);
+  const selectedCables = selectedCableIds
+    .map((id) => opgwCables.find((feature) => feature.properties.id === id))
+    .filter(Boolean) as OpgwCableFeature[];
+  const structureIds = uniqueStrings([
+    ...(continuityHighlight.structureIds || []),
+    ...selectedCables.flatMap((cable) => cable.properties.structureIds),
+  ]);
+  const selectedStructures = structureIds
+    .map((id) => transmissionStructures.find((feature) => feature.properties.id === id))
+    .filter(Boolean) as TransmissionStructureFeature[];
+  const selectedSpliceClosureIds = uniqueStrings([
+    ...(strandContinuityRecord?.spliceClosureIds || []),
+    ...(continuityHighlight.spliceClosureIds || []),
+    ...Array.from(spliceClosureIds),
+  ]);
+  const selectedPatchPanelIds = uniqueStrings([
+    strandContinuityRecord?.aEndPatchPanelId,
+    strandContinuityRecord?.zEndPatchPanelId,
+    ...(continuityHighlight.patchPanelIds || []),
+    ...selectedCables.flatMap((cable) => patchPanels.filter((panel) => panel.fiberCableIds.includes(cable.properties.id)).map((panel) => panel.id)),
+  ]);
+  const displayedStrandNumbers = continuityHighlight.strandNumbers?.length ? continuityHighlight.strandNumbers : strandContinuityRecord?.strandNumbers || [];
+  const selectedStrandNumberSet = new Set(displayedStrandNumbers);
+  const selectedFiberStrands = fiberStrands.filter((strand) =>
+    selectedCableIds.includes(strand.cableId)
+    && (!selectedStrandNumberSet.size || selectedStrandNumberSet.has(strand.strandNumber))
+  );
+  const selectedFiberStrandIds = uniqueStrings([
+    ...(continuityHighlight.fiberStrandIds || []),
+    ...selectedFiberStrands.map((strand) => strand.id),
+  ]);
+  const selectedFiberSpliceIds = continuityHighlight.fiberSpliceIds?.length
+    ? continuityHighlight.fiberSpliceIds
+    : strandContinuityRecord?.fiberSpliceIds || [];
+  const selectedDeviceIds = uniqueStrings([
+    strandContinuityRecord?.terminatedDeviceId,
+    ...(continuityHighlight.deviceIds || []),
+    ...((strandContinuityRecord?.continuitySegments || []).filter((segment) => segment.objectType === "telecom_device").map((segment) => segment.objectId)),
+  ]);
+  const selectedDevicePortIds = uniqueStrings([
+    strandContinuityRecord?.terminatedDevicePortId,
+    ...(continuityHighlight.devicePortIds || []),
+    ...((strandContinuityRecord?.continuitySegments || []).filter((segment) => segment.objectType === "device_port").map((segment) => segment.objectId)),
+  ]);
+  const selectedAssignments = uniqueStrings([strandContinuityRecord?.assignmentId, ...continuityHighlight.assignmentIds]);
+  const databaseLinkGroups = [
+    {
+      title: "Cable used",
+      links: selectedCables.map((cable) => ({
+        id: cable.properties.id,
+        label: cable.properties.cableName,
+        href: `/opgw/cables/${encodeURIComponent(cable.properties.id)}`,
+        detail: `${cable.properties.fiberCount}F / ${cable.properties.routeMiles.toFixed(2)} mi`,
+      })),
+    },
+    {
+      title: "Fiber strand IDs",
+      links: selectedFiberStrandIds.map((strandId) => {
+        const fiberStrand = fiberStrands.find((item) => item.id === strandId);
+        return {
+          id: strandId,
+          label: strandId,
+          href: `/fiber-strands?search=${encodeURIComponent(strandId)}`,
+          detail: fiberStrand ? `${fiberStrand.cableId} / strand ${fiberStrand.strandNumber} / ${fiberStrand.status}` : "linked fiber strand record",
+        };
+      }),
+    },
+    {
+      title: "Structures on cable",
+      links: selectedStructures.map((structure) => ({
+        id: structure.properties.id,
+        label: structure.properties.structureNumber,
+        href: `/transmission-structures?search=${encodeURIComponent(structure.properties.structureNumber)}`,
+        detail: `${structure.properties.structureType} / ${structure.properties.lineId}`,
+      })),
+    },
+    {
+      title: "Splice closures",
+      links: selectedSpliceClosureIds.map((closureId) => {
+        const closure = spliceClosures.find((feature) => feature.properties.id === closureId)?.properties;
+        return {
+          id: closureId,
+          label: closure?.name || closureId,
+          href: `/splice-closures/${encodeURIComponent(closureId)}`,
+          detail: closure ? `${closure.closureType} / ${closure.structureNumber}` : "splice closure",
+        };
+      }),
+    },
+    {
+      title: "Patch panels",
+      links: selectedPatchPanelIds.map((panelId) => {
+        const panel = patchPanels.find((item) => item.id === panelId);
+        return {
+          id: panelId,
+          label: panel?.name || panelId,
+          href: `/patch-panels/${encodeURIComponent(panelId)}`,
+          detail: panel ? `${panel.portCount} ports / ${panel.connectorType}` : "patch panel",
+        };
+      }),
+    },
+    {
+      title: "Fiber splices",
+      links: selectedFiberSpliceIds.map((spliceId) => {
+        const splice = fiberSplices.find((item) => item.id === spliceId);
+        return {
+          id: spliceId,
+          label: spliceId,
+          href: `/splice-matrix?search=${encodeURIComponent(spliceId)}`,
+          detail: splice ? `${splice.spliceType} / ${splice.lossDb?.toFixed(3) || "0.000"} dB` : "splice record",
+        };
+      }),
+    },
+    {
+      title: "Fiber assignments",
+      links: selectedAssignments.map((assignmentId) => {
+        const assignment = fiberAssignments.find((item) => item.id === assignmentId);
+        return {
+          id: assignmentId,
+          label: assignment?.assignmentName || assignmentId,
+          href: `/fiber-assignments?search=${encodeURIComponent(assignmentId)}`,
+          detail: assignment ? `${assignment.serviceType} / ${assignment.status}` : "assignment",
+        };
+      }),
+    },
+    {
+      title: "End device",
+      links: selectedDeviceIds.map((deviceId) => ({
+        id: deviceId,
+        label: strandContinuityRecord?.terminatedDeviceId === deviceId ? strandContinuityRecord.terminatedDeviceName || deviceId : deviceId,
+        href: `/devices?search=${encodeURIComponent(deviceId)}`,
+        detail: "terminal telecom device",
+      })),
+    },
+    {
+      title: "Device ports",
+      links: selectedDevicePortIds.map((portId) => ({
+        id: portId,
+        label: strandContinuityRecord?.terminatedDevicePortId === portId ? strandContinuityRecord.terminatedDevicePortName || portId : portId,
+        href: `/device-ports?search=${encodeURIComponent(portId)}`,
+        detail: "terminal device port",
+      })),
+    },
+  ].map((group) => ({ ...group, links: compactContinuityLinks(group.links) })).filter((group) => group.links.length);
+  const continuitySegmentRows = (strandContinuityRecord?.continuitySegments || [])
+    .filter((segment) => {
+      if (!selectedStrandNumberSet.size) return true;
+      if (segment.objectType !== "fiber_splice" && segment.objectType !== "strand") return true;
+      if (!segment.strandNumbers?.length) return true;
+      return segment.strandNumbers.some((strandNumber) => selectedStrandNumberSet.has(strandNumber));
+    })
+    .map((segment) => {
+      const segmentStrandNumbers = segment.strandNumbers?.filter((strandNumber) => !selectedStrandNumberSet.size || selectedStrandNumberSet.has(strandNumber));
+      const segmentStrandIds = segmentStrandNumbers
+        ?.flatMap((strandNumber) => selectedFiberStrands.filter((fiberStrand) => fiberStrand.strandNumber === strandNumber).map((fiberStrand) => fiberStrand.id));
+      return {
+        sequenceNumber: segment.sequenceNumber,
+        objectType: segment.objectType.replaceAll("_", " "),
+        label: segment.label,
+        href: continuityObjectHref(segment.objectType, segment.objectId),
+        detail: uniqueStrings([
+          segment.cableId,
+          segmentStrandNumbers?.length ? `strand ${segmentStrandNumbers.join(", ")}` : undefined,
+          segmentStrandIds?.length ? `fiber strand ID ${segmentStrandIds.join(", ")}` : undefined,
+          segment.lossDb !== undefined ? `${segment.lossDb.toFixed(3)} dB` : undefined,
+        ]).join(" / "),
+      };
+    });
   const traceHref = continuityHighlight.serviceId
     ? `/fiber-trace?service=${encodeURIComponent(continuityHighlight.serviceId)}`
+    : strandContinuityRecord?.serviceId
+      ? `/fiber-trace?service=${encodeURIComponent(strandContinuityRecord.serviceId)}`
     : continuityHighlight.label.startsWith("SYN-SPLICE-")
       ? `/fiber-trace?spliceConnection=${encodeURIComponent(continuityHighlight.label)}`
       : selectedSplicePointId
@@ -4133,27 +4455,35 @@ function buildDashboardContinuitySummary({
         : `/fiber-trace`;
   return {
     label: continuityHighlight.label,
+    strandContinuityId: strandContinuityRecord?.strandContinuityId || continuityHighlight.strandContinuityId,
+    strandNumbers: displayedStrandNumbers,
+    strandIds: selectedFiberStrandIds,
     filterLabel: searchLayerLabel(filterContext.searchLayerFilter),
-    serviceIds: displayServices.map((service) => service.serviceId),
-    primaryServiceName: firstService ? `${firstService.serviceId} / ${firstService.serviceName}` : "No synthetic service matched this map highlight",
-    endpointA: firstService?.fromSiteName || "Endpoint A",
-    endpointZ: firstService?.toSiteName || "Endpoint Z",
+    serviceIds: displayServices.length ? displayServices.map((service) => service.serviceId) : uniqueStrings([strandContinuityRecord?.serviceId]),
+    primaryServiceName: firstService ? `${firstService.serviceId} / ${firstService.serviceName}` : strandContinuityRecord ? `${strandContinuityRecord.serviceId || strandContinuityRecord.assignmentId} / ${strandContinuityRecord.continuityName}` : "No synthetic service matched this map highlight",
+    endpointA: firstService?.fromSiteName || strandContinuityRecord?.aEndPatchPanelId || "Endpoint A",
+    endpointZ: firstService?.toSiteName || strandContinuityRecord?.zEndPatchPanelId || "Endpoint Z",
     pathStatus: worstPathStatus(displayPaths),
-    totalTransmissionLines: uniqueStrings(displayPaths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId))).length || firstPath?.totalTransmissionLines || 0,
-    totalCableSections: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId))).length,
+    totalTransmissionLines: uniqueStrings(displayPaths.flatMap((path) => path.segments.map((segment) => segment.transmissionLineId))).length || firstPath?.totalTransmissionLines || uniqueStrings(selectedCables.map((cable) => cable.properties.lineId)).length,
+    totalCableSections: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "cable_section").map((segment) => segment.objectId))).length || continuityHighlight.sectionIds?.length || 0,
     totalSpanSegments: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "span_segment").map((segment) => segment.objectId))).length,
-    totalSplicePoints: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "splice_point" || segment.objectType === "splice_connection").map((segment) => segment.splicePointId || segment.spliceConnectionId || segment.objectId))).length,
-    totalPatchPanels: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "patch_panel").map((segment) => segment.objectId))).length,
-    estimatedLossDb: displayPaths.length ? Math.max(...displayPaths.map((path) => path.totalEstimatedLossDb)) : 0,
-    criticality: highestCriticality(displayServices),
-    protectionLevel: uniqueStrings(displayServices.map((service) => service.protectionLevel)).join(", ") || "no service",
-    layerType: uniqueStrings(displayServices.map((service) => service.layerType)).join(" + ") || searchLayerLabel(filterContext.searchLayerFilter),
-    servicesCarried: displayServices.length,
+    totalSplicePoints: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "splice_point" || segment.objectType === "splice_connection").map((segment) => segment.splicePointId || segment.spliceConnectionId || segment.objectId))).length || selectedSpliceClosureIds.length,
+    totalPatchPanels: uniqueStrings(displayPaths.flatMap((path) => path.segments.filter((segment) => segment.objectType === "patch_panel").map((segment) => segment.objectId))).length || selectedPatchPanelIds.length,
+    estimatedLossDb: displayPaths.length ? Math.max(...displayPaths.map((path) => path.totalEstimatedLossDb)) : strandContinuityRecord?.estimatedLossDb || 0,
+    criticality: displayServices.length ? highestCriticality(displayServices) : strandContinuityRecord?.criticality || "no service",
+    protectionLevel: uniqueStrings(displayServices.map((service) => service.protectionLevel)).join(", ") || strandContinuityRecord?.serviceType || "no service",
+    layerType: uniqueStrings(displayServices.map((service) => service.layerType)).join(" + ") || strandContinuityRecord?.status || searchLayerLabel(filterContext.searchLayerFilter),
+    servicesCarried: displayServices.length || (strandContinuityRecord?.serviceId ? 1 : 0),
     warningSummary: uniqueStrings([
       ...displayPaths.flatMap((path) => path.warningSummary),
       filterContext.searchLayerFilter === "all" ? undefined : `Summary scoped to selected filter: ${searchLayerLabel(filterContext.searchLayerFilter)}.`,
     ]),
     traceHref,
+    selectedCableIds,
+    totalStructures: selectedStructures.length,
+    databaseLinkGroups,
+    continuitySegmentRows,
+    layerIsolationLabel: "Only Strand Continuity is enabled in the layer display; linked records render as strand context.",
   };
 }
 
@@ -5309,7 +5639,7 @@ function FiberStrandTable({
   opgwCables: OpgwCableFeature[];
   strandContinuityRecords: StrandContinuityRecord[];
   onUpdateStrands: (cableId: string, strandNumbers: number[], status: FiberStrand["status"], assignmentId?: string) => void;
-  onViewContinuity: (record: StrandContinuityRecord) => void;
+  onViewContinuity: (record: StrandContinuityRecord, strand: FiberStrand) => void;
 }) {
   const [cableId, setCableId] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -5421,10 +5751,10 @@ function FiberStrandTable({
                     <button
                       type="button"
                       disabled={!continuityRecord}
-                      title={continuityRecord ? "View full strand continuity on the dashboard without device layers" : "No continuity record for this strand"}
+                      title={continuityRecord ? "View full strand continuity with linked cable, structures, splices, patch panels, service, and end device" : "No continuity record for this strand"}
                       onClick={(event) => {
                         event.stopPropagation();
-                        if (continuityRecord) onViewContinuity(continuityRecord);
+                        if (continuityRecord) onViewContinuity(continuityRecord, strand);
                       }}
                     >
                       View
@@ -7433,21 +7763,11 @@ function isTruthyUrlParam(value: string | null) {
 }
 
 function strandContinuityLayerState(current: Record<StreetMapLayerKey, boolean>, options: StrandContinuityFocusOptions = {}) {
-  const includeDevices = options.includeDevices ?? true;
+  void options;
   const next = Object.fromEntries(
     (Object.keys(current) as StreetMapLayerKey[]).map((key) => [key, false]),
   ) as Record<StreetMapLayerKey, boolean>;
   next.strandContinuity = true;
-  next.syntheticOpgwCables = true;
-  next.opgwRoutes = true;
-  next.opgwCableSections = true;
-  next.opgwSplicePoints = true;
-  next.spliceClosures = true;
-  next.patchPanels = true;
-  next.fiberAssignments = true;
-  next.telecomNodes = includeDevices;
-  next.selIconNodes = includeDevices;
-  next.c3794Nodes = includeDevices;
   return next;
 }
 

@@ -127,7 +127,7 @@ export function FiberStrandTablePage() {
       continuity_view: continuityRecord ? strandContinuityDashboardHref(continuityRecord) : "No continuity record",
     } as unknown as JsonRecord;
   });
-  return <SyntheticPage title="Fiber Strand Table" subtitle="One synthetic strand record per generated OPGW fiber. Use View to isolate its splice, cable, patch-panel, and assignment continuity on the dashboard without device layers." error={data.error}><DataTable rows={rows} columns={["cableId", "strandNumber", "tubeNumber", "colorCode", "status", "assignmentId", "circuitId", "continuity_id", "continuity_view"]} filterField="status" /></SyntheticPage>;
+  return <SyntheticPage title="Fiber Strand Table" subtitle="One synthetic strand record per generated OPGW fiber. Use View to isolate its cable, structures, splices, patch panels, assignment, service, and end-device links on the dashboard." error={data.error}><DataTable rows={rows} columns={["cableId", "strandNumber", "tubeNumber", "colorCode", "status", "assignmentId", "circuitId", "continuity_id", "continuity_view"]} filterField="status" /></SyntheticPage>;
 }
 
 export function SplicePointsPage() {
@@ -161,7 +161,7 @@ export function StrandContinuityPage() {
   }) as unknown as JsonRecord);
   const panelIds = new Set(data.strandContinuity.flatMap((record) => [record.aEndPatchPanelId, record.zEndPatchPanelId].filter(Boolean)));
   return (
-    <SyntheticPage title="Strand Continuity" subtitle="Synthetic end-to-end strand paths from substation patch panels through splices and fiber assets. Dashboard strand views hide device layers by default." error={data.error}>
+    <SyntheticPage title="Strand Continuity" subtitle="Synthetic end-to-end strand paths from substation patch panels through splices, fiber assets, services, and terminal devices. Dashboard strand views isolate the map to the strand continuity layer." error={data.error}>
       <section className="metric-grid" aria-label="Strand continuity metrics">
         <Metric label="Continuity paths" value={data.strandContinuity.length.toLocaleString()} detail="Generated strand-level demos" />
         <Metric label="Patch panels" value={panelIds.size.toLocaleString()} detail="A/Z panel terminations" />
@@ -174,7 +174,7 @@ export function StrandContinuityPage() {
           <span className="badge active">isolated layer mode</span>
         </div>
         <div className="panel-body">
-          <p className="subtle">Open any row on the map to turn off unrelated layers, highlight the strand assignment, and show the cable, splice, patch-panel, and fiber asset path without device overlays.</p>
+          <p className="subtle">Open any row on the map to turn off unrelated layers, highlight the strand assignment, and show the cable, structure, splice, patch-panel, service, and end-device database links.</p>
           <div className="strand-continuity-card-grid">
             {data.strandContinuity.slice(0, 12).map((record) => (
               <article className="strand-continuity-card" key={record.id}>

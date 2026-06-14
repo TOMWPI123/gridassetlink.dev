@@ -44,12 +44,22 @@ export type FocusRequest = { selection: StreetMapSelection; sequence: number };
 
 export type ContinuityHighlight = {
   label: string;
+  strandContinuityId?: string;
   serviceId?: string;
   assignmentIds: string[];
   cableIds: string[];
   routeIds?: string[];
   sectionIds?: string[];
   splicePointIds: string[];
+  spliceClosureIds?: string[];
+  fiberSpliceIds?: string[];
+  patchPanelIds?: string[];
+  structureIds?: string[];
+  deviceIds?: string[];
+  devicePortIds?: string[];
+  fiberStrandIds?: string[];
+  strandNumbers?: number[];
+  mapCoordinates?: Coordinate[][];
 };
 
 type StreetLevelAssetMapProps = {

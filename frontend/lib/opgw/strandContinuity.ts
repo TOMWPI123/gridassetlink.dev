@@ -20,5 +20,5 @@ export function findStrandContinuityRecord(strand: FiberStrand, records: StrandC
 }
 
 export function strandContinuityDashboardHref(record: StrandContinuityRecord) {
-  return `/dashboard?drawer=layers&strandContinuity=${encodeURIComponent(record.id)}&hideDevices=1`;
+  return `/dashboard?drawer=summary&strandContinuity=${encodeURIComponent(record.id)}`;
 }
