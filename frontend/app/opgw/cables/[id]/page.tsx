@@ -18,5 +18,18 @@ export default async function Page({ params }: PageProps) {
   const data = await loadSyntheticFiberContinuityData();
   const view = buildOpgwCableContinuityView(id, data);
   if (!view) notFound();
-  return <OpgwCableContinuityPage view={view} />;
+  const cableModules = data.opgwCables.map((feature) => {
+    const cable = feature.properties;
+    return {
+      id: cable.id,
+      cableName: cable.cableName,
+      lineId: cable.lineId,
+      lineName: cable.lineName || cable.lineId,
+      status: cable.status,
+      fiberCount: cable.fiberCount,
+      routeMiles: cable.routeMiles,
+      spliceClosureCount: cable.connectedSpliceClosureIds.length,
+    };
+  });
+  return <OpgwCableContinuityPage view={view} cableModules={cableModules} />;
 }

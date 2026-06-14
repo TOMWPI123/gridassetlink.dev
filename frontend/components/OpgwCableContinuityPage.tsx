@@ -2,9 +2,50 @@ import Link from "next/link";
 import { AlertTriangle, Cable, GitCompareArrows, Network, Route, ShieldAlert, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import type { OpgwCableContinuityView } from "@/lib/opgw/cableContinuity";
+import { OpgwCableModuleSearch, type OpgwCableModuleSearchItem } from "@/components/OpgwCableModuleSearch";
 
-export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityView }) {
+type ClosureSpliceGroup = {
+  closure?: OpgwCableContinuityView["spliceClosures"][number];
+  point?: OpgwCableContinuityView["splicePoints"][number];
+  rows: OpgwCableContinuityView["fiberSplices"];
+  closureId: string;
+  openId: string;
+  structureNumber: string;
+  closureType: string;
+  status: string;
+};
+
+const spanAttributeColumns = [
+  "spanSegmentId",
+  "cableSectionId",
+  "opgwRouteId",
+  "transmissionLineId",
+  "fromStructureId",
+  "toStructureId",
+  "fromStructureNumber",
+  "toStructureNumber",
+  "spanLengthFt",
+  "fiberCount",
+  "cableStatus",
+  "spanStatus",
+  "hasMidspanIssue",
+  "sagClearanceNote",
+  "inspectionStatus",
+  "outageRiskScore",
+  "openWorkOrderCount",
+  "synthetic",
+  "notes",
+  "geometryType",
+  "geometryCoordinates",
+] as const;
+
+type SpanAttributeColumn = typeof spanAttributeColumns[number];
+type SpanAttributeRow = Record<SpanAttributeColumn, string>;
+
+export function OpgwCableContinuityPage({ view, cableModules }: { view: OpgwCableContinuityView; cableModules: OpgwCableModuleSearchItem[] }) {
   const cable = view.cable.properties;
+  const spliceClosureGroups = buildClosureSpliceGroups(view);
+  const spanAttributeRows = buildSpanAttributeRows(view);
   return (
     <main className="splice-manager-page opgw-cable-page">
       <header className="splice-manager-hero">
@@ -30,6 +71,8 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
         <SummaryCard label="Strands" value={view.totals.totalStrands.toLocaleString()} />
         <SummaryCard label="Estimated Loss" value={`${view.totals.estimatedLossDb.toFixed(2)} dB`} />
       </section>
+
+      <OpgwCableModuleSearch modules={cableModules} currentCableId={cable.id} />
 
       <section className="splice-manager-grid">
         <div className="splice-manager-main">
@@ -95,6 +138,32 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
                 </tbody>
               </table>
             </div>
+          </Panel>
+
+          <Panel title="Linked Cable Spans" icon={<Workflow size={17} />}>
+            <div className="opgw-span-attribute-summary">
+              <DetailItem label="Linked span records" value={spanAttributeRows.length.toLocaleString()} />
+              <DetailItem label="Total span feet" value={spanAttributeRows.reduce((sum, row) => sum + Number(row.spanLengthFt || 0), 0).toLocaleString()} />
+              <DetailItem label="Inspection issues" value={spanAttributeRows.filter((row) => row.hasMidspanIssue === "true" || row.inspectionStatus === "issue_found").length.toLocaleString()} />
+              <DetailItem label="Open work orders" value={spanAttributeRows.reduce((sum, row) => sum + Number(row.openWorkOrderCount || 0), 0).toLocaleString()} />
+            </div>
+            <div className="splice-table-wrap tall">
+              <table className="splice-manager-table span-attributes">
+                <thead>
+                  <tr>
+                    {spanAttributeColumns.map((column) => <th key={column}>{column}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {spanAttributeRows.map((row) => (
+                    <tr key={row.spanSegmentId}>
+                      {spanAttributeColumns.map((column) => <td key={`${row.spanSegmentId}-${column}`}>{row[column] || "-"}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="splice-side-note">Every row is a synthetic structure-to-structure span linked to this OPGW cable through its cable section. Geometry is shown as the span endpoint coordinates for quick GIS review.</p>
           </Panel>
 
           <Panel title="Transmission Structures on Cable" icon={<Workflow size={17} />}>
@@ -165,54 +234,60 @@ export function OpgwCableContinuityPage({ view }: { view: OpgwCableContinuityVie
           </Panel>
 
           <Panel title="Splicing and Closures" icon={<GitCompareArrows size={17} />}>
-            <div className="opgw-closure-grid">
-              {view.spliceClosures.map((closure) => {
-                const point = view.splicePoints.find((item) => item.properties.closureId === closure.properties.id);
-                const openId = point?.properties.splicePointId || closure.properties.id;
-                return (
-                  <article key={closure.properties.id}>
-                    <strong>{closure.properties.name}</strong>
-                    <span>{closure.properties.id} / {closure.properties.structureNumber}</span>
+            <div className="opgw-closure-table-stack">
+              {spliceClosureGroups.length ? spliceClosureGroups.map((group) => (
+                <article className="opgw-closure-splice-table" key={group.closureId}>
+                  <div className="opgw-closure-splice-header">
+                    <div>
+                      <strong>{group.closure?.properties.name || group.closureId}</strong>
+                      <span>{group.closureId} / {group.structureNumber}</span>
+                    </div>
                     <dl>
-                      <div><dt>Type</dt><dd>{closure.properties.closureType.replaceAll("_", " ")}</dd></div>
-                      <div><dt>Rows</dt><dd>{view.fiberSplices.filter((splice) => splice.spliceClosureId === closure.properties.id).length}</dd></div>
-                      <div><dt>Status</dt><dd><StatusPill value={closure.properties.status} /></dd></div>
+                      <div><dt>Type</dt><dd>{group.closureType}</dd></div>
+                      <div><dt>Rows</dt><dd>{group.rows.length.toLocaleString()}</dd></div>
+                      <div><dt>Status</dt><dd><StatusPill value={group.status} /></dd></div>
+                      <div><dt>Point</dt><dd>{group.point?.properties.splicePointId || "unmapped"}</dd></div>
                     </dl>
                     <div className="opgw-inline-actions">
-                      <Link href={`/opgw/splices/${encodeURIComponent(openId)}`}>Open Splice Manager</Link>
-                      <Link href={`/opgw/splices/${encodeURIComponent(openId)}/diagram`}>Interactive Diagram</Link>
+                      <Link href={`/opgw/splices/${encodeURIComponent(group.openId)}`}>Open Splice Manager</Link>
+                      <Link href={`/opgw/splices/${encodeURIComponent(group.openId)}/diagram`}>Interactive Diagram</Link>
                     </div>
-                  </article>
-                );
-              })}
-            </div>
-            <div className="splice-table-wrap tall">
-              <table className="splice-manager-table matrix">
-                <thead>
-                  <tr>
-                    <th>Closure</th>
-                    <th>Incoming</th>
-                    <th>Outgoing</th>
-                    <th>Splice Type</th>
-                    <th>Loss</th>
-                    <th>Status</th>
-                    <th>Assignment</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.fiberSplices.slice(0, 360).map((splice) => (
-                    <tr key={splice.id}>
-                      <td>{splice.spliceClosureId}</td>
-                      <td>{splice.fromCableId} / {splice.fromStrandNumber}</td>
-                      <td>{splice.toCableId} / {splice.toStrandNumber}</td>
-                      <td>{splice.spliceType}</td>
-                      <td>{(splice.lossDb || 0).toFixed(2)} dB</td>
-                      <td><StatusPill value={splice.status} /></td>
-                      <td>{splice.assignmentId || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </div>
+                  {group.rows.length ? (
+                    <div className="splice-table-wrap closure-table">
+                      <table className="splice-manager-table matrix">
+                        <thead>
+                          <tr>
+                            <th>Row</th>
+                            <th>Incoming</th>
+                            <th>Outgoing</th>
+                            <th>Splice Type</th>
+                            <th>Loss</th>
+                            <th>Status</th>
+                            <th>Assignment</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.rows.slice(0, 160).map((splice) => (
+                            <tr key={splice.id}>
+                              <td>{splice.id}</td>
+                              <td>{splice.fromCableId} / {splice.fromStrandNumber}</td>
+                              <td>{splice.toCableId} / {splice.toStrandNumber}</td>
+                              <td>{splice.spliceType}</td>
+                              <td>{(splice.lossDb || 0).toFixed(2)} dB</td>
+                              <td><StatusPill value={splice.status} /></td>
+                              <td>{splice.assignmentId || "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {group.rows.length > 160 ? <p className="splice-side-note">Showing 160 of {group.rows.length.toLocaleString()} splice rows for this closure.</p> : null}
+                    </div>
+                  ) : (
+                    <p className="splice-side-note">No splice matrix rows are currently linked to this closure.</p>
+                  )}
+                </article>
+              )) : <div className="splice-side-note">No splice closures are linked to this cable.</div>}
             </div>
           </Panel>
 
@@ -344,4 +419,81 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 function StatusPill({ value }: { value: string }) {
   return <span className={`splice-status-pill ${value.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()}`}>{value.replaceAll("_", " ")}</span>;
+}
+
+function buildSpanAttributeRows(view: OpgwCableContinuityView): SpanAttributeRow[] {
+  return view.spanSegments.map((span) => {
+    const properties = span.properties;
+    return {
+      spanSegmentId: formatAttributeValue(properties.spanSegmentId),
+      cableSectionId: formatAttributeValue(properties.cableSectionId),
+      opgwRouteId: formatAttributeValue(properties.opgwRouteId),
+      transmissionLineId: formatAttributeValue(properties.transmissionLineId),
+      fromStructureId: formatAttributeValue(properties.fromStructureId),
+      toStructureId: formatAttributeValue(properties.toStructureId),
+      fromStructureNumber: formatAttributeValue(properties.fromStructureNumber),
+      toStructureNumber: formatAttributeValue(properties.toStructureNumber),
+      spanLengthFt: formatAttributeValue(properties.spanLengthFt),
+      fiberCount: formatAttributeValue(properties.fiberCount),
+      cableStatus: formatAttributeValue(properties.cableStatus),
+      spanStatus: formatAttributeValue(properties.spanStatus),
+      hasMidspanIssue: formatAttributeValue(properties.hasMidspanIssue),
+      sagClearanceNote: formatAttributeValue(properties.sagClearanceNote),
+      inspectionStatus: formatAttributeValue(properties.inspectionStatus),
+      outageRiskScore: formatAttributeValue(properties.outageRiskScore),
+      openWorkOrderCount: formatAttributeValue(properties.openWorkOrderCount),
+      synthetic: formatAttributeValue(properties.synthetic),
+      notes: formatAttributeValue(properties.notes),
+      geometryType: span.geometry.type,
+      geometryCoordinates: span.geometry.coordinates.map((coordinate) => coordinate.map((value) => Number(value).toFixed(6)).join(", ")).join(" -> "),
+    };
+  });
+}
+
+function formatAttributeValue(value: unknown) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (Array.isArray(value)) return value.join(", ");
+  return String(value);
+}
+
+function buildClosureSpliceGroups(view: OpgwCableContinuityView) {
+  const rowsByClosureId = new Map<string, OpgwCableContinuityView["fiberSplices"]>();
+  view.fiberSplices.forEach((splice) => {
+    const closureId = splice.spliceClosureId || "UNMAPPED-CLOSURE";
+    const rows = rowsByClosureId.get(closureId) || [];
+    rows.push(splice);
+    rowsByClosureId.set(closureId, rows);
+  });
+
+  const groups: ClosureSpliceGroup[] = view.spliceClosures.map((closure) => {
+    const point = view.splicePoints.find((item) => item.properties.closureId === closure.properties.id);
+    const rows = rowsByClosureId.get(closure.properties.id) || [];
+    rowsByClosureId.delete(closure.properties.id);
+    return {
+      closure,
+      point,
+      rows,
+      closureId: closure.properties.id,
+      openId: point?.properties.splicePointId || closure.properties.id,
+      structureNumber: closure.properties.structureNumber,
+      closureType: closure.properties.closureType.replaceAll("_", " "),
+      status: closure.properties.status,
+    };
+  });
+
+  rowsByClosureId.forEach((rows, closureId) => {
+    groups.push({
+      closure: undefined,
+      point: view.splicePoints.find((item) => item.properties.closureId === closureId),
+      rows,
+      closureId,
+      openId: closureId,
+      structureNumber: "unmapped structure",
+      closureType: "unmapped closure reference",
+      status: rows.some((row) => row.status === "proposed") ? "proposed" : "existing",
+    });
+  });
+
+  return groups;
 }

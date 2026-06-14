@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { DataTable } from "@/components/DataTable";
+import { OpgwCableModuleSearch, type OpgwCableModuleSearchItem } from "@/components/OpgwCableModuleSearch";
 import { findStrandContinuityRecord, strandContinuityDashboardHref } from "@/lib/opgw/strandContinuity";
 import type { FiberAssignment, FiberSplice, FiberStrand, OpgwCableCollection, PatchPanel, SpliceClosureCollection, StrandContinuityRecord, SyntheticService, TransmissionStructureCollection } from "@/lib/types/assets";
 import type { JsonRecord } from "@/types";
@@ -187,6 +188,7 @@ export function OpgwCablesPage() {
 }
 
 function OpgwCableModuleSection({ rows, linkedLoading, linkedError }: { rows: JsonRecord[]; linkedLoading: boolean; linkedError: string }) {
+  const searchModules = useMemo(() => buildCableModuleSearchItems(rows), [rows]);
   const featured = rows
     .slice()
     .sort((a, b) => String(a.id || "").localeCompare(String(b.id || ""), undefined, { numeric: true }))
@@ -206,6 +208,9 @@ function OpgwCableModuleSection({ rows, linkedLoading, linkedError }: { rows: Js
       </div>
       {linkedLoading ? <div className="panel-body subtle">Loading linked asset identifiers for strands, splices, services, and devices...</div> : null}
       {linkedError ? <div className="badge red">{linkedError}</div> : null}
+      <div className="panel-body">
+        <OpgwCableModuleSearch modules={searchModules} currentCableId="" />
+      </div>
       <div className="opgw-cable-module-metrics">
         <Metric label="Cable modules" value={rows.length.toLocaleString()} detail="Full detail views available" />
         <Metric label="Synthetic route miles" value={totalMiles.toFixed(1)} detail="Planning/demo OPGW mileage" />
@@ -244,6 +249,21 @@ function OpgwCableModuleSection({ rows, linkedLoading, linkedError }: { rows: Js
       </div>
     </section>
   );
+}
+
+function buildCableModuleSearchItems(rows: JsonRecord[]): OpgwCableModuleSearchItem[] {
+  return rows
+    .map((row) => ({
+      id: String(row.id || ""),
+      cableName: String(row.cableName || row.id || ""),
+      lineId: String(row.lineId || ""),
+      lineName: String(row.lineName || row.lineId || ""),
+      status: String(row.status || "synthetic"),
+      fiberCount: Number(row.fiberCount || 0),
+      routeMiles: Number(row.routeMiles || 0),
+      spliceClosureCount: Number(row.spliceClosureCount || 0),
+    }))
+    .filter((item) => item.id);
 }
 
 export function FiberStrandTablePage() {
