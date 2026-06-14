@@ -117,6 +117,42 @@ const distributionNetworkLayerKeys: StreetMapLayerKey[] = [
   "distributionFiberAssignments",
 ];
 
+function currentDashboardUrlParams() {
+  if (typeof window === "undefined") return new URLSearchParams();
+  return new URLSearchParams(window.location.search);
+}
+
+function hasStrandContinuityUrlParam() {
+  const params = currentDashboardUrlParams();
+  return Boolean(params.get("strandContinuity") || params.get("strandContinuityId"));
+}
+
+function initialDashboardLayerState() {
+  return hasStrandContinuityUrlParam() ? strandContinuityLayerState(dashboardStreetLayers) : dashboardStreetLayers;
+}
+
+function initialDashboardSearchLayer(): DashboardSearchLayer {
+  return hasStrandContinuityUrlParam() ? "strandContinuity" : "all";
+}
+
+function initialDashboardVisibilityFilter() {
+  return hasStrandContinuityUrlParam() ? "synthetic-demo" : "all";
+}
+
+function initialDashboardRightMode(): RightDrawerMode {
+  const drawer = currentDashboardUrlParams().get("drawer");
+  if (drawer && isDashboardRightDrawerMode(drawer)) return drawer;
+  return hasStrandContinuityUrlParam() ? "summary" : "modules";
+}
+
+function initialDashboardRightCollapsed() {
+  return !hasStrandContinuityUrlParam() && !currentDashboardUrlParams().get("drawer");
+}
+
+function isDashboardRightDrawerMode(value: string): value is RightDrawerMode {
+  return ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design", "guide"].includes(value);
+}
+
 type MapStatus = "loading" | "active" | "error";
 type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "scale" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor" | "design" | "guide";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
@@ -1280,23 +1316,23 @@ export function DashboardPage() {
   const [addAssetKind, setAddAssetKind] = useState<AddAssetKind | null>(null);
   const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
-  const [searchLayerFilter, setSearchLayerFilter] = useState<DashboardSearchLayer>("all");
+  const [searchLayerFilter, setSearchLayerFilter] = useState<DashboardSearchLayer>(() => initialDashboardSearchLayer());
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [assetTypeFilter, setAssetTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
-  const [visibilityFilter, setVisibilityFilter] = useState("all");
+  const [visibilityFilter, setVisibilityFilter] = useState(() => initialDashboardVisibilityFilter());
   const [ownerFilter, setOwnerFilter] = useState("all");
-  const [rightCollapsed, setRightCollapsed] = useState(true);
-  const [rightMode, setRightMode] = useState<RightDrawerMode>("modules");
+  const [rightCollapsed, setRightCollapsed] = useState(() => initialDashboardRightCollapsed());
+  const [rightMode, setRightMode] = useState<RightDrawerMode>(() => initialDashboardRightMode());
   const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [continuityHighlight, setContinuityHighlight] = useState<ContinuityHighlight | undefined>();
   const deepLinkFocusApplied = useRef(false);
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [mapStatusMessage, setMapStatusMessage] = useState("");
-  const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(dashboardStreetLayers);
+  const [streetLayers, setStreetLayers] = useState<Record<StreetMapLayerKey, boolean>>(() => initialDashboardLayerState());
   const [isolatedOpgwRouteId, setIsolatedOpgwRouteId] = useState<string | null>(null);
   const [isolatedOpgwSectionId, setIsolatedOpgwSectionId] = useState<string | null>(null);
   const [isolatedOpgwSplicePointId, setIsolatedOpgwSplicePointId] = useState<string | null>(null);
@@ -3051,7 +3087,10 @@ export function DashboardPage() {
     const distributionRouteId = params.get("distributionRoute") || params.get("distributionRouteId");
 
     if (strandContinuityId) {
-      if (!strandContinuityRecords.length || (!visibleFiberAssignments.length && !visibleOpgwCables.length)) return;
+      if (!strandContinuityRecords.length || !visibleOpgwCables.length || !visibleFiberAssignments.length || !fiberStrands.length || !visiblePatchPanels.length || !fiberSplices.length) {
+        void loadMapDataGroups(["opgwTopology", "fiberDetails", "patchPanels", "spliceContinuity"]);
+        return;
+      }
       const record = strandContinuityRecords.find((item) =>
         item.id === strandContinuityId
         || item.strandContinuityId === strandContinuityId
@@ -3144,7 +3183,7 @@ export function DashboardPage() {
       setRightCollapsed(false);
       showToast(`Showing map context for ${serviceId || cable.properties.id}.`);
     }
-  }, [fiberSplices, legacyTelecomCircuits, loadMapDataGroups, strandContinuityRecords, syntheticFiberAssignments, syntheticServices, visibleDistributionFiberAssignments, visibleDistributionPoleFiberRoutes, visibleDistributionPoles, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints]);
+  }, [fiberSplices, fiberStrands, legacyTelecomCircuits, loadMapDataGroups, strandContinuityRecords, syntheticFiberAssignments, syntheticServices, visibleDistributionFiberAssignments, visibleDistributionPoleFiberRoutes, visibleDistributionPoles, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSplicePoints, visiblePatchPanels, visibleTransmissionStructures]);
 
   function clearOpgwLayerIsolation() {
     setIsolatedOpgwRouteId(null);
