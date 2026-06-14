@@ -1,0 +1,8 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "id": "PROP-FBR-001", "title": "Proposed Worcester-to-Providence diverse fiber", "changeType": "fiber_route", "status": "engineering_review", "fromSite": "SUB-MA-AUB", "toSite": "SUB-RI-PVD", "relatedAssetId": "FBR-RI-003", "notes": "Synthetic route concept for planning mode demonstration." }, "geometry": { "type": "LineString", "coordinates": [[-71.84, 42.20], [-71.66, 42.02], [-71.41, 41.82]] } },
+    { "type": "Feature", "properties": { "id": "PROP-CIR-002", "title": "Proposed backup protection circuit", "changeType": "circuit", "status": "draft", "fromSite": "SUB-MA-WBS", "toSite": "SUB-MA-BOS", "relatedAssetId": "87L-MA-WBS-AUB-001", "notes": "Local-state route drafting can be saved to API later." }, "geometry": { "type": "LineString", "coordinates": [[-71.88, 42.05], [-71.45, 42.22], [-71.06, 42.36]] } },
+    { "type": "Feature", "properties": { "id": "PROP-DEV-003", "title": "Proposed Portland battery telemetry", "changeType": "device", "status": "field_ready", "fromSite": "SUB-ME-POR", "toSite": "SUB-NH-MAN", "relatedAssetId": "NODE-ME-BATT", "notes": "Synthetic proposed battery/power telemetry overlay." }, "geometry": { "type": "LineString", "coordinates": [[-70.26, 43.66], [-71.45, 42.99]] } }
+  ]
+}

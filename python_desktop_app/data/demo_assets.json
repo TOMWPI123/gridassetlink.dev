@@ -1,0 +1,626 @@
+{
+  "synthetic_data_notice": "Fictional synthetic/demo utility telecom planning data only. Not an official National Grid product and not for operations.",
+  "assets": [
+    {
+      "id": "SUB-WBS",
+      "asset_type": "substation",
+      "name": "West Bay Switching Station",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.533, 42.348] },
+      "properties": {
+        "region": "MA Central",
+        "state": "MA",
+        "voltage_kv": 115,
+        "telecom_room": "Relay House A",
+        "battery_plant": "48 VDC demo string",
+        "criticality": "high",
+        "risk_score": 82,
+        "device_ids": ["DEV-WBS-ICON-01", "DEV-WBS-RTR-01"],
+        "fiber_span_ids": ["FBR-WBS-AUB-001"],
+        "notes": "Synthetic substation used as the western anchor for demo OPGW services."
+      }
+    },
+    {
+      "id": "SUB-AUB",
+      "asset_type": "substation",
+      "name": "Auburn Telecom Hub",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.835, 42.194] },
+      "properties": {
+        "region": "MA Central",
+        "state": "MA",
+        "voltage_kv": 345,
+        "telecom_room": "Control Building B",
+        "battery_plant": "125 VDC demo plant",
+        "criticality": "critical",
+        "risk_score": 91,
+        "device_ids": ["DEV-AUB-ICON-01", "DEV-AUB-OTN-01"],
+        "fiber_span_ids": ["FBR-WBS-AUB-001", "FBR-AUB-BOS-002"],
+        "notes": "Synthetic telecom aggregation hub. Demo data only."
+      }
+    },
+    {
+      "id": "SUB-BOS",
+      "asset_type": "substation",
+      "name": "Boston North 345 kV Yard",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.063, 42.401] },
+      "properties": {
+        "region": "Boston Metro",
+        "state": "MA",
+        "voltage_kv": 345,
+        "telecom_room": "Fiber Mezzanine",
+        "battery_plant": "48 VDC demo plant",
+        "criticality": "high",
+        "risk_score": 79,
+        "device_ids": ["DEV-BOS-OTN-01"],
+        "fiber_span_ids": ["FBR-AUB-BOS-002"],
+        "notes": "Synthetic metro endpoint for C37.94, SCADA, and Ethernet services."
+      }
+    },
+    {
+      "id": "SUB-RI",
+      "asset_type": "substation",
+      "name": "Rhode Island South Terminal",
+      "status": "planned",
+      "lifecycle": "proposed",
+      "geometry": { "type": "Point", "coordinates": [-71.432, 41.744] },
+      "properties": {
+        "region": "RI Coastal",
+        "state": "RI",
+        "voltage_kv": 115,
+        "telecom_room": "Planned telecom bay",
+        "battery_plant": "Future 48 VDC",
+        "criticality": "normal",
+        "risk_score": 47,
+        "device_ids": [],
+        "fiber_span_ids": ["FBR-BOS-RI-003"],
+        "notes": "Proposed synthetic southern endpoint."
+      }
+    },
+    {
+      "id": "TL-WBS-AUB",
+      "asset_type": "transmission_line",
+      "name": "Synthetic 115 kV West Bay to Auburn Line",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.533, 42.348], [-71.62, 42.31], [-71.735, 42.247], [-71.835, 42.194]] },
+      "properties": {
+        "line_id": "TL-WBS-AUB",
+        "voltage_kv": 115,
+        "owner": "TelecomNE Demo Utility",
+        "structure_ids": ["STR-WBS-001", "STR-WBS-002", "STR-AUB-003"],
+        "fiber_span_ids": ["FBR-WBS-AUB-001"],
+        "notes": "Synthetic corridor generated for desktop demo."
+      }
+    },
+    {
+      "id": "TL-AUB-BOS",
+      "asset_type": "transmission_line",
+      "name": "Synthetic 345 kV Auburn to Boston Line",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.835, 42.194], [-71.54, 42.26], [-71.29, 42.34], [-71.063, 42.401]] },
+      "properties": {
+        "line_id": "TL-AUB-BOS",
+        "voltage_kv": 345,
+        "owner": "TelecomNE Demo Utility",
+        "structure_ids": ["STR-AUB-101", "STR-AUB-118", "STR-BOS-205"],
+        "fiber_span_ids": ["FBR-AUB-BOS-002"],
+        "notes": "Synthetic public-reference style corridor, not operational."
+      }
+    },
+    {
+      "id": "TL-BOS-RI",
+      "asset_type": "transmission_line",
+      "name": "Proposed Boston to Rhode Island Design Corridor",
+      "status": "proposed",
+      "lifecycle": "proposed",
+      "geometry": { "type": "LineString", "coordinates": [[-71.063, 42.401], [-71.18, 42.18], [-71.302, 41.96], [-71.432, 41.744]] },
+      "properties": {
+        "line_id": "TL-BOS-RI",
+        "voltage_kv": 115,
+        "owner": "TelecomNE Demo Utility",
+        "structure_ids": ["STR-BOS-301", "STR-RI-402"],
+        "fiber_span_ids": ["FBR-BOS-RI-003"],
+        "notes": "Proposed synthetic design corridor separated from existing records."
+      }
+    },
+    {
+      "id": "STR-WBS-001",
+      "asset_type": "structure",
+      "name": "WBS Structure 001",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.58, 42.325] },
+      "properties": {
+        "structure_number": "WBS-001",
+        "line_id": "TL-WBS-AUB",
+        "structure_type": "tangent",
+        "has_opgw": true,
+        "splice_point_ids": [],
+        "criticality": "normal"
+      }
+    },
+    {
+      "id": "STR-AUB-003",
+      "asset_type": "structure",
+      "name": "Auburn Deadend Structure 003",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.793, 42.222] },
+      "properties": {
+        "structure_number": "AUB-003",
+        "line_id": "TL-WBS-AUB",
+        "structure_type": "deadend",
+        "has_opgw": true,
+        "splice_point_ids": ["SPL-AUB-001"],
+        "criticality": "high",
+        "risk_score": 85
+      }
+    },
+    {
+      "id": "STR-BOS-205",
+      "asset_type": "structure",
+      "name": "Boston Terminal Structure 205",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.104, 42.384] },
+      "properties": {
+        "structure_number": "BOS-205",
+        "line_id": "TL-AUB-BOS",
+        "structure_type": "terminal",
+        "has_opgw": true,
+        "splice_point_ids": ["SPL-BOS-001"],
+        "criticality": "high",
+        "risk_score": 76
+      }
+    },
+    {
+      "id": "OPGW-WBS-AUB",
+      "asset_type": "opgw_route",
+      "name": "OPGW Route WBS to AUB",
+      "status": "active_synthetic",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.533, 42.348], [-71.62, 42.31], [-71.735, 42.247], [-71.835, 42.194]] },
+      "properties": {
+        "opgw_route_id": "OPGW-WBS-AUB",
+        "transmission_line_id": "TL-WBS-AUB",
+        "fiber_span_ids": ["FBR-WBS-AUB-001"],
+        "total_fiber_count": 96,
+        "route_miles": 19.4,
+        "criticality": "critical",
+        "risk_score": 88,
+        "notes": "Synthetic OPGW route used for continuity and outage impact demos."
+      }
+    },
+    {
+      "id": "OPGW-AUB-BOS",
+      "asset_type": "opgw_route",
+      "name": "OPGW Route AUB to BOS",
+      "status": "active_synthetic",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.835, 42.194], [-71.54, 42.26], [-71.29, 42.34], [-71.063, 42.401]] },
+      "properties": {
+        "opgw_route_id": "OPGW-AUB-BOS",
+        "transmission_line_id": "TL-AUB-BOS",
+        "fiber_span_ids": ["FBR-AUB-BOS-002"],
+        "total_fiber_count": 144,
+        "route_miles": 43.8,
+        "criticality": "high",
+        "risk_score": 74,
+        "notes": "Synthetic OPGW route used for device and service dependency demos."
+      }
+    },
+    {
+      "id": "FBR-WBS-AUB-001",
+      "asset_type": "fiber_span",
+      "name": "96F OPGW WBS-AUB Span",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.533, 42.348], [-71.62, 42.31], [-71.735, 42.247], [-71.835, 42.194]] },
+      "properties": {
+        "cable_id": "FBR-WBS-AUB-001",
+        "cable_type": "OPGW",
+        "fiber_count": 96,
+        "available_strands": 42,
+        "strand_range": "1-96",
+        "construction_status": "existing",
+        "from_structure_id": "STR-WBS-001",
+        "to_structure_id": "STR-AUB-003",
+        "splice_point_ids": ["SPL-WBS-001", "SPL-AUB-001"],
+        "route_asset_ids": ["TL-WBS-AUB", "OPGW-WBS-AUB", "SUB-WBS", "SUB-AUB"],
+        "service_ids": ["SVC-87L-WBS-AUB"],
+        "notes": "Synthetic existing OPGW span with assigned protection circuits."
+      }
+    },
+    {
+      "id": "FBR-AUB-BOS-002",
+      "asset_type": "fiber_span",
+      "name": "144F OPGW AUB-BOS Span",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.835, 42.194], [-71.54, 42.26], [-71.29, 42.34], [-71.063, 42.401]] },
+      "properties": {
+        "cable_id": "FBR-AUB-BOS-002",
+        "cable_type": "OPGW",
+        "fiber_count": 144,
+        "available_strands": 61,
+        "strand_range": "1-144",
+        "construction_status": "existing",
+        "from_structure_id": "STR-AUB-003",
+        "to_structure_id": "STR-BOS-205",
+        "splice_point_ids": ["SPL-AUB-001", "SPL-BOS-001"],
+        "route_asset_ids": ["TL-AUB-BOS", "OPGW-AUB-BOS", "SUB-AUB", "SUB-BOS"],
+        "service_ids": ["SVC-SCADA-AUB-BOS", "SVC-ETH-AUB-BOS"],
+        "notes": "Synthetic existing OPGW span with SCADA and Ethernet services."
+      }
+    },
+    {
+      "id": "FBR-BOS-RI-003",
+      "asset_type": "fiber_span",
+      "name": "Proposed 96F BOS-RI Fiber Design",
+      "status": "proposed",
+      "lifecycle": "proposed",
+      "geometry": { "type": "LineString", "coordinates": [[-71.063, 42.401], [-71.18, 42.18], [-71.302, 41.96], [-71.432, 41.744]] },
+      "properties": {
+        "cable_id": "FBR-BOS-RI-003",
+        "cable_type": "OPGW",
+        "fiber_count": 96,
+        "available_strands": 96,
+        "strand_range": "1-96",
+        "construction_status": "proposed",
+        "from_structure_id": "STR-BOS-205",
+        "to_structure_id": "STR-RI-402",
+        "splice_point_ids": ["SPL-RI-NEW"],
+        "route_asset_ids": ["TL-BOS-RI", "SUB-BOS", "SUB-RI"],
+        "service_ids": [],
+        "notes": "Proposed design span kept separate from existing demo records."
+      }
+    },
+    {
+      "id": "SPL-WBS-001",
+      "asset_type": "splice_point",
+      "name": "WBS Relay House LIU Splice",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.533, 42.348] },
+      "properties": {
+        "splice_id": "SPL-WBS-001",
+        "splice_type": "terminal_splice",
+        "fiber_span_id": "FBR-WBS-AUB-001",
+        "splice_count": 24,
+        "connected_assignment_ids": ["FA-87L-001"],
+        "notes": "Synthetic terminal splice in substation relay house."
+      }
+    },
+    {
+      "id": "SPL-AUB-001",
+      "asset_type": "splice_point",
+      "name": "Auburn OPGW Transition Splice",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.793, 42.222] },
+      "properties": {
+        "splice_id": "SPL-AUB-001",
+        "splice_type": "transition_splice",
+        "fiber_span_id": "FBR-WBS-AUB-001",
+        "splice_count": 36,
+        "connected_assignment_ids": ["FA-87L-001", "FA-SCADA-002"],
+        "notes": "Synthetic splice linking west and metro OPGW sections."
+      }
+    },
+    {
+      "id": "SPL-BOS-001",
+      "asset_type": "splice_point",
+      "name": "Boston OPGW Terminal Splice",
+      "status": "existing",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.104, 42.384] },
+      "properties": {
+        "splice_id": "SPL-BOS-001",
+        "splice_type": "terminal_splice",
+        "fiber_span_id": "FBR-AUB-BOS-002",
+        "splice_count": 28,
+        "connected_assignment_ids": ["FA-SCADA-002", "FA-ETH-003"],
+        "notes": "Synthetic terminal splice at Boston metro endpoint."
+      }
+    },
+    {
+      "id": "SPL-RI-NEW",
+      "asset_type": "splice_point",
+      "name": "Proposed RI Terminal Splice",
+      "status": "proposed",
+      "lifecycle": "proposed",
+      "geometry": { "type": "Point", "coordinates": [-71.432, 41.744] },
+      "properties": {
+        "splice_id": "SPL-RI-NEW",
+        "splice_type": "terminal_splice",
+        "fiber_span_id": "FBR-BOS-RI-003",
+        "splice_count": 0,
+        "connected_assignment_ids": [],
+        "notes": "Proposed synthetic splice point for design preview."
+      }
+    },
+    {
+      "id": "POLE-AUB-001",
+      "asset_type": "distribution_pole",
+      "name": "Auburn Distribution Pole 001",
+      "status": "in_service_synthetic",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.802, 42.181] },
+      "properties": {
+        "pole_number": "AUB-001",
+        "feeder_id": "AUB-FDR-7",
+        "utility_owner": "TelecomNE Demo Utility",
+        "telecom_role": "distribution_backbone",
+        "fiber_count": 48,
+        "fiber_span_ids": ["FBR-AUB-DIST-001"],
+        "splice_point_ids": ["SPL-AUB-DIST-001"],
+        "criticality": "normal",
+        "notes": "Synthetic distribution pole with fiber lateral attachment."
+      }
+    },
+    {
+      "id": "POLE-AUB-002",
+      "asset_type": "distribution_pole",
+      "name": "Auburn Distribution Pole 002",
+      "status": "in_service_synthetic",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.786, 42.176] },
+      "properties": {
+        "pole_number": "AUB-002",
+        "feeder_id": "AUB-FDR-7",
+        "utility_owner": "TelecomNE Demo Utility",
+        "telecom_role": "splice_pole",
+        "fiber_count": 48,
+        "fiber_span_ids": ["FBR-AUB-DIST-001"],
+        "splice_point_ids": ["SPL-AUB-DIST-001"],
+        "criticality": "normal",
+        "notes": "Synthetic sample pole used for create/edit/delete workflow comparison."
+      }
+    },
+    {
+      "id": "FBR-AUB-DIST-001",
+      "asset_type": "fiber_span",
+      "name": "Auburn Distribution 48F Lateral",
+      "status": "in_service_synthetic",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.835, 42.194], [-71.802, 42.181], [-71.786, 42.176]] },
+      "properties": {
+        "cable_id": "FBR-AUB-DIST-001",
+        "cable_type": "ADSS",
+        "fiber_count": 48,
+        "available_strands": 30,
+        "strand_range": "1-48",
+        "construction_status": "existing",
+        "route_asset_ids": ["SUB-AUB", "POLE-AUB-001", "POLE-AUB-002"],
+        "splice_point_ids": ["SPL-AUB-DIST-001"],
+        "notes": "Synthetic distribution lateral tied to Auburn hub."
+      }
+    },
+    {
+      "id": "SPL-AUB-DIST-001",
+      "asset_type": "splice_point",
+      "name": "Auburn Distribution Tap Splice",
+      "status": "in_service_synthetic",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.795, 42.179] },
+      "properties": {
+        "splice_id": "SPL-AUB-DIST-001",
+        "splice_type": "tap_splice",
+        "fiber_span_id": "FBR-AUB-DIST-001",
+        "splice_count": 8,
+        "connected_assignment_ids": ["FA-DIST-004"],
+        "notes": "Synthetic distribution splice point."
+      }
+    },
+    {
+      "id": "DEV-WBS-ICON-01",
+      "asset_type": "device",
+      "name": "WBS SEL ICON Node",
+      "status": "online",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.531, 42.35] },
+      "properties": {
+        "device_id": "DEV-WBS-ICON-01",
+        "device_type": "SEL ICON",
+        "site": "SUB-WBS",
+        "rack": "R1",
+        "shelf": "S1",
+        "slot": "2",
+        "port": "P03",
+        "ip_address": "10.60.12.11",
+        "vendor_model": "SEL ICON 3620",
+        "service_role": "Protection transport",
+        "operational_status": "online",
+        "linked_asset_ids": ["SUB-WBS", "FBR-WBS-AUB-001", "CIR-87L-WBS-AUB-001"],
+        "notes": "Synthetic device inventory record."
+      }
+    },
+    {
+      "id": "DEV-AUB-ICON-01",
+      "asset_type": "device",
+      "name": "AUB SEL ICON Node",
+      "status": "online",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.832, 42.197] },
+      "properties": {
+        "device_id": "DEV-AUB-ICON-01",
+        "device_type": "SEL ICON",
+        "site": "SUB-AUB",
+        "rack": "R2",
+        "shelf": "S1",
+        "slot": "5",
+        "port": "P07",
+        "ip_address": "10.60.22.11",
+        "vendor_model": "SEL ICON 3620",
+        "service_role": "Protection and C37.94 aggregation",
+        "operational_status": "online",
+        "linked_asset_ids": ["SUB-AUB", "FBR-WBS-AUB-001", "FBR-AUB-BOS-002", "CIR-87L-WBS-AUB-001"],
+        "notes": "Synthetic Auburn ICON node."
+      }
+    },
+    {
+      "id": "DEV-AUB-OTN-01",
+      "asset_type": "device",
+      "name": "AUB Nokia OTN Shelf",
+      "status": "online",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.828, 42.201] },
+      "properties": {
+        "device_id": "DEV-AUB-OTN-01",
+        "device_type": "DWDM/OTN",
+        "site": "SUB-AUB",
+        "rack": "R3",
+        "shelf": "S2",
+        "slot": "1",
+        "port": "LINE-1",
+        "ip_address": "10.60.22.31",
+        "vendor_model": "Nokia 1830 PSS demo",
+        "service_role": "Ethernet transport",
+        "operational_status": "online",
+        "linked_asset_ids": ["SUB-AUB", "FBR-AUB-BOS-002", "CIR-ETH-AUB-BOS-002"],
+        "notes": "Synthetic OTN device record."
+      }
+    },
+    {
+      "id": "DEV-BOS-OTN-01",
+      "asset_type": "device",
+      "name": "BOS Nokia OTN Shelf",
+      "status": "maintenance",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.06, 42.404] },
+      "properties": {
+        "device_id": "DEV-BOS-OTN-01",
+        "device_type": "DWDM/OTN",
+        "site": "SUB-BOS",
+        "rack": "R5",
+        "shelf": "S1",
+        "slot": "4",
+        "port": "LINE-2",
+        "ip_address": "10.60.40.41",
+        "vendor_model": "Nokia 1830 PSS demo",
+        "service_role": "SCADA and Ethernet aggregation",
+        "operational_status": "maintenance",
+        "linked_asset_ids": ["SUB-BOS", "FBR-AUB-BOS-002", "CIR-SCADA-AUB-BOS-001", "CIR-ETH-AUB-BOS-002"],
+        "notes": "Synthetic device flagged for maintenance in demo."
+      }
+    },
+    {
+      "id": "CIR-87L-WBS-AUB-001",
+      "asset_type": "circuit",
+      "name": "87L WBS-AUB Protection Channel 1",
+      "status": "active",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.533, 42.348], [-71.62, 42.31], [-71.735, 42.247], [-71.835, 42.194]] },
+      "properties": {
+        "circuit_id": "CIR-87L-WBS-AUB-001",
+        "service_type": "Protection",
+        "bandwidth": "64 kbps C37.94",
+        "protection_class": "Line differential",
+        "a_end": "DEV-WBS-ICON-01",
+        "z_end": "DEV-AUB-ICON-01",
+        "route_asset_ids": ["FBR-WBS-AUB-001", "SPL-WBS-001", "SPL-AUB-001", "DEV-WBS-ICON-01", "DEV-AUB-ICON-01"],
+        "criticality": "critical",
+        "notes": "Synthetic protection circuit for dependency tracing."
+      }
+    },
+    {
+      "id": "CIR-SCADA-AUB-BOS-001",
+      "asset_type": "circuit",
+      "name": "AUB-BOS SCADA Transport",
+      "status": "active",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.835, 42.194], [-71.54, 42.26], [-71.29, 42.34], [-71.063, 42.401]] },
+      "properties": {
+        "circuit_id": "CIR-SCADA-AUB-BOS-001",
+        "service_type": "SCADA",
+        "bandwidth": "10 Mbps",
+        "protection_class": "Diverse backup pending",
+        "a_end": "DEV-AUB-OTN-01",
+        "z_end": "DEV-BOS-OTN-01",
+        "route_asset_ids": ["FBR-AUB-BOS-002", "SPL-AUB-001", "SPL-BOS-001", "DEV-AUB-OTN-01", "DEV-BOS-OTN-01"],
+        "criticality": "high",
+        "notes": "Synthetic SCADA circuit."
+      }
+    },
+    {
+      "id": "CIR-ETH-AUB-BOS-002",
+      "asset_type": "circuit",
+      "name": "AUB-BOS Engineering Ethernet",
+      "status": "planned",
+      "lifecycle": "proposed",
+      "geometry": { "type": "LineString", "coordinates": [[-71.835, 42.194], [-71.54, 42.26], [-71.29, 42.34], [-71.063, 42.401]] },
+      "properties": {
+        "circuit_id": "CIR-ETH-AUB-BOS-002",
+        "service_type": "Ethernet",
+        "bandwidth": "1 Gbps",
+        "protection_class": "Ring protected proposed",
+        "a_end": "DEV-AUB-OTN-01",
+        "z_end": "DEV-BOS-OTN-01",
+        "route_asset_ids": ["FBR-AUB-BOS-002", "FBR-BOS-RI-003", "DEV-AUB-OTN-01", "DEV-BOS-OTN-01"],
+        "criticality": "normal",
+        "notes": "Synthetic proposed Ethernet service path."
+      }
+    },
+    {
+      "id": "SVC-87L-WBS-AUB",
+      "asset_type": "service",
+      "name": "West Bay Auburn 87L Service",
+      "status": "active_synthetic",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.533, 42.348], [-71.62, 42.31], [-71.735, 42.247], [-71.835, 42.194]] },
+      "properties": {
+        "service_id": "SVC-87L-WBS-AUB",
+        "service_type": "Protection",
+        "from_site": "SUB-WBS",
+        "to_site": "SUB-AUB",
+        "circuit_id": "CIR-87L-WBS-AUB-001",
+        "dependency_ids": ["SUB-WBS", "SUB-AUB", "DEV-WBS-ICON-01", "DEV-AUB-ICON-01", "FBR-WBS-AUB-001", "SPL-WBS-001", "SPL-AUB-001", "CIR-87L-WBS-AUB-001"],
+        "continuity_status": "complete",
+        "criticality": "critical",
+        "notes": "Synthetic end-to-end service dependency record."
+      }
+    },
+    {
+      "id": "SVC-SCADA-AUB-BOS",
+      "asset_type": "service",
+      "name": "Auburn Boston SCADA Service",
+      "status": "active_synthetic",
+      "lifecycle": "existing",
+      "geometry": { "type": "LineString", "coordinates": [[-71.835, 42.194], [-71.54, 42.26], [-71.29, 42.34], [-71.063, 42.401]] },
+      "properties": {
+        "service_id": "SVC-SCADA-AUB-BOS",
+        "service_type": "SCADA",
+        "from_site": "SUB-AUB",
+        "to_site": "SUB-BOS",
+        "circuit_id": "CIR-SCADA-AUB-BOS-001",
+        "dependency_ids": ["SUB-AUB", "SUB-BOS", "DEV-AUB-OTN-01", "DEV-BOS-OTN-01", "FBR-AUB-BOS-002", "SPL-AUB-001", "SPL-BOS-001", "CIR-SCADA-AUB-BOS-001"],
+        "continuity_status": "warning",
+        "criticality": "high",
+        "notes": "Synthetic service with maintenance risk at BOS OTN shelf."
+      }
+    },
+    {
+      "id": "WO-BOS-2601",
+      "asset_type": "work_order",
+      "name": "Inspect BOS OTN LINE-2 Optics",
+      "status": "open",
+      "lifecycle": "existing",
+      "geometry": { "type": "Point", "coordinates": [-71.06, 42.404] },
+      "properties": {
+        "work_order_id": "WO-BOS-2601",
+        "priority": "high",
+        "assigned_group": "Fiber Field Techs",
+        "due_date": "2026-07-01",
+        "linked_asset_ids": ["DEV-BOS-OTN-01", "SVC-SCADA-AUB-BOS", "CIR-SCADA-AUB-BOS-001"],
+        "notes": "Synthetic work order for desktop demo."
+      }
+    }
+  ]
+}
+

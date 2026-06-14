@@ -1,0 +1,9 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "woId": "WO-NE-2601", "title": "Install ICON C37.94 service test jumper", "assignedGroup": "Protection Telecom", "status": "in_progress", "priority": "critical", "dueDate": "2026-07-12", "relatedAssetId": "NODE-WBS-ICON", "site": "SUB-MA-WBS" }, "geometry": { "type": "Point", "coordinates": [-71.872, 42.06] } },
+    { "type": "Feature", "properties": { "woId": "WO-NE-2602", "title": "OTDR assumed OPGW span", "assignedGroup": "Fiber Field Ops", "status": "open", "priority": "high", "dueDate": "2026-07-22", "relatedAssetId": "FBR-CMA-001", "site": "SUB-MA-AUB" }, "geometry": { "type": "Point", "coordinates": [-71.83, 42.205] } },
+    { "type": "Feature", "properties": { "woId": "WO-NE-2603", "title": "Verify Auburn timing source alarm", "assignedGroup": "Telecom Engineering", "status": "open", "priority": "high", "dueDate": "2026-06-28", "relatedAssetId": "NODE-AUB-ICON", "site": "SUB-MA-AUB" }, "geometry": { "type": "Point", "coordinates": [-71.842, 42.214] } },
+    { "type": "Feature", "properties": { "woId": "WO-NE-2604", "title": "Provider demarc readiness check", "assignedGroup": "Carrier Services", "status": "open", "priority": "normal", "dueDate": "2026-08-04", "relatedAssetId": "FBR-ME-006", "site": "SUB-ME-POR" }, "geometry": { "type": "Point", "coordinates": [-70.25, 43.66] } }
+  ]
+}

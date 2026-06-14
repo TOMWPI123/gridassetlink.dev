@@ -1,0 +1,8 @@
+.venv/
+build/
+dist/
+*.spec
+*.log
+data/gridassetlink_demo.sqlite
+data/gridassetlink_demo.sqlite-*
+

@@ -6095,6 +6095,197 @@ th { color: #4d5e70; font-size: 11px; font-weight: 760; text-transform: uppercas
   list-style: none;
 }
 
+.dashboard-circuit-trace-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-circuit-layer-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgba(126, 238, 255, 0.22);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(10, 24, 30, 0.76);
+  cursor: pointer;
+}
+
+.dashboard-circuit-layer-toggle.active {
+  border-color: rgba(216, 248, 79, 0.45);
+  background: rgba(216, 248, 79, 0.1);
+}
+
+.dashboard-circuit-layer-toggle input {
+  margin-top: 4px;
+}
+
+.dashboard-circuit-layer-toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.dashboard-circuit-layer-toggle strong {
+  color: #f5fcff;
+  font-size: 0.84rem;
+}
+
+.dashboard-circuit-layer-toggle small {
+  color: rgba(226, 244, 248, 0.72);
+  line-height: 1.35;
+}
+
+.dashboard-circuit-trace-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dashboard-circuit-trace-metrics div {
+  border: 1px solid rgba(126, 238, 255, 0.18);
+  border-radius: 8px;
+  padding: 9px;
+  background: rgba(8, 20, 26, 0.72);
+}
+
+.dashboard-circuit-trace-metrics span {
+  display: block;
+  color: rgba(226, 244, 248, 0.64);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.dashboard-circuit-trace-metrics strong {
+  color: #f5fcff;
+  font-size: 1rem;
+}
+
+.dashboard-empty-panel {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(126, 238, 255, 0.16);
+  border-radius: 8px;
+  padding: 11px;
+  background: rgba(7, 19, 25, 0.72);
+}
+
+.dashboard-empty-panel strong {
+  color: #f6fdff;
+  font-size: 0.84rem;
+}
+
+.dashboard-empty-panel span {
+  color: rgba(226, 244, 248, 0.68);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.dashboard-circuit-trace-list {
+  display: grid;
+  gap: 10px;
+  max-height: min(58vh, 620px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.dashboard-circuit-trace-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(126, 238, 255, 0.16);
+  border-radius: 8px;
+  padding: 11px;
+  background: rgba(7, 19, 25, 0.8);
+}
+
+.dashboard-circuit-trace-card.active {
+  border-color: rgba(216, 248, 79, 0.58);
+  box-shadow: 0 0 0 1px rgba(216, 248, 79, 0.16);
+}
+
+.dashboard-circuit-trace-card > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.dashboard-circuit-trace-card span {
+  color: #d8f84f;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dashboard-circuit-trace-card strong {
+  color: #f8fdff;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.dashboard-circuit-trace-card small {
+  color: rgba(226, 244, 248, 0.68);
+  line-height: 1.35;
+}
+
+.dashboard-circuit-trace-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.dashboard-circuit-trace-card dl div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.dashboard-circuit-trace-card dt {
+  color: rgba(226, 244, 248, 0.58);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+}
+
+.dashboard-circuit-trace-card dd {
+  margin: 2px 0 0;
+  color: #edfaff;
+  font-size: 0.78rem;
+}
+
+.dashboard-circuit-trace-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dashboard-circuit-trace-actions button,
+.dashboard-circuit-trace-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border-radius: 7px;
+  border: 1px solid rgba(126, 238, 255, 0.22);
+  background: rgba(12, 38, 46, 0.85);
+  color: #eafcff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.dashboard-circuit-trace-actions button {
+  cursor: pointer;
+  background: rgba(216, 248, 79, 0.16);
+  border-color: rgba(216, 248, 79, 0.36);
+}
+
+.dashboard-circuit-trace-note {
+  margin: 0;
+  color: rgba(226, 244, 248, 0.66);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 @media (max-width: 1420px) {
   .dashboard-map-mode-grid,
   .dashboard-mode-street-level .dashboard-map-mode-grid {

@@ -1573,6 +1573,7 @@ export type StreetMapLayerKey =
   | "spliceClosures"
   | "fiberAssignments"
   | "strandContinuity"
+  | "circuitTraceRoutes"
   | "patchPanels"
   | "availableStrandCapacity"
   | "criticalRidingCircuits"

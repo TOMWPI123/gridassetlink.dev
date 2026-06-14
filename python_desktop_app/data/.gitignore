@@ -1,0 +1,6 @@
+gridassetlink_demo.sqlite
+gridassetlink_demo.sqlite-*
+*.gpkg
+*.sqlite
+*.db
+

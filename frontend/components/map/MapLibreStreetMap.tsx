@@ -489,6 +489,7 @@ export function MapLibreStreetMap({
           {layers.availableStrandCapacity ? <span><i className="legend-opgw-capacity" />Available strands</span> : null}
           {layers.criticalRidingCircuits ? <span><i className="legend-critical-route" />Critical riding circuits</span> : null}
           {layers.strandContinuity ? <span><i className="legend-critical-route" />Strand Continuity</span> : null}
+          {layers.circuitTraceRoutes ? <span><i className="legend-critical-route" />Circuit trace routes</span> : null}
           {layers.distributionPoleDensity || layers.distributionPoles || layers.distributionFiberRoutes || layers.distributionSplicePoints || layers.distributionSlackLoops || layers.distributionFiberAssignments ? <span><i className="legend-line" />Distribution Network</span> : null}
           {layers.transmissionStructures || layers.spliceClosures ? <span><i className="legend-structure" />Synthetic structures/splices</span> : null}
           {layers.designAssets ? <span><i className="legend-node" />Editable planning assets</span> : null}
@@ -783,10 +784,10 @@ function addPlanningSourcesAndLayers(map: MapLibreMap, gisApiBase: string) {
     type: "line",
     source: sourceIds.fiberAssignments,
     paint: {
-      "line-color": ["case", ["get", "isContinuityHighlight"], "#ffffff", ["get", "isCritical"], "#ff5b5b", ["match", ["get", "status"], "active", "#6effff", "reserved", "#efc95f", "planned", "#ffd85f", "proposed", "#ff4fd8", "#9bd6ff"]],
-      "line-width": ["case", ["get", "isContinuityHighlight"], ["interpolate", ["linear"], ["zoom"], 5, 7.5, 10, 12], ["get", "isCritical"], ["interpolate", ["linear"], ["zoom"], 5, 5.5, 10, 9.5], ["interpolate", ["linear"], ["zoom"], 5, 3.4, 10, 7]],
+      "line-color": ["case", ["get", "isContinuityHighlight"], "#ffffff", ["get", "isCircuitTrace"], "#d8f84f", ["get", "isCritical"], "#ff5b5b", ["match", ["get", "status"], "active", "#6effff", "reserved", "#efc95f", "planned", "#ffd85f", "proposed", "#ff4fd8", "#9bd6ff"]],
+      "line-width": ["case", ["get", "isContinuityHighlight"], ["interpolate", ["linear"], ["zoom"], 5, 7.5, 10, 12], ["get", "isCircuitTrace"], ["interpolate", ["linear"], ["zoom"], 5, 5.8, 10, 10.2], ["get", "isCritical"], ["interpolate", ["linear"], ["zoom"], 5, 5.5, 10, 9.5], ["interpolate", ["linear"], ["zoom"], 5, 3.4, 10, 7]],
       "line-opacity": ["case", ["get", "isContinuityHighlight"], 0.96, ["get", "isCritical"], 0.86, ["match", ["get", "status"], "reserved", 0.82, 0.68]],
-      "line-dasharray": ["case", ["get", "isCritical"], ["literal", [1.4, 0.8]], ["literal", [1, 0]]],
+      "line-dasharray": ["case", ["get", "isCircuitTrace"], ["literal", [1.8, 0.65]], ["get", "isCritical"], ["literal", [1.4, 0.8]], ["literal", [1, 0]]],
     },
   });
   addClusterLayers(map, sourceIds.distributionPoleDensity, "synthetic-distribution-pole-density", "#7dd3fc", "density cells");
@@ -829,10 +830,10 @@ function addPlanningSourcesAndLayers(map: MapLibreMap, gisApiBase: string) {
     type: "line",
     source: sourceIds.distributionFiberAssignments,
     paint: {
-      "line-color": ["match", ["get", "criticality"], "critical", "#ff5b5b", "high", "#ffb84d", "low", "#8ab4f8", "#a8fff2"],
-      "line-width": ["case", ["==", ["get", "criticality"], "critical"], ["interpolate", ["linear"], ["zoom"], 6, 2.2, 12, 6.8], ["interpolate", ["linear"], ["zoom"], 6, 1.4, 12, 4.8]],
+      "line-color": ["case", ["get", "isCircuitTrace"], "#d8f84f", ["match", ["get", "criticality"], "critical", "#ff5b5b", "high", "#ffb84d", "low", "#8ab4f8", "#a8fff2"]],
+      "line-width": ["case", ["get", "isCircuitTrace"], ["interpolate", ["linear"], ["zoom"], 6, 2.8, 12, 7.4], ["==", ["get", "criticality"], "critical"], ["interpolate", ["linear"], ["zoom"], 6, 2.2, 12, 6.8], ["interpolate", ["linear"], ["zoom"], 6, 1.4, 12, 4.8]],
       "line-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.28, 10, 0.68, 13, 0.92],
-      "line-dasharray": ["case", ["==", ["get", "status"], "active_synthetic"], ["literal", [1, 0]], ["literal", [1.1, 0.75]]],
+      "line-dasharray": ["case", ["get", "isCircuitTrace"], ["literal", [1.8, 0.65]], ["==", ["get", "status"], "active_synthetic"], ["literal", [1, 0]], ["literal", [1.1, 0.75]]],
     },
   });
   addClusterLayers(map, sourceIds.distributionPoles, "synthetic-distribution-poles", "#52f2c8", "poles");
@@ -1710,6 +1711,7 @@ function buildDatasets(
     || layers.availableStrandCapacity
     || layers.opgwOutageImpact
     || layers.strandContinuity
+    || layers.circuitTraceRoutes
     || hasContinuityHighlight;
   const spliceMetricLayerRequested = layers.opgwSplicePoints
     || layers.spliceClosures
@@ -2131,7 +2133,7 @@ function buildDatasets(
       geometry: feature.geometry,
       }];
     })) : emptyCollection,
-    fiberAssignments: layers.fiberAssignments || layers.criticalRidingCircuits || layers.strandContinuity ? collection(fiberAssignments.flatMap((assignment) => {
+    fiberAssignments: layers.fiberAssignments || layers.criticalRidingCircuits || layers.strandContinuity || layers.circuitTraceRoutes ? collection(fiberAssignments.flatMap((assignment) => {
       const isContinuityHighlight = continuitySets.assignmentIds.has(assignment.id);
       if (layers.strandContinuity && !isContinuityHighlight) return [];
       if (layers.criticalRidingCircuits && !layers.fiberAssignments && !isCriticalFiberAssignment(assignment) && !isContinuityHighlight) return [];
@@ -2151,6 +2153,7 @@ function buildDatasets(
           status: assignment.status,
           serviceType: assignment.serviceType,
           isCritical: isCriticalFiberAssignment(assignment),
+          isCircuitTrace: layers.circuitTraceRoutes || isContinuityHighlight,
           estimatedLossDb: assignment.estimatedLossDb || 0,
           synthetic: true,
           isContinuityHighlight,
@@ -2211,7 +2214,7 @@ function buildDatasets(
       },
       geometry: feature.geometry,
     }))) : emptyCollection,
-    distributionFiberAssignments: layers.distributionFiberAssignments ? collection(distributionFiberAssignments.map((feature) => ({
+    distributionFiberAssignments: layers.distributionFiberAssignments || layers.circuitTraceRoutes ? collection(distributionFiberAssignments.map((feature) => ({
       type: "Feature",
       properties: {
         kind: "distribution_fiber_assignment",
@@ -2220,6 +2223,7 @@ function buildDatasets(
         status: feature.properties.status,
         serviceType: feature.properties.serviceType,
         criticality: feature.properties.criticality,
+        isCircuitTrace: layers.circuitTraceRoutes,
         routeId: feature.properties.routeId,
         feederId: feature.properties.feederId,
         utilityOwner: feature.properties.utilityOwner,

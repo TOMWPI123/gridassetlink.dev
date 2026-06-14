@@ -38,6 +38,7 @@ type MapLayerControlPanelProps = {
   estimatedDistributionPoleScale?: number;
   availableStrandCount?: number;
   strandContinuityCount?: number;
+  circuitTraceCount?: number;
   criticalRidingCircuitCount?: number;
   outageImpactCount?: number;
   openOpgwWorkOrderCount?: number;
@@ -103,6 +104,7 @@ const opgwLayerRows: Array<{ key: StreetMapLayerKey; label: string; note: string
   { key: "fiberStrandsLayer", label: "Fiber Strands", note: "Strand records belong to cable sections in this engineering view.", badges: ["Strands"] },
   { key: "fiberAssignments", label: "Fiber Assignments", note: "Synthetic service assignments on OPGW cable sections.", badges: ["Assignments"] },
   { key: "strandContinuity", label: "Strand Continuity", note: "Isolated full-strand view from patch panels through splices to terminated devices.", badges: ["Trace", "Strand view"] },
+  { key: "circuitTraceRoutes", label: "Circuit Trace Routes", note: "Dashboard layer that lists circuits and isolates a full synthetic route when selected.", badges: ["Trace", "Circuits"] },
   { key: "availableStrandCapacity", label: "Available Strand Capacity", note: "Capacity coloring from synthetic strand records.", badges: ["Capacity"] },
   { key: "criticalRidingCircuits", label: "Critical Riding Circuits", note: "Synthetic SEL ICON, C37.94, DTT, Protection, and SCADA assignments.", badges: ["Critical"] },
   { key: "opgwOutageImpact", label: "Outage Impact", note: "Synthetic high-risk routes, sections, and spans.", badges: ["Impact"] },
@@ -153,6 +155,7 @@ export function MapLayerControlPanel({
   estimatedDistributionPoleScale = 0,
   availableStrandCount = 0,
   strandContinuityCount = 0,
+  circuitTraceCount = 0,
   criticalRidingCircuitCount = 0,
   outageImpactCount = 0,
   openOpgwWorkOrderCount = 0,
@@ -340,6 +343,7 @@ export function MapLayerControlPanel({
                     patchPanelCount,
                     availableStrandCount,
                     strandContinuityCount,
+                    circuitTraceCount,
                     criticalRidingCircuitCount,
                     outageImpactCount,
                     openOpgwWorkOrderCount,
@@ -962,6 +966,7 @@ function opgwCountForLayer(
     distributionFiberAssignmentCount: number;
     availableStrandCount: number;
     strandContinuityCount: number;
+    circuitTraceCount: number;
     criticalRidingCircuitCount: number;
     outageImpactCount: number;
     openOpgwWorkOrderCount: number;
@@ -992,6 +997,7 @@ function opgwCountForLayer(
   if (layer === "fiberStrandsLayer") return counts.availableStrandCount;
   if (layer === "fiberAssignments") return counts.criticalRidingCircuitCount;
   if (layer === "strandContinuity") return counts.strandContinuityCount;
+  if (layer === "circuitTraceRoutes") return counts.circuitTraceCount;
   if (layer === "availableStrandCapacity") return counts.availableStrandCount;
   if (layer === "criticalRidingCircuits") return counts.criticalRidingCircuitCount;
   if (layer === "opgwOutageImpact") return counts.outageImpactCount;
@@ -1012,7 +1018,7 @@ function dataWarningForLayer(layer: StreetMapLayerKey, warnings?: Record<string,
   if (layer === "distributionSplicePoints") return warnings?.distributionSplicePoints;
   if (layer === "distributionSlackLoops") return warnings?.distributionSlackLoops;
   if (layer === "distributionFiberAssignments") return warnings?.distributionFiberAssignments;
-  if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "existingFiberSplices" || layer === "proposedFiberSplices" || layer === "compareSpliceLayers" || layer === "fiberStrandsLayer" || layer === "strandContinuity" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.strandContinuity || warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments || warnings?.syntheticServices;
+  if (layer === "assumedOpgwRoutes" || layer === "plannedOpgwFiber" || layer === "verifiedOpgwFiber" || layer === "opgwRoutes" || layer === "opgwCableSections" || layer === "opgwSpanSegments" || layer === "opgwSplicePoints" || layer === "existingFiberSplices" || layer === "proposedFiberSplices" || layer === "compareSpliceLayers" || layer === "fiberStrandsLayer" || layer === "strandContinuity" || layer === "circuitTraceRoutes" || layer === "availableStrandCapacity" || layer === "opgwOutageImpact" || layer === "opgwOpenWorkOrders" || layer === "opgwSpanInspectionIssues") return warnings?.strandContinuity || warnings?.opgwCables || warnings?.fiberStrands || warnings?.fiberAssignments || warnings?.syntheticServices;
   if (layer === "spliceClosures") return warnings?.spliceClosures;
   if (layer === "patchPanels") return warnings?.patchPanels;
   if (layer === "criticalRidingCircuits") return warnings?.fiberAssignments;

@@ -50,6 +50,7 @@ const initialStreetLayers: Record<StreetMapLayerKey, boolean> = {
   spliceClosures: false,
   fiberAssignments: false,
   strandContinuity: false,
+  circuitTraceRoutes: false,
   patchPanels: false,
   availableStrandCapacity: false,
   criticalRidingCircuits: false,
@@ -150,11 +151,11 @@ function initialDashboardRightCollapsed() {
 }
 
 function isDashboardRightDrawerMode(value: string): value is RightDrawerMode {
-  return ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design", "guide"].includes(value);
+  return ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "circuits", "editor", "design", "guide"].includes(value);
 }
 
 type MapStatus = "loading" | "active" | "error";
-type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "scale" | "sources" | "details" | "strands" | "splices" | "assignments" | "editor" | "design" | "guide";
+type RightDrawerMode = "modules" | "summary" | "filters" | "layers" | "scale" | "sources" | "details" | "strands" | "splices" | "assignments" | "circuits" | "editor" | "design" | "guide";
 type AddAssetKind = "substation" | "transmission_line" | "telecom_node" | "sel_icon_node" | "fiber_node" | "circuit_endpoint" | "work_order" | "proposed_change";
 type DashboardOperatingMode = "in_service" | "planned";
 type DashboardLayerSummary = {
@@ -224,6 +225,20 @@ type CircuitRouteTarget = {
   assignments: FiberAssignment[];
   distributionAssignment?: DistributionFiberAssignmentFeature;
   legacyCircuit?: GeoFeature<TelecomCircuitProperties, "LineString">;
+};
+type CircuitTraceListItem = {
+  id: string;
+  label: string;
+  serviceType: string;
+  status: string;
+  criticality: string;
+  endpointA: string;
+  endpointZ: string;
+  source: "SEL ICON service" | "OPGW assignment" | "Distribution assignment" | "Legacy circuit";
+  assignmentCount: number;
+  cableCount: number;
+  routeMiles?: number;
+  traceHref: string;
 };
 type DashboardMapDataGroup =
   | "publicReference"
@@ -1231,6 +1246,7 @@ type DashboardSearchLayer =
   | "opgwSplicePoints"
   | "fiberAssignments"
   | "strandContinuity"
+  | "circuitTraceRoutes"
   | "distributionPoleDensity"
   | "distributionPoles"
   | "distributionFiberRoutes"
@@ -1257,6 +1273,7 @@ const searchLayerOptions: Array<{ value: DashboardSearchLayer; label: string; ki
   { value: "opgwSplicePoints", label: "OPGW splice points", kinds: ["opgw_splice_point"] },
   { value: "fiberAssignments", label: "Fiber assignments", kinds: ["fiber_assignment"] },
   { value: "strandContinuity", label: "Strand Continuity", kinds: ["fiber_assignment"] },
+  { value: "circuitTraceRoutes", label: "Circuit trace routes", kinds: ["fiber_assignment", "distribution_fiber_assignment"] },
   { value: "distributionFiberRoutes", label: "Distribution Network", kinds: ["distribution_pole_density", "distribution_pole", "distribution_pole_fiber", "distribution_splice_point", "distribution_slack_loop", "distribution_fiber_assignment"] },
   { value: "patchPanels", label: "Patch panels", kinds: ["patch_panel"] },
   { value: "syntheticSubstations", label: "Synthetic substations", kinds: ["synthetic_substation"] },
@@ -1270,7 +1287,7 @@ const moduleLayerCoverage: Record<string, StreetMapLayerKey[]> = {
   "/substations": ["publicSubstations", "syntheticSubstations"],
   "/devices": ["telecomNodes", "selIconNodes", "fccUtilityTowers"],
   "/device-ports": ["selIconNodes", "patchPanels", "fiberAssignments"],
-  "/circuits": ["criticalRidingCircuits", "fiberAssignments", "fccMicrowaveLinks"],
+  "/circuits": ["circuitTraceRoutes", "criticalRidingCircuits", "fiberAssignments", "fccMicrowaveLinks"],
   "/work-orders": ["opgwOpenWorkOrders", "workOrderLocations", "opgwSpanInspectionIssues"],
   "/transmission-lines": ["publicTransmissionLines", "assumedOpgwRoutes", "plannedOpgwFiber"],
   "/transmission-structures": ["transmissionStructures", "opgwSpanSegments", "spliceClosures"],
@@ -1285,7 +1302,7 @@ const moduleLayerCoverage: Record<string, StreetMapLayerKey[]> = {
   "/splice-points": ["opgwSplicePoints", "existingFiberSplices", "proposedFiberSplices"],
   "/patch-panels": ["patchPanels", "spliceClosures"],
   "/deviceops/change-requests": ["proposedChanges", "plannedOpgwFiber", "opgwOpenWorkOrders"],
-  "/fiber-trace": ["fiberAssignments", "opgwCableSections", "opgwSpanSegments"],
+  "/fiber-trace": ["circuitTraceRoutes", "fiberAssignments", "opgwCableSections", "opgwSpanSegments"],
   "/outage-impact": ["opgwOutageImpact", "criticalRidingCircuits", "opgwSpanInspectionIssues"],
   "/splice-matrix": ["existingFiberSplices", "proposedFiberSplices", "compareSpliceLayers"],
   "/fiber-strand-table": ["fiberStrandsLayer", "availableStrandCapacity"],
@@ -1658,33 +1675,38 @@ export function DashboardPage() {
       || streetLayers.opgwOpenWorkOrders
       || streetLayers.opgwSpanInspectionIssues
       || streetLayers.strandContinuity
+      || streetLayers.circuitTraceRoutes
       || rightMode === "splices"
       || rightMode === "strands"
       || rightMode === "assignments"
+      || rightMode === "circuits"
       || Boolean(continuityHighlight);
     if (needsOpgwTopology) groups.push("opgwTopology");
 
     if (hasCircuitRouteFocus) {
       groups.push("fiberAssignments");
-    } else if (streetLayers.availableStrandCapacity || streetLayers.fiberAssignments || streetLayers.criticalRidingCircuits || streetLayers.strandContinuity || rightMode === "strands" || rightMode === "assignments" || Boolean(continuityHighlight)) {
+    } else if (streetLayers.availableStrandCapacity || streetLayers.fiberAssignments || streetLayers.criticalRidingCircuits || streetLayers.strandContinuity || streetLayers.circuitTraceRoutes || rightMode === "strands" || rightMode === "assignments" || rightMode === "circuits" || Boolean(continuityHighlight)) {
       groups.push("fiberDetails");
     }
     if (streetLayers.patchPanels || streetLayers.strandContinuity || rightMode === "strands" || Boolean(continuityHighlight)) {
       groups.push("patchPanels");
     }
-    if (hasCircuitRouteFocus || continuityHighlight?.serviceId) {
+    if (hasCircuitRouteFocus || streetLayers.circuitTraceRoutes || rightMode === "circuits" || continuityHighlight?.serviceId) {
       groups.push("syntheticServices");
+    }
+    if (hasCircuitRouteFocus || streetLayers.circuitTraceRoutes || rightMode === "circuits") {
+      groups.push("legacyTelecomCircuits");
     }
     if (streetLayers.existingFiberSplices || streetLayers.proposedFiberSplices || streetLayers.compareSpliceLayers || (streetLayers.strandContinuity && !hasCircuitRouteFocus) || rightMode === "splices" || (Boolean(continuityHighlight) && !hasCircuitRouteFocus)) {
       groups.push("spliceContinuity");
     }
-    if (streetLayers.distributionFiberRoutes || streetLayers.distributionSplicePoints || streetLayers.distributionSlackLoops || streetLayers.distributionFiberAssignments || searchLayerFilter === "distributionFiberRoutes") {
+    if (streetLayers.distributionFiberRoutes || streetLayers.distributionSplicePoints || streetLayers.distributionSlackLoops || streetLayers.distributionFiberAssignments || streetLayers.circuitTraceRoutes || rightMode === "circuits" || searchLayerFilter === "distributionFiberRoutes") {
       groups.push("distributionFiberRoutes");
     }
     if (streetLayers.distributionSplicePoints || streetLayers.distributionSlackLoops) {
       groups.push("distributionRouteDetails");
     }
-    if (streetLayers.distributionFiberAssignments) {
+    if (streetLayers.distributionFiberAssignments || streetLayers.circuitTraceRoutes || rightMode === "circuits") {
       groups.push("distributionFiberAssignments");
     }
     if (streetLayers.distributionPoles) groups.push("distributionPoleSample");
@@ -1741,7 +1763,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const drawer = new URLSearchParams(window.location.search).get("drawer");
-    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "editor", "design", "guide"];
+    const allowedDrawers: RightDrawerMode[] = ["modules", "summary", "filters", "layers", "scale", "sources", "details", "strands", "splices", "assignments", "circuits", "editor", "design", "guide"];
     if (drawer && allowedDrawers.includes(drawer as RightDrawerMode)) {
       setRightMode(drawer as RightDrawerMode);
       setRightCollapsed(false);
@@ -1977,6 +1999,10 @@ export function DashboardPage() {
     () => buildOpgwPlanningMetrics(visibleOpgwCables, fiberStrands, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints),
     [fiberStrands, visibleFiberAssignments, visibleOpgwCableSections, visibleOpgwCables, visibleOpgwSpanSegments, visibleOpgwSplicePoints],
   );
+  const circuitTraceItems = useMemo(
+    () => buildCircuitTraceItems(syntheticServices, visibleFiberAssignments, visibleDistributionFiberAssignments, legacyTelecomCircuits),
+    [legacyTelecomCircuits, syntheticServices, visibleDistributionFiberAssignments, visibleFiberAssignments],
+  );
   const hasSubstationOwnerLayerState = Object.keys(visibleSubstationOwners).length > 0;
   const hasTransmissionLineOwnerLayerState = Object.keys(visibleTransmissionLineOwners).length > 0;
   const hasFccTowerOwnerLayerState = Object.keys(visibleFccTowerOwners).length > 0;
@@ -2110,6 +2136,7 @@ export function DashboardPage() {
       availableStrandCount: opgwPlanningMetrics.availableStrands,
       fiberAssignmentCount: visibleFiberAssignments.length,
       strandContinuityCount: strandContinuityRecords.length,
+      circuitTraceCount: circuitTraceItems.length,
       criticalRidingCircuitCount: opgwPlanningMetrics.criticalRidingCircuits,
       outageImpactCount: opgwPlanningMetrics.outageImpactCount,
       openOpgwWorkOrderCount: opgwPlanningMetrics.openWorkOrders,
@@ -2119,7 +2146,7 @@ export function DashboardPage() {
       workOrderLocationCount: availableWorkOrderIds.length,
       designAssetRecordCount: visibleDesignAssetRecords.length,
     }),
-    [estimatedDistributionPoleScale, fiberStrands.length, layerFilteredFccMicrowaveLinks.length, layerFilteredFccUtilityTowers.length, layerFilteredPublicSubstations.length, layerFilteredPublicTransmissionLines.length, layerFilteredSpliceClosures.length, layerFilteredTransmissionStructures.length, opgwPlanningMetrics.assumedRouteCount, opgwPlanningMetrics.availableStrands, opgwPlanningMetrics.criticalRidingCircuits, opgwPlanningMetrics.openWorkOrders, opgwPlanningMetrics.outageImpactCount, opgwPlanningMetrics.plannedRouteCount, opgwPlanningMetrics.spanInspectionIssues, opgwPlanningMetrics.verifiedRouteCount, strandContinuityRecords.length, streetLayers, visibleDesignAssetRecords.length, visibleDistributionFiberAssignments.length, visibleDistributionPoleDensity.length, visibleDistributionPoleFiberRoutes.length, visibleDistributionPoles.length, visibleDistributionSlackLoops.length, visibleDistributionSplicePoints.length, visibleFccMicrowaveLinks.length, visibleFccUtilityTowers.length, visibleFiberAssignments.length, visibleNodes.length, visibleOpgwCableSections.length, visibleOpgwCables.length, visibleOpgwRoutes.length, visibleOpgwSpanSegments.length, visibleOpgwSplicePoints.length, visiblePatchPanels.length, visiblePublicSubstations.length, visiblePublicTransmissionLines.length, visibleSpliceClosures.length, visibleSyntheticSubstations.length, visibleTransmissionLines.length, visibleTransmissionStructures.length],
+    [circuitTraceItems.length, estimatedDistributionPoleScale, fiberStrands.length, layerFilteredFccMicrowaveLinks.length, layerFilteredFccUtilityTowers.length, layerFilteredPublicSubstations.length, layerFilteredPublicTransmissionLines.length, layerFilteredSpliceClosures.length, layerFilteredTransmissionStructures.length, opgwPlanningMetrics.assumedRouteCount, opgwPlanningMetrics.availableStrands, opgwPlanningMetrics.criticalRidingCircuits, opgwPlanningMetrics.openWorkOrders, opgwPlanningMetrics.outageImpactCount, opgwPlanningMetrics.plannedRouteCount, opgwPlanningMetrics.spanInspectionIssues, opgwPlanningMetrics.verifiedRouteCount, strandContinuityRecords.length, streetLayers, visibleDesignAssetRecords.length, visibleDistributionFiberAssignments.length, visibleDistributionPoleDensity.length, visibleDistributionPoleFiberRoutes.length, visibleDistributionPoles.length, visibleDistributionSlackLoops.length, visibleDistributionSplicePoints.length, visibleFccMicrowaveLinks.length, visibleFccUtilityTowers.length, visibleFiberAssignments.length, visibleNodes.length, visibleOpgwCableSections.length, visibleOpgwCables.length, visibleOpgwRoutes.length, visibleOpgwSpanSegments.length, visibleOpgwSplicePoints.length, visiblePatchPanels.length, visiblePublicSubstations.length, visiblePublicTransmissionLines.length, visibleSpliceClosures.length, visibleSyntheticSubstations.length, visibleTransmissionLines.length, visibleTransmissionStructures.length],
   );
   const summaryCards = useMemo(
     () => buildSummaryCards(visibleTransmissionMaps, visibleSubstations, visibleNodes, visibleTransmissionLines, visiblePublicTransmissionLines, visiblePublicSubstations, visibleFccUtilityTowers, visibleFccMicrowaveLinks, visibleSyntheticSubstations, visibleTransmissionStructures, visibleOpgwCables, visibleOpgwRoutes, visibleOpgwCableSections, visibleOpgwSpanSegments, visibleOpgwSplicePoints, visibleSpliceClosures, visibleFiberAssignments, visibleDistributionPoles, visibleDistributionPoleFiberRoutes, visibleDistributionPoleDensity, visibleDistributionSplicePoints, visibleDistributionSlackLoops, visibleDistributionFiberAssignments, estimatedDistributionPoleScale, visiblePatchPanels),
@@ -2507,6 +2534,24 @@ export function DashboardPage() {
         setSearchLayerFilter("all");
         setVisibilityFilter("all");
       }
+    }
+    if (layer === "circuitTraceRoutes") {
+      if (enabled) {
+        setStreetLayers((current) => ({ ...current, circuitTraceRoutes: true, fiberAssignments: true, criticalRidingCircuits: true }));
+        setSearchLayerFilter("circuitTraceRoutes");
+        setVisibilityFilter("synthetic-demo");
+        setRightMode("circuits");
+        setRightCollapsed(false);
+        showToast("Circuit Trace Routes layer enabled. Choose a circuit to isolate its full route.");
+        return;
+      }
+      setIsolatedCircuitId(null);
+      setContinuityHighlight(undefined);
+      setStreetLayers((current) => ({ ...current, circuitTraceRoutes: false }));
+      setSearchLayerFilter((current) => current === "circuitTraceRoutes" ? "all" : current);
+      setVisibilityFilter("all");
+      showToast("Circuit Trace Routes layer hidden.");
+      return;
     }
     setIsolatedCircuitId(null);
     setStreetLayers((current) => ({ ...current, [layer]: enabled }));
@@ -2974,10 +3019,10 @@ export function DashboardPage() {
     setFocusRequest({ selection, sequence: Date.now() });
     setStreetLayers((current) => circuitRouteLayerState(current, circuitRouteLayerFamily(target, highlight)));
     setSearch(target.service?.serviceId || target.service?.circuitId || target.assignments[0]?.id || circuitId);
-    setSearchLayerFilter(selection.kind === "distribution_fiber_assignment" ? "distributionFiberRoutes" : "strandContinuity");
+    setSearchLayerFilter("circuitTraceRoutes");
     setVisibilityFilter("synthetic-demo");
     setSearchOpen(false);
-    setRightMode("layers");
+    setRightMode("circuits");
     setRightCollapsed(false);
     showToast(`Showing full circuit route for ${highlight.label}. Other map layers are hidden.`);
     return true;
@@ -3724,6 +3769,13 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "sources" ? "active" : ""} onClick={() => setRightMode("sources")}><TableProperties size={14} />Sources</button>
               <button type="button" className={rightMode === "details" ? "active" : ""} onClick={() => setRightMode("details")}><SlidersHorizontal size={14} />Details</button>
               <button type="button" className={rightMode === "splices" ? "active" : ""} onClick={() => setRightMode("splices")}><Cable size={14} />Splices</button>
+              <button type="button" className={rightMode === "circuits" ? "active" : ""} onClick={() => {
+                setRightMode("circuits");
+                setRightCollapsed(false);
+                setStreetLayers((current) => ({ ...current, circuitTraceRoutes: true }));
+                setSearchLayerFilter("circuitTraceRoutes");
+                setVisibilityFilter("synthetic-demo");
+              }}><Route size={14} />Circuits</button>
               <button type="button" onClick={handleGuideClick}><BookOpen size={14} />Guide</button>
               <button type="button" className={rightMode === "design" ? "active" : ""} onClick={handleDesignModeClick}><PencilRuler size={14} />Design</button>
             </div>
@@ -3786,6 +3838,7 @@ export function DashboardPage() {
                     estimatedDistributionPoleScale={estimatedDistributionPoleScale}
                     availableStrandCount={opgwPlanningMetrics.availableStrands}
                     strandContinuityCount={strandContinuityRecords.length}
+                    circuitTraceCount={circuitTraceItems.length}
                     criticalRidingCircuitCount={opgwPlanningMetrics.criticalRidingCircuits}
                     outageImpactCount={opgwPlanningMetrics.outageImpactCount}
                     openOpgwWorkOrderCount={opgwPlanningMetrics.openWorkOrders}
@@ -3859,6 +3912,18 @@ export function DashboardPage() {
               ) : null}
               {rightMode === "splices" ? <SpliceMatrix closures={visibleSpliceClosures} splices={fiberSplices} selectedAsset={selectedAsset} onAddSplice={addSyntheticSplice} onDeleteSplice={deleteSyntheticSplice} /> : null}
               {rightMode === "assignments" ? <FiberAssignmentPlanner assignments={visibleFiberAssignments} opgwCables={visibleOpgwCables} structures={visibleTransmissionStructures} strands={fiberStrands} onCreateAssignment={createSyntheticFiberAssignment} /> : null}
+              {rightMode === "circuits" ? (
+                <div className="dashboard-drawer-stack">
+                  {continuitySummary ? <ContinuitySummaryPanel summary={continuitySummary} /> : null}
+                  <CircuitTraceDrawer
+                    circuits={circuitTraceItems}
+                    selectedCircuitId={isolatedCircuitId}
+                    layerEnabled={streetLayers.circuitTraceRoutes}
+                    onToggleLayer={(enabled) => handleStreetLayerChange("circuitTraceRoutes", enabled)}
+                    onFocusCircuit={focusCircuitRoute}
+                  />
+                </div>
+              ) : null}
               {rightMode === "guide" ? (
                 <DatabaseGuideDrawer
                   coverageAreas={databaseGuideCoverageAreas}
@@ -4073,12 +4138,233 @@ function ContinuitySummaryPanel({ summary }: { summary: DashboardContinuitySumma
   );
 }
 
+function CircuitTraceDrawer({
+  circuits,
+  selectedCircuitId,
+  layerEnabled,
+  onToggleLayer,
+  onFocusCircuit,
+}: {
+  circuits: CircuitTraceListItem[];
+  selectedCircuitId: string | null;
+  layerEnabled: boolean;
+  onToggleLayer: (enabled: boolean) => void;
+  onFocusCircuit: (circuitId: string) => boolean;
+}) {
+  const criticalCount = circuits.filter((item) => ["critical", "high"].includes(item.criticality.toLowerCase())).length;
+  const plannedCount = circuits.filter((item) => item.status.toLowerCase().includes("planned") || item.status.toLowerCase().includes("proposed")).length;
+  const visibleCircuits = circuits.slice(0, 120);
+  return (
+    <section className="dashboard-circuit-trace-panel" aria-label="Circuit trace route dashboard">
+      <div className="dashboard-panel-heading">
+        <Route size={16} />
+        <div>
+          <strong>Circuit Trace Routes</strong>
+          <span>List circuits, then isolate a full route on the dashboard map.</span>
+        </div>
+      </div>
+      <label className={`dashboard-circuit-layer-toggle ${layerEnabled ? "active" : ""}`}>
+        <input type="checkbox" checked={layerEnabled} onChange={(event) => onToggleLayer(event.currentTarget.checked)} />
+        <span>
+          <strong>Show Circuit Trace Routes layer</strong>
+          <small>Synthetic/demo routing only; all unrelated layers are hidden when a route is isolated.</small>
+        </span>
+      </label>
+      <div className="dashboard-circuit-trace-metrics">
+        <div><span>Traceable circuits</span><strong>{circuits.length.toLocaleString()}</strong></div>
+        <div><span>Critical/high</span><strong>{criticalCount.toLocaleString()}</strong></div>
+        <div><span>Planned/proposed</span><strong>{plannedCount.toLocaleString()}</strong></div>
+      </div>
+      {!circuits.length ? (
+        <div className="dashboard-empty-panel">
+          <strong>Loading circuit trace data</strong>
+          <span>Enable the layer or wait for synthetic services, fiber assignments, distribution assignments, and legacy circuits to load.</span>
+        </div>
+      ) : (
+        <div className="dashboard-circuit-trace-list">
+          {visibleCircuits.map((circuit) => {
+            const active = selectedCircuitId ? circuitTraceMatchesSelected(circuit, selectedCircuitId) : false;
+            return (
+              <article className={`dashboard-circuit-trace-card ${active ? "active" : ""}`} key={`${circuit.source}-${circuit.id}`}>
+                <div>
+                  <span>{circuit.source}</span>
+                  <strong>{circuit.label}</strong>
+                  <small>{circuit.endpointA} to {circuit.endpointZ}</small>
+                </div>
+                <dl>
+                  <div><dt>Type</dt><dd>{circuit.serviceType}</dd></div>
+                  <div><dt>Status</dt><dd>{circuit.status.replaceAll("_", " ")}</dd></div>
+                  <div><dt>Criticality</dt><dd>{circuit.criticality}</dd></div>
+                  <div><dt>Assignments</dt><dd>{circuit.assignmentCount}</dd></div>
+                  <div><dt>Cables</dt><dd>{circuit.cableCount}</dd></div>
+                  {circuit.routeMiles !== undefined ? <div><dt>Miles</dt><dd>{circuit.routeMiles.toFixed(1)}</dd></div> : null}
+                </dl>
+                <div className="dashboard-circuit-trace-actions">
+                  <button type="button" onClick={() => onFocusCircuit(circuit.id)}>Show Route</button>
+                  <Link href={circuit.traceHref}>Open Trace</Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+      {circuits.length > visibleCircuits.length ? (
+        <p className="dashboard-circuit-trace-note">Showing the first {visibleCircuits.length.toLocaleString()} circuit records. Use search by layer for a narrower set.</p>
+      ) : null}
+    </section>
+  );
+}
+
 function formatFilterOption(value: string) {
   return value === "all" ? "All" : value;
 }
 
 function uniqueStrings(values: Array<string | undefined | null>) {
   return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function buildCircuitTraceItems(
+  services: SyntheticService[],
+  assignments: FiberAssignment[],
+  distributionAssignments: DistributionFiberAssignmentFeature[],
+  legacyCircuits: Array<GeoFeature<TelecomCircuitProperties, "LineString">>,
+): CircuitTraceListItem[] {
+  const items = new Map<string, CircuitTraceListItem>();
+  const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
+
+  services.forEach((service) => {
+    const assignmentIds = uniqueStrings([service.primaryPathAssignmentId, service.backupPathAssignmentId]);
+    const linkedAssignments = assignmentIds.map((id) => assignmentById.get(id)).filter(Boolean) as FiberAssignment[];
+    const cableCount = new Set([
+      ...(service.continuityCableIds || []),
+      ...linkedAssignments.flatMap((assignment) => assignment.cableIds),
+    ]).size;
+    const routeMiles = linkedAssignments.reduce((sum, assignment) => sum + (assignment.estimatedDistanceMiles || 0), 0);
+    const id = service.circuitId || service.serviceId;
+    addCircuitTraceItem(items, {
+      id,
+      label: service.serviceId,
+      serviceType: service.serviceType,
+      status: service.operationalStatus,
+      criticality: service.criticality,
+      endpointA: service.fromSiteName,
+      endpointZ: service.toSiteName,
+      source: "SEL ICON service",
+      assignmentCount: linkedAssignments.length || assignmentIds.length,
+      cableCount,
+      routeMiles: routeMiles || undefined,
+      traceHref: `/dashboard?drawer=circuits&fullCircuitRoute=${encodeURIComponent(id)}`,
+    });
+  });
+
+  assignments.forEach((assignment) => {
+    addCircuitTraceItem(items, {
+      id: assignment.id,
+      label: assignment.assignmentName,
+      serviceType: assignment.serviceType,
+      status: assignment.status,
+      criticality: isDashboardCriticalFiberAssignment(assignment) ? "critical" : "normal",
+      endpointA: assignment.aEndNodeId || assignment.aEndStructureId || "A-end",
+      endpointZ: assignment.zEndNodeId || assignment.zEndStructureId || "Z-end",
+      source: "OPGW assignment",
+      assignmentCount: 1,
+      cableCount: assignment.cableIds.length,
+      routeMiles: assignment.estimatedDistanceMiles,
+      traceHref: `/dashboard?drawer=circuits&fullCircuitRoute=${encodeURIComponent(assignment.id)}`,
+    });
+  });
+
+  distributionAssignments.forEach((feature) => {
+    const properties = feature.properties;
+    const id = properties.circuitId || properties.serviceId || properties.id;
+    addCircuitTraceItem(items, {
+      id,
+      label: properties.circuitId || properties.serviceName || properties.assignmentName,
+      serviceType: properties.serviceType,
+      status: properties.status,
+      criticality: properties.criticality,
+      endpointA: properties.endpointAPatchPanelId || properties.aEndPoleId,
+      endpointZ: properties.endpointZPatchPanelId || properties.zEndPoleId,
+      source: "Distribution assignment",
+      assignmentCount: 1,
+      cableCount: 1,
+      routeMiles: properties.routeMiles,
+      traceHref: `/dashboard?drawer=circuits&fullCircuitRoute=${encodeURIComponent(id)}`,
+    });
+  });
+
+  legacyCircuits.forEach((feature) => {
+    const properties = feature.properties;
+    addCircuitTraceItem(items, {
+      id: properties.circuitId,
+      label: properties.circuitName || properties.circuitId,
+      serviceType: properties.serviceType,
+      status: properties.status,
+      criticality: properties.criticality,
+      endpointA: properties.aEnd,
+      endpointZ: properties.zEnd,
+      source: "Legacy circuit",
+      assignmentCount: 1,
+      cableCount: 0,
+      traceHref: `/dashboard?drawer=circuits&fullCircuitRoute=${encodeURIComponent(properties.circuitId)}`,
+    });
+  });
+
+  return [...items.values()].sort((a, b) =>
+    circuitTracePriority(b) - circuitTracePriority(a)
+    || a.source.localeCompare(b.source)
+    || a.label.localeCompare(b.label)
+  );
+}
+
+function addCircuitTraceItem(items: Map<string, CircuitTraceListItem>, item: CircuitTraceListItem) {
+  const key = normalizeCircuitLookup(item.id || item.label);
+  if (!key) return;
+  const existing = items.get(key);
+  if (!existing) {
+    items.set(key, item);
+    return;
+  }
+  items.set(key, {
+    ...existing,
+    assignmentCount: Math.max(existing.assignmentCount, item.assignmentCount),
+    cableCount: Math.max(existing.cableCount, item.cableCount),
+    routeMiles: existing.routeMiles || item.routeMiles,
+    criticality: circuitCriticalityRank(item.criticality) > circuitCriticalityRank(existing.criticality) ? item.criticality : existing.criticality,
+    status: existing.status.toLowerCase().includes("active") ? existing.status : item.status,
+  });
+}
+
+function circuitTraceMatchesSelected(item: CircuitTraceListItem, selectedCircuitId: string) {
+  const selected = normalizeCircuitLookup(selectedCircuitId);
+  return Boolean(selected) && [
+    item.id,
+    item.label,
+  ].some((value) => normalizeCircuitLookup(value).includes(selected));
+}
+
+function circuitTracePriority(item: CircuitTraceListItem) {
+  return circuitCriticalityRank(item.criticality) * 10
+    + (item.status.toLowerCase().includes("active") ? 3 : 0)
+    + (item.status.toLowerCase().includes("planned") || item.status.toLowerCase().includes("proposed") ? 2 : 0)
+    + Math.min(item.assignmentCount, 5);
+}
+
+function circuitCriticalityRank(value: string) {
+  const normalized = value.toLowerCase();
+  if (normalized === "critical") return 4;
+  if (normalized === "high") return 3;
+  if (normalized === "medium" || normalized === "normal") return 2;
+  if (normalized === "low") return 1;
+  return 0;
+}
+
+function isDashboardCriticalFiberAssignment(assignment: FiberAssignment) {
+  return assignment.serviceType === "SEL_ICON"
+    || assignment.serviceType === "C37_94"
+    || assignment.serviceType === "Protection"
+    || assignment.serviceType === "DTT"
+    || assignment.serviceType === "SCADA";
 }
 
 function continuityObjectHref(objectType: string, objectId: string) {
@@ -7515,6 +7801,7 @@ function buildDashboardLayerSummaries({
   availableStrandCount,
   fiberAssignmentCount,
   strandContinuityCount,
+  circuitTraceCount,
   criticalRidingCircuitCount,
   outageImpactCount,
   openOpgwWorkOrderCount,
@@ -7558,6 +7845,7 @@ function buildDashboardLayerSummaries({
   availableStrandCount: number;
   fiberAssignmentCount: number;
   strandContinuityCount: number;
+  circuitTraceCount: number;
   criticalRidingCircuitCount: number;
   outageImpactCount: number;
   openOpgwWorkOrderCount: number;
@@ -7632,6 +7920,7 @@ function buildDashboardLayerSummaries({
     layer("availableStrandCapacity", "Available strand capacity", "Analysis overlays", availableStrandCount, availableStrandCount, "/fiber-strand-table", "Capacity overlay calculated from synthetic strand statuses", "Capacity is demo planning data only."),
     layer("fiberAssignments", "Fiber assignments", "Planning assets", fiberAssignmentCount, fiberAssignmentCount, "/fiber-assignments", "Synthetic service-to-strand assignment model", "Synthetic/demo assignments only."),
     layer("strandContinuity", "Strand Continuity", "Analysis overlays", strandContinuityCount, strandContinuityCount, "/strand-continuity", "Derived end-to-end strand views from existing fiber strands, cables, splices, patch panels, assignments, services, and devices", "Synthetic/demo linked asset data only. No separate continuity object is created."),
+    layer("circuitTraceRoutes", "Circuit trace routes", "Analysis overlays", circuitTraceCount, circuitTraceCount, "/fiber-trace", "Traceable circuit list derived from synthetic services, assignments, distribution routes, and legacy circuit geometry", "Synthetic/demo circuit paths only; not operational routing."),
     layer("criticalRidingCircuits", "Critical riding circuits", "Analysis overlays", criticalRidingCircuitCount, criticalRidingCircuitCount, "/outage-impact", "Synthetic critical service assignments riding OPGW paths", "Fictional circuits only; not operational routing."),
     layer("opgwOutageImpact", "Outage impact", "Analysis overlays", outageImpactCount, outageImpactCount, "/outage-impact", "Synthetic outage-risk overlay from route capacity and assignment flags", "Demo impact analysis only."),
     layer("opgwOpenWorkOrders", "Open OPGW work orders", "Planning assets", openOpgwWorkOrderCount, openOpgwWorkOrderCount, "/work-orders", "Synthetic OPGW work-order indicators", "Demo work orders only."),
@@ -7828,6 +8117,7 @@ function searchLayerForStreetLayer(layer: StreetMapLayerKey): DashboardSearchLay
   if (layer === "opgwSpanSegments" || layer === "opgwOutageImpact" || layer === "opgwSpanInspectionIssues") return "opgwSpanSegments";
   if (layer === "opgwSplicePoints") return "opgwSplicePoints";
   if (layer === "strandContinuity") return "strandContinuity";
+  if (layer === "circuitTraceRoutes") return "circuitTraceRoutes";
   if (layer === "fiberAssignments" || layer === "availableStrandCapacity" || layer === "criticalRidingCircuits") return "fiberAssignments";
   if (isDistributionLayerKey(layer)) return "distributionFiberRoutes";
   if (layer === "patchPanels") return "patchPanels";
@@ -7877,6 +8167,7 @@ function circuitRouteLayerState(current: Record<StreetMapLayerKey, boolean>, fam
   const next = Object.fromEntries(
     (Object.keys(current) as StreetMapLayerKey[]).map((key) => [key, false]),
   ) as Record<StreetMapLayerKey, boolean>;
+  next.circuitTraceRoutes = true;
   if (family === "distribution") {
     next.distributionFiberRoutes = true;
     next.distributionFiberAssignments = true;
@@ -7920,7 +8211,7 @@ function visibilityForSearchLayer(layer: DashboardSearchLayer) {
 function gisSearchTypesForLayer(layer: string): Array<"pole" | "circuit" | "fiber" | "splice" | "handhole" | "mux"> {
   if (layer === "distributionPoles") return ["pole"];
   if (layer === "distributionFiberRoutes") return ["pole", "fiber", "circuit", "splice"];
-  if (layer === "distributionFiberAssignments" || layer === "fiberAssignments") return ["fiber", "circuit"];
+  if (layer === "distributionFiberAssignments" || layer === "fiberAssignments" || layer === "circuitTraceRoutes") return ["fiber", "circuit"];
   if (layer === "distributionSplicePoints" || layer === "spliceClosures") return ["splice"];
   if (layer === "all") return ["pole", "fiber", "circuit", "splice"];
   return [];
@@ -8249,6 +8540,7 @@ function publicLayerSet(layers: Record<StreetMapLayerKey, boolean>) {
     distributionSlackLoops: false,
     distributionFiberAssignments: false,
     circuitEndpoints: false,
+    circuitTraceRoutes: false,
     workOrderLocations: false,
     proposedChanges: false,
     missingLocationAssets: false,
