@@ -169,6 +169,15 @@ type DashboardLayerSummary = {
   moduleHref: string;
   safety: string;
 };
+type ModuleCreateAction = {
+  key: string;
+  label: string;
+  note: string;
+  toolKey?: string;
+  href?: string;
+  layerKeys: StreetMapLayerKey[];
+  moduleHref: string;
+};
 type DashboardContinuitySummary = {
   label: string;
   strandContinuityId?: string;
@@ -1311,6 +1320,56 @@ const moduleLayerCoverage: Record<string, StreetMapLayerKey[]> = {
   "/import-export": ["publicTransmissionLines", "publicSubstations", "syntheticOpgwCables"],
   "/data-sources": ["publicTransmissionLines", "publicSubstations", "fccUtilityTowers", "fccMicrowaveLinks"],
   "/sql-reports": ["publicTransmissionLines", "publicSubstations", "opgwOutageImpact", "availableStrandCapacity"],
+};
+
+const databaseEntryCreateActions: ModuleCreateAction[] = [
+  { key: "database-object", label: "Any Object", note: "Create any table-only database object with custom fields.", toolKey: "create-database-object", layerKeys: ["designAssets"], moduleHref: "/admin/database" },
+  { key: "pole", label: "Pole / Support", note: "Insert a synthetic pole, support, or regional structure.", toolKey: "create-pole", layerKeys: ["distributionPoles", "transmissionStructures", "designAssets"], moduleHref: "/transmission-structures" },
+  { key: "fiber-span", label: "Cable / Span", note: "Create a fiber span, OPGW section, ADSS span, or route segment.", toolKey: "create-fiber-span", layerKeys: ["opgwCableSections", "opgwSpanSegments", "distributionFiberRoutes", "designAssets"], moduleHref: "/fiber-cables" },
+  { key: "fiber-strand", label: "Fiber Strand", note: "Add strand inventory tied to a cable or assignment.", toolKey: "create-fiber-strand", layerKeys: ["fiberStrandsLayer", "availableStrandCapacity", "designAssets"], moduleHref: "/fiber-strands" },
+  { key: "splice", label: "Splice Closure", note: "Create a splice point/closure that can appear on the map.", toolKey: "create-splice", layerKeys: ["opgwSplicePoints", "spliceClosures", "designAssets"], moduleHref: "/splice-closures" },
+  { key: "fiber-splice", label: "Splice Row", note: "Create an incoming/outgoing strand splice record.", toolKey: "create-fiber-splice", layerKeys: ["existingFiberSplices", "proposedFiberSplices", "compareSpliceLayers", "designAssets"], moduleHref: "/splice-matrix" },
+  { key: "patch-panel", label: "Patch Panel", note: "Create LIU or patch-panel records linked to cables and ports.", toolKey: "create-patch-panel", layerKeys: ["patchPanels", "designAssets"], moduleHref: "/patch-panels" },
+  { key: "patch-panel-port", label: "Panel Port", note: "Create a patch-panel port or termination object.", toolKey: "create-patch-panel-port", layerKeys: ["patchPanels", "fiberStrandsLayer", "designAssets"], moduleHref: "/patch-panels" },
+  { key: "device", label: "Device", note: "Create a device, SEL ICON node, router, relay, RTU, or NID.", toolKey: "create-device", layerKeys: ["telecomNodes", "selIconNodes", "designAssets"], moduleHref: "/devices" },
+  { key: "device-port", label: "Device Port", note: "Create hardware ports linked to devices, patch panels, and services.", toolKey: "create-device-port", layerKeys: ["telecomNodes", "patchPanels", "fiberAssignments", "designAssets"], moduleHref: "/device-ports" },
+  { key: "circuit", label: "Circuit", note: "Create a circuit/service record with endpoints and route links.", toolKey: "create-circuit", layerKeys: ["circuitTraceRoutes", "criticalRidingCircuits", "fiberAssignments", "designAssets"], moduleHref: "/circuits" },
+  { key: "fiber-assignment", label: "Fiber Assignment", note: "Assign strands, cables, splices, and endpoints to a service.", toolKey: "create-fiber-assignment", layerKeys: ["fiberAssignments", "strandContinuity", "circuitTraceRoutes", "designAssets"], moduleHref: "/fiber-assignments" },
+  { key: "work-order", label: "Work Order", note: "Issue field work from a saved design object or create one manually.", href: "/work-orders/new", layerKeys: ["workOrderLocations", "designAssets"], moduleHref: "/work-orders" },
+];
+
+const moduleCreateActionKeysByHref: Record<string, string[]> = {
+  "/dashboard": ["database-object", "pole", "fiber-span", "splice"],
+  "/regional-grid": ["pole", "fiber-span", "database-object"],
+  "/substations": ["patch-panel", "device", "database-object"],
+  "/devices": ["device", "device-port"],
+  "/device-ports": ["device-port", "patch-panel-port"],
+  "/circuits": ["circuit", "fiber-assignment"],
+  "/work-orders": ["work-order", "database-object"],
+  "/transmission-lines": ["fiber-span", "pole"],
+  "/transmission-structures": ["pole", "splice"],
+  "/opgw": ["fiber-span", "splice"],
+  "/opgw-cables": ["fiber-span", "fiber-strand", "fiber-assignment"],
+  "/distribution-fiber": ["pole", "fiber-span", "splice", "fiber-assignment"],
+  "/fiber-cables": ["fiber-span", "fiber-strand"],
+  "/fiber-strands": ["fiber-strand", "fiber-assignment"],
+  "/fiber-assignments": ["fiber-assignment", "circuit"],
+  "/strand-continuity": ["fiber-assignment", "fiber-splice", "patch-panel-port"],
+  "/splice-closures": ["splice", "fiber-splice"],
+  "/splice-points": ["splice", "fiber-splice"],
+  "/patch-panels": ["patch-panel", "patch-panel-port"],
+  "/deviceops/change-requests": ["database-object", "work-order"],
+  "/fiber-trace": ["circuit", "fiber-assignment"],
+  "/outage-impact": ["circuit", "work-order"],
+  "/splice-matrix": ["fiber-splice", "splice"],
+  "/fiber-strand-table": ["fiber-strand", "fiber-assignment"],
+  "/fiber-assignment-planner": ["fiber-assignment", "circuit"],
+  "/guide": ["database-object", "pole", "fiber-span", "fiber-splice"],
+  "/import-export": ["database-object"],
+  "/data-sources": ["database-object"],
+  "/sql-reports": ["database-object"],
+  "/creator": ["database-object", "pole", "fiber-span", "device"],
+  "/admin/database": ["database-object", "device", "fiber-span", "circuit"],
 };
 
 export function DashboardPage() {
@@ -3300,6 +3359,44 @@ export function DashboardPage() {
     issueMapCommand("resize");
   }
 
+  function openModuleCreateAction(action: ModuleCreateAction) {
+    if (action.href && !action.toolKey) return;
+    setDesignModeEnabled(true);
+    setStreetLayers((current) => enableLayerKeys({ ...current, designAssets: true }, action.layerKeys));
+    setSearchLayerFilter(searchLayerForStreetLayer(action.layerKeys[0]) || "designAssets");
+    setVisibilityFilter("synthetic-demo");
+    setRightMode("design");
+    setRightCollapsed(false);
+    setActiveTool("select");
+    setSelectedAsset((current) => current?.kind === "design_asset_record" ? null : current);
+    setPendingDesignGeometry(null);
+    setDesignDrawingCoordinates([]);
+    if (action.toolKey) {
+      setSelectedDesignAssetTypeSlug(designAssetSlugForCreateAction(action.toolKey));
+      setDesignQuickToolKey(`${action.toolKey}:${Date.now()}`);
+      showToast(`Create ${action.label} opened. Save it as a Design Mode record so it appears in dashboard layers and linked modules.`);
+    }
+    void loadDesignAssets(true);
+    issueMapCommand("resize");
+  }
+
+  function showModuleLayersOnDashboard(href: string, layerKeys: StreetMapLayerKey[]) {
+    const keys = layerKeys.length ? layerKeys : moduleLayerCoverage[href] || [];
+    if (!keys.length) {
+      setRightMode("layers");
+      setRightCollapsed(false);
+      showToast("No mapped dashboard layers are defined for this module yet.");
+      return;
+    }
+    setStreetLayers((current) => enableLayerKeys(current, keys));
+    setSearchLayerFilter(searchLayerForStreetLayer(keys[0]) || "all");
+    setVisibilityFilter(keys.some((key) => visibilityForStreetLayer(key) === "public") ? "all" : "synthetic-demo");
+    setRightMode("layers");
+    setRightCollapsed(false);
+    showToast(`Layer viewer opened for ${keys.length} mapped module layer${keys.length === 1 ? "" : "s"}.`);
+    issueMapCommand("resize");
+  }
+
   function handleChangeAssetsClick() {
     openDashboardChangeTool(null, selectedAsset ? `Ready to change ${selectedAsset.label}.` : "Change Assets opened. Select an asset or add a new design record.");
   }
@@ -3780,7 +3877,14 @@ export function DashboardPage() {
               <button type="button" className={rightMode === "design" ? "active" : ""} onClick={handleDesignModeClick}><PencilRuler size={14} />Design</button>
             </div>
             <div className="dashboard-drawer-body">
-              {rightMode === "modules" ? <ModulesDrawer pathname={pathname} layerSummaries={dashboardLayerSummaries} /> : null}
+              {rightMode === "modules" ? (
+                <ModulesDrawer
+                  pathname={pathname}
+                  layerSummaries={dashboardLayerSummaries}
+                  onCreateEntry={openModuleCreateAction}
+                  onShowLayers={showModuleLayersOnDashboard}
+                />
+              ) : null}
               {rightMode === "summary" ? <SummaryDrawer cards={summaryCards} publicOnly={publicOnly} mapStatusMessage={mapStatusMessage} opgwMetrics={opgwPlanningMetrics} layerSummaries={dashboardLayerSummaries} /> : null}
               {rightMode === "filters" ? (
                 <FiltersResultsDrawer
@@ -5605,17 +5709,43 @@ function DashboardDataSourcesPanel() {
   );
 }
 
-function ModulesDrawer({ pathname, layerSummaries }: { pathname: string; layerSummaries: DashboardLayerSummary[] }) {
+function ModulesDrawer({
+  pathname,
+  layerSummaries,
+  onCreateEntry,
+  onShowLayers,
+}: {
+  pathname: string;
+  layerSummaries: DashboardLayerSummary[];
+  onCreateEntry: (action: ModuleCreateAction) => void;
+  onShowLayers: (href: string, layerKeys: StreetMapLayerKey[]) => void;
+}) {
   return (
     <section className="dashboard-module-drawer" aria-label="Application modules">
       <div className="dashboard-panel-heading">
         <Network size={16} />
         <div>
           <strong>TelecomNE modules</strong>
-          <span>Account-gated synthetic planning modules</span>
+          <span>Synthetic planning modules, database entry tools, and layer links</span>
         </div>
       </div>
       <LayerSummaryDigest layerSummaries={layerSummaries} />
+      <div className="dashboard-module-create-panel">
+        <div className="dashboard-module-section-title">Create database entries</div>
+        <div className="dashboard-module-create-grid">
+          {databaseEntryCreateActions.map((action) => action.href && !action.toolKey ? (
+            <Link href={action.href} className="dashboard-module-create-button" key={action.key}>
+              <strong>{action.label}</strong>
+              <span>{action.note}</span>
+            </Link>
+          ) : (
+            <button type="button" className="dashboard-module-create-button" key={action.key} onClick={() => onCreateEntry(action)}>
+              <strong>{action.label}</strong>
+              <span>{action.note}</span>
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="dashboard-module-sections">
         {appNavGroups.map((group) => (
           <section className="dashboard-module-section" key={group.title}>
@@ -5624,20 +5754,32 @@ function ModulesDrawer({ pathname, layerSummaries }: { pathname: string; layerSu
               {group.items.map(([href, label, Icon]) => {
                 const moduleLayers = layersForModule(href, layerSummaries);
                 const visibleFeatureCount = moduleLayers.reduce((sum, layer) => sum + layer.visible, 0);
+                const createActions = createActionsForModule(href).slice(0, 3);
+                const layerKeys = moduleLayers.map((layer) => layer.key);
                 return (
-                  <Link className={`dashboard-module-link ${isActiveModule(pathname, href) ? "active" : ""}`} href={href} key={href}>
-                    <Icon size={15} />
-                    <span className="dashboard-module-link-copy">
-                      <span>{label}</span>
-                      {moduleLayers.length ? (
-                        <small>{moduleLayers.slice(0, 2).map((layer) => layer.label).join(" + ")}{moduleLayers.length > 2 ? ` +${moduleLayers.length - 2}` : ""}</small>
-                      ) : <small>Module data tables</small>}
-                    </span>
-                    <span className="dashboard-module-layer-count">
-                      {formatCompactCount(visibleFeatureCount)}
-                      <small>visible</small>
-                    </span>
-                  </Link>
+                  <article className={`dashboard-module-card ${isActiveModule(pathname, href) ? "active" : ""}`} key={href}>
+                    <Link className="dashboard-module-link" href={href}>
+                      <Icon size={15} />
+                      <span className="dashboard-module-link-copy">
+                        <span>{label}</span>
+                        {moduleLayers.length ? (
+                          <small>{moduleLayers.slice(0, 2).map((layer) => layer.label).join(" + ")}{moduleLayers.length > 2 ? ` +${moduleLayers.length - 2}` : ""}</small>
+                        ) : <small>Module data tables</small>}
+                      </span>
+                      <span className="dashboard-module-layer-count">
+                        {formatCompactCount(visibleFeatureCount)}
+                        <small>visible</small>
+                      </span>
+                    </Link>
+                    <div className="dashboard-module-card-actions">
+                      {createActions.map((action) => action.href && !action.toolKey ? (
+                        <Link href={action.href} key={action.key}>Create {action.label}</Link>
+                      ) : (
+                        <button type="button" key={action.key} onClick={() => onCreateEntry(action)}>Create {action.label}</button>
+                      ))}
+                      <button type="button" onClick={() => onShowLayers(href, layerKeys)}>Layer Viewer</button>
+                    </div>
+                  </article>
                 );
               })}
             </div>
@@ -7764,6 +7906,39 @@ function formatCompactCount(value: number) {
 function layersForModule(href: string, layerSummaries: DashboardLayerSummary[]) {
   const layerByKey = new Map(layerSummaries.map((layer) => [layer.key, layer]));
   return (moduleLayerCoverage[href] || []).map((key) => layerByKey.get(key)).filter((layer): layer is DashboardLayerSummary => Boolean(layer));
+}
+
+function enableLayerKeys(current: Record<StreetMapLayerKey, boolean>, keys: StreetMapLayerKey[]) {
+  const next = { ...current };
+  keys.forEach((key) => {
+    next[key] = true;
+  });
+  return next;
+}
+
+function designAssetSlugForCreateAction(toolKey: string) {
+  const slugByToolKey: Record<string, string> = {
+    "create-database-object": "design-database-object",
+    "create-pole": "design-distribution-pole",
+    "create-device": "design-device",
+    "create-device-port": "design-device-port",
+    "create-splice": "design-splice-point",
+    "create-fiber-splice": "design-fiber-splice",
+    "create-fiber-span": "design-opgw-cable",
+    "create-fiber-strand": "design-fiber-strand",
+    "create-patch-panel": "design-patch-panel",
+    "create-patch-panel-port": "design-patch-panel-port",
+    "create-circuit": "design-circuit",
+    "create-fiber-assignment": "design-fiber-assignment",
+  };
+  return slugByToolKey[toolKey] || "design-database-object";
+}
+
+function createActionsForModule(href: string) {
+  const actionByKey = new Map(databaseEntryCreateActions.map((action) => [action.key, action]));
+  return (moduleCreateActionKeysByHref[href] || ["database-object"])
+    .map((key) => actionByKey.get(key))
+    .filter((action): action is ModuleCreateAction => Boolean(action));
 }
 
 function buildDashboardLayerSummaries({
