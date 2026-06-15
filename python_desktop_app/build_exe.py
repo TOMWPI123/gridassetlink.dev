@@ -24,6 +24,8 @@ def main() -> int:
         "--add-data",
         f"{ROOT / 'data' / 'demo_assets.json'};data",
         "--add-data",
+        f"{ROOT / 'data' / 'gis_layers'};data/gis_layers",
+        "--add-data",
         f"{ROOT / '.env.example'};.",
         "--collect-submodules",
         "PySide6",

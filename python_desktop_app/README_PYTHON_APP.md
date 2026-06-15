@@ -10,8 +10,9 @@ This desktop app uses synthetic/demo records only by default. It is not an offic
 - `backend/` owns SQLite storage, API routes, import/export, dependencies, audit logs, and rule-based command handling.
 - `frontend/` is a local HTML/CSS/JavaScript dashboard served by FastAPI and embedded in the desktop shell.
 - `data/demo_assets.json` seeds fictional substations, transmission lines, structures, OPGW routes, fiber spans, splice points, distribution poles, devices, circuits, services, and work orders.
+- `data/gis_layers/` bundles the existing dashboard GIS GeoJSON dataset for the desktop map, including public-reference transmission/substation/FCC layers and synthetic OPGW, distribution fiber, splice, pole, and structure layers.
 - SQLite is the default local store. Optional PostGIS settings are reserved in `.env.example` but not required.
-- The map uses an offline SVG renderer, so the app does not need internet access for the MVP.
+- The map uses a dashboard-style custom canvas renderer with CARTO dark street tiles and bundled GIS overlays for responsive pan/zoom. Large GIS layers are rendered as capped previews for performance while full feature counts remain visible in the layer controls.
 
 ## Run Locally
 
@@ -39,11 +40,24 @@ python main.py --reset-demo-data
 
 ## Dashboard Features
 
-- Offline interactive SVG map.
+- Dashboard-style custom canvas street map with CARTO dark basemap tiles and bundled GIS overlay projection.
 - Layer controls for substations, transmission lines, distribution poles, structures, OPGW routes, fiber spans, splice points, devices, circuits, services, and work orders.
+- GIS dataset layer controls for the bundled GeoJSON data pack:
+  - public transmission lines
+  - public substations
+  - synthetic substations
+  - synthetic transmission structures
+  - synthetic OPGW cables
+  - synthetic distribution pole samples
+  - synthetic distribution fiber routes
+  - synthetic distribution splice points
+  - synthetic splice closures
+  - FCC utility towers
+  - FCC microwave paths
+  - dashboard telecom nodes, fiber routes, circuits, work orders, and proposed changes
 - Existing vs proposed/design lifecycle filtering.
 - Asset search and status filtering.
-- Clickable map assets and result rows with detail panels.
+- Clickable local assets, GIS dataset features, and result rows with detail panels.
 - Dependency tracing for services, devices, circuits, fibers, splice points, substations, and work orders.
 - Create/edit/delete workflows for synthetic records.
 - Create distribution poles, fiber spans, splice points, devices, substations, circuits, and services.
@@ -113,4 +127,3 @@ For point records, `longitude` and `latitude` are enough. For line or polygon re
 ## Future OpenAI Assistant Adapter
 
 `backend/assistant_adapter.py` defines a clean boundary for replacing the local deterministic command handler with an OpenAI-backed assistant later. The MVP intentionally does not import an OpenAI SDK or hard-code credentials. Keep API keys in `.env` or another approved secret source.
-

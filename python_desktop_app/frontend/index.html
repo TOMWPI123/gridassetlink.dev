@@ -56,7 +56,7 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section class="panel street-layer-control-panel">
             <div class="panel-heading">
               <span>Editable Asset Layers</span>
               <button class="tiny-button" id="show-all-layers-button" type="button">All</button>
@@ -64,7 +64,7 @@
             <div id="layer-list" class="layer-list"></div>
           </section>
 
-          <section class="panel">
+          <section class="panel street-layer-control-panel">
             <div class="panel-heading">
               <span>GIS Dataset Layers</span>
               <small id="gis-layer-summary">Loading</small>
@@ -81,18 +81,29 @@
           </section>
         </aside>
 
-        <section class="map-stage" aria-label="Offline synthetic GIS map">
+        <section class="map-stage" aria-label="Custom rendered synthetic GIS map">
           <div class="stage-toolbar">
             <div>
               <strong>New England Telecom Planning Map</strong>
-              <span id="tile-mode-label">Offline SVG map mode</span>
+              <span id="tile-mode-label">Custom canvas map mode</span>
             </div>
             <div class="stage-stats" id="summary-cards"></div>
           </div>
 
-          <div class="map-frame">
-            <svg id="asset-map" class="asset-map" viewBox="0 0 1000 700" role="img" aria-label="Synthetic grid asset map"></svg>
-            <div class="map-legend" id="map-legend"></div>
+          <div class="map-frame street-map-panel street-map-panel-fullscreen">
+            <div class="street-map-canvas-shell tool-select">
+              <canvas id="asset-canvas" class="asset-canvas" aria-label="Synthetic grid asset map"></canvas>
+              <svg id="asset-map" class="asset-map street-level-svg" viewBox="0 0 1000 700" role="img" aria-label="Synthetic grid asset map"></svg>
+              <div class="local-map-controls" aria-label="Map controls">
+                <button id="map-zoom-in-button" type="button" title="Zoom in">+</button>
+                <button id="map-zoom-out-button" type="button" title="Zoom out">-</button>
+              </div>
+              <div class="street-map-placement-hint" id="map-status-pill">Custom canvas map initializing</div>
+              <button class="map-fit-button" id="fit-map-button" type="button" title="Reset to ISO-NE dashboard view">Fit</button>
+              <div class="local-map-readout" id="map-readout">Zoom 6.0 / ISO-NE</div>
+              <div class="local-map-popup" id="map-popup" hidden></div>
+              <div class="map-legend local-map-legend" id="map-legend"></div>
+            </div>
           </div>
 
           <section class="bottom-console" aria-label="Local command panel">

@@ -71,7 +71,7 @@ def create_app(reset_demo_data: bool = False) -> FastAPI:
             "database_path": str(settings.database_path),
             "offline_map_mode": settings.offline_map_mode,
             "postgis_configured": bool(settings.postgis_url),
-            "tile_mode": "offline-svg" if settings.offline_map_mode else "optional-external-tiles",
+            "tile_mode": "custom-canvas-carto-dark-gis-overlay",
         }
 
     @app.get("/favicon.ico", include_in_schema=False)

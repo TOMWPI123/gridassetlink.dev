@@ -16,6 +16,19 @@
   --line: #5dd3ff;
   --proposed: #f7c96b;
   --existing: #68e1ad;
+  --dash-bg: #071012;
+  --dash-panel: rgba(9, 17, 20, 0.72);
+  --dash-panel-2: rgba(14, 27, 31, 0.82);
+  --dash-border: rgba(180, 231, 236, 0.14);
+  --dash-text: #eefcfb;
+  --dash-muted: #9bb5b8;
+  --dash-cyan: #69d7e4;
+  --dash-teal: #28c7a9;
+  --dash-green: #64d88a;
+  --dash-amber: #efc95f;
+  --dash-red: #ff6b6b;
+  --dash-violet: #b390ff;
+  --dash-blue: #70a7ff;
   --shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
   --radius: 8px;
   --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -288,6 +301,16 @@ textarea:focus {
   background: rgba(4, 13, 15, 0.54);
 }
 
+.street-layer-control-panel {
+  background: rgba(16, 25, 29, 0.86);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
+
+.street-layer-toggle {
+  border-color: rgba(232, 241, 240, 0.1);
+  background: rgba(232, 241, 240, 0.055);
+}
+
 .layer-row.active {
   border-color: rgba(87, 199, 255, 0.3);
   background: rgba(28, 73, 82, 0.42);
@@ -430,23 +453,91 @@ textarea:focus {
 
 .map-frame {
   position: relative;
-  min-height: 480px;
+  min-height: clamp(620px, calc(100vh - 250px), 780px);
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid var(--dash-border);
   border-radius: var(--radius);
-  background: #081416;
-  box-shadow: var(--shadow);
+  background: var(--dash-bg);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
 }
 
+.street-map-panel {
+  display: block;
+}
+
+.street-map-canvas-shell {
+  position: relative;
+  min-height: inherit;
+  height: 100%;
+  overflow: hidden;
+  background: #071012;
+  isolation: isolate;
+}
+
+.street-map-canvas-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  min-height: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(105, 215, 228, 0.05), transparent 42%, rgba(239, 201, 95, 0.06)),
+    #071012;
+}
+
+.asset-canvas,
 .asset-map {
   display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   width: 100%;
   height: 100%;
-  min-height: 520px;
+  min-height: inherit;
+  pointer-events: none;
+  contain: layout paint;
+  transition: opacity 120ms ease;
+  will-change: opacity;
+}
+
+.asset-canvas {
+  display: none;
+  pointer-events: auto;
+  touch-action: none;
+  will-change: transform;
+}
+
+body.map-canvas-mode .asset-canvas {
+  display: block;
+}
+
+body.map-canvas-mode .asset-map {
+  display: none;
+}
+
+.asset-map.map-moving {
+  opacity: 0.42;
+}
+
+.asset-canvas.map-moving {
+  cursor: grabbing;
+}
+
+.asset-map.map-moving .gis-line,
+.asset-map.map-moving .gis-point,
+.asset-map.map-moving .line-asset,
+.asset-map.map-moving .point-asset {
+  pointer-events: none;
 }
 
 .map-background {
   fill: #0a1618;
+}
+
+.map-projection-vignette {
+  fill: rgba(7, 16, 18, 0.06);
+  pointer-events: none;
 }
 
 .map-grid line {
@@ -476,6 +567,8 @@ textarea:focus {
   stroke-linecap: round;
   stroke-linejoin: round;
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
 }
 
 .line-hit {
@@ -484,8 +577,9 @@ textarea:focus {
 }
 
 .line-visible {
-  stroke-width: 4;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+  stroke-width: 4.4;
+  opacity: 0.92;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.58));
 }
 
 .line-asset.proposed .line-visible {
@@ -497,8 +591,57 @@ textarea:focus {
   stroke: #fff4cf;
 }
 
+.gis-line,
+.gis-point {
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.gis-line-hit {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.001);
+  stroke-width: 12;
+}
+
+.gis-line-visible {
+  fill: none;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.72;
+  filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.55));
+}
+
+.gis-line.selected .gis-line-visible {
+  stroke: #fff4cf;
+  stroke-width: 4;
+  opacity: 0.92;
+}
+
+.gis-point-hit {
+  fill: rgba(255, 255, 255, 0.001);
+}
+
+.gis-point-visible {
+  opacity: 0.82;
+  stroke: rgba(4, 13, 15, 0.92);
+  stroke-width: 1.15;
+  filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.55));
+}
+
+.gis-point.selected .gis-point-visible {
+  r: 7px;
+  fill: #fff4cf;
+  opacity: 1;
+  stroke: rgba(4, 13, 15, 0.95);
+  stroke-width: 2;
+}
+
 .point-asset {
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
 }
 
 .point-asset .marker-ring {
@@ -528,32 +671,210 @@ textarea:focus {
 
 .map-legend {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  left: 50%;
+  bottom: 14px;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: auto;
+  gap: 7px;
+  width: calc(100% - 28px);
+  max-width: min(980px, calc(100% - 28px));
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.local-legend-list {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  max-width: calc(100% - 24px);
+  justify-content: flex-start;
 }
 
+.local-legend-title {
+  margin-left: 2px;
+  color: var(--dash-muted);
+  font-size: 10px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.local-map-legend span,
 .legend-chip {
   display: inline-flex;
-  gap: 6px;
   align-items: center;
-  min-height: 26px;
+  gap: 7px;
+  min-height: 28px;
   padding: 5px 8px;
-  border: 1px solid rgba(178, 233, 226, 0.18);
-  border-radius: 7px;
-  background: rgba(4, 13, 15, 0.78);
-  color: var(--soft);
-  font-size: 10px;
+  border: 1px solid rgba(232, 241, 240, 0.14);
+  border-radius: 999px;
+  background: rgba(7, 16, 18, 0.76);
+  color: var(--dash-text);
+  font-size: 11px;
   font-weight: 780;
+  backdrop-filter: blur(10px);
+}
+
+.legend-chip.gis-chip {
+  border-style: dashed;
+  color: #b6d8d2;
 }
 
 .legend-swatch {
-  width: 9px;
-  height: 9px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
+}
+
+.gis-swatch {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.42);
+}
+
+.street-swatch {
+  border-radius: 3px;
+  background:
+    linear-gradient(135deg, transparent 0 32%, rgba(7, 16, 18, 0.9) 32% 46%, transparent 46% 100%),
+    #efc95f;
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 207, 0.5);
+}
+
+.scale-swatch {
+  background: linear-gradient(135deg, #6ee7f5, #f7c96b);
+}
+
+.street-map-placement-hint {
+  position: absolute;
+  top: 13px;
+  left: 56px;
+  z-index: 5;
+  max-width: min(420px, calc(100% - 126px));
+  min-height: 31px;
+  padding: 8px 10px;
+  border: 1px solid rgba(232, 241, 240, 0.14);
+  border-radius: 999px;
+  background: rgba(7, 16, 18, 0.76);
+  color: var(--dash-text);
+  font-size: 11px;
+  font-weight: 780;
+  backdrop-filter: blur(10px);
+}
+
+.map-fit-button {
+  position: absolute;
+  top: 13px;
+  right: 12px;
+  z-index: 5;
+  min-height: 31px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: rgba(7, 16, 18, 0.78);
+  color: var(--dash-text);
+  font-size: 11px;
+  font-weight: 820;
+  backdrop-filter: blur(10px);
+}
+
+.local-map-readout {
+  position: absolute;
+  right: 12px;
+  bottom: 76px;
+  z-index: 5;
+  padding: 6px 8px;
+  border: 1px solid rgba(232, 241, 240, 0.12);
+  border-radius: 999px;
+  background: rgba(7, 16, 18, 0.72);
+  color: var(--dash-muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.local-map-popup {
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  gap: 3px;
+  width: min(260px, 42%);
+  min-width: 190px;
+  padding: 10px 11px;
+  border: 1px solid rgba(232, 241, 240, 0.2);
+  border-radius: 8px;
+  background: rgba(7, 16, 18, 0.9);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+  color: var(--dash-text);
+  pointer-events: none;
+  transform: translate(14px, -50%);
+  backdrop-filter: blur(12px);
+  transition: opacity 120ms ease;
+}
+
+.local-map-popup.map-moving {
+  opacity: 0;
+}
+
+.local-map-popup[hidden] {
+  display: none;
+}
+
+.local-map-popup span {
+  color: var(--dash-muted);
+  font-size: 10px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.local-map-popup strong {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-map-popup small {
+  color: var(--dash-amber);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.local-map-controls {
+  position: absolute;
+  top: 13px;
+  left: 12px;
+  z-index: 7;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid rgba(232, 241, 240, 0.16);
+  border-radius: 8px;
+  background: rgba(7, 16, 18, 0.78);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(10px);
+}
+
+.local-map-controls button {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  min-width: 31px;
+  height: 31px;
+  min-height: 31px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dash-text);
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.local-map-controls button + button {
+  border-top: 1px solid rgba(232, 241, 240, 0.14);
+}
+
+.local-map-controls button:hover,
+.local-map-controls button:focus-visible {
+  background: rgba(105, 215, 228, 0.12);
+  transform: none;
 }
 
 .bottom-console {
@@ -754,14 +1075,24 @@ textarea:focus {
   font-weight: 720;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1500px) {
   .workspace {
-    grid-template-columns: 280px minmax(480px, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
+  .map-stage {
+    order: -1;
+    min-height: 0;
+  }
+
+  .left-rail,
   .right-rail {
     grid-column: 1 / -1;
     max-height: none;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .right-rail {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
@@ -775,6 +1106,11 @@ textarea:focus {
 
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .map-stage {
+    order: -1;
+    min-height: 0;
   }
 
   .left-rail,
@@ -797,8 +1133,26 @@ textarea:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .map-frame,
+  .street-map-canvas-shell,
+  .asset-canvas,
   .asset-map {
-    min-height: 420px;
+    min-height: 480px;
+  }
+
+  .street-map-placement-hint {
+    right: 64px;
+    left: 56px;
+    max-width: none;
+  }
+
+  .local-map-readout {
+    right: 10px;
+    bottom: 92px;
+  }
+
+  .local-legend-list {
+    max-height: 84px;
+    overflow: hidden;
   }
 }
-

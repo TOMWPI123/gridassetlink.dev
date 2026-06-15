@@ -61,7 +61,7 @@ GIS_LAYER_MANIFEST: list[dict[str, Any]] = [
         "color": "#6ee7f5",
         "geometry": "line",
         "render_limit": 650,
-        "default_visible": True,
+        "default_visible": False,
         "notice": "Fictional OPGW planning assumptions.",
     },
     {
@@ -72,7 +72,7 @@ GIS_LAYER_MANIFEST: list[dict[str, Any]] = [
         "color": "#f7c96b",
         "geometry": "point",
         "render_limit": 900,
-        "default_visible": False,
+        "default_visible": True,
         "notice": "Fictional synthetic/demo distribution pole sample.",
     },
     {
@@ -138,7 +138,7 @@ GIS_LAYER_MANIFEST: list[dict[str, Any]] = [
         "color": "#57c7ff",
         "geometry": "point",
         "render_limit": 250,
-        "default_visible": True,
+        "default_visible": False,
         "notice": "Fictional dashboard telecom node layer.",
     },
     {
@@ -149,7 +149,7 @@ GIS_LAYER_MANIFEST: list[dict[str, Any]] = [
         "color": "#44d07b",
         "geometry": "line",
         "render_limit": 250,
-        "default_visible": True,
+        "default_visible": False,
         "notice": "Fictional dashboard fiber route layer.",
     },
     {
@@ -160,7 +160,7 @@ GIS_LAYER_MANIFEST: list[dict[str, Any]] = [
         "color": "#ff7d7d",
         "geometry": "line",
         "render_limit": 250,
-        "default_visible": True,
+        "default_visible": False,
         "notice": "Fictional dashboard telecom circuit layer.",
     },
     {
@@ -171,7 +171,7 @@ GIS_LAYER_MANIFEST: list[dict[str, Any]] = [
         "color": "#ffffff",
         "geometry": "point",
         "render_limit": 250,
-        "default_visible": True,
+        "default_visible": False,
         "notice": "Fictional dashboard work order layer.",
     },
     {
@@ -182,7 +182,7 @@ GIS_LAYER_MANIFEST: list[dict[str, Any]] = [
         "color": "#f7c96b",
         "geometry": "line",
         "render_limit": 250,
-        "default_visible": True,
+        "default_visible": False,
         "notice": "Fictional proposed change layer.",
     },
 ]
@@ -266,4 +266,3 @@ def _sample_features(features: list[dict[str, Any]], limit: int) -> list[dict[st
         return features
     step = len(features) / limit
     return [features[min(int(index * step), len(features) - 1)] for index in range(limit)]
-
